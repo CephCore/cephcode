@@ -1,8 +1,8 @@
 <div align="center">
 
-# ⚖️ Claude Code By Dek1MillionToken — Legal Notice Required
+# Claude Code By Dek1MillionToken — Legal Notice Required
 
-**⚠️ READ LEGAL DISCLAIMER BEFORE USING ⚠️**
+**READ LEGAL DISCLAIMER BEFORE USING**
 
 Before using this software, you **MUST** read and accept:
 - **[NOTICE.md](NOTICE.md)** — Quick legal summary (required reading)
@@ -148,7 +148,7 @@ Claude Code provides 100+ slash commands. Type `/` in the prompt to explore.
 | `/config` | Open settings editor |
 | `/theme` | Change color theme |
 | `/color` | Change accent color |
-| `/effort` | Adjust thinking effort (low → max) |
+| `/effort` | Adjust thinking effort (low -> max) |
 | `/buddy` | Configure AI companion (Buddy) |
 | `/status` | Show system status |
 | `/doctor` | Run diagnostics & auto-fix |
@@ -206,7 +206,7 @@ KAIROS=1 BRIDGE_MODE=1 ULTRAPLAN=1 VOICE_MODE=1 bun run src/main.tsx session
 
 ### Settings Hierarchy
 
-Settings are loaded from multiple sources (lowest → highest precedence):
+Settings are loaded from multiple sources (lowest -> highest precedence):
 
 1. Built-in defaults
 2. Environment variables (`CLAUDE_CODE_*`)
@@ -312,7 +312,7 @@ my-plugin/
 ## Security
 
 - **Sandboxed execution** — Bash/PowerShell commands run in platform-specific sandboxes (Linux: PID namespace + seccomp-bpf, macOS: Seatbelt, Windows: Job objects)
-- **Multi-layer permissions** — Policy → Project → User → Environment → Code
+- **Multi-layer permissions** — Policy -> Project -> User -> Environment -> Code
 - **Encrypted credentials** — API keys stored in system keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
 - **Audit trail** — All actions logged in session transcript
 - **No secret logging** — API keys are redacted from all logs
@@ -330,7 +330,7 @@ ClaudeCode/
 │   ├── cli/                        # App.tsx, transports, handlers
 │   ├── commands/                   # 100+ slash commands
 │   │   ├── model/                  # /model
-│   │   ├── provider-select/        # /provider
+│   │   ├── provider-select-        # /provider
 │   │   ├── buddy/                  # /buddy
 │   │   ├── config/                 # /config
 │   │   ├── mcp/                    # /mcp
@@ -381,7 +381,7 @@ ClaudeCode/
 
 ```bash
 bun install              # Install dependencies
-bun run build            # Production build → dist/
+bun run build            # Production build -> dist/
 bun run dev              # Dev mode with --watch
 bun test                 # Run tests
 bun x tsc --noEmit       # Type check
@@ -492,7 +492,7 @@ Scopes: `provider`, `command`, `tool`, `ui`, `permissions`, `mcp`, `plugin`, `br
 
 ## Legal & Compliance
 
-**⚠️ CRITICAL LEGAL NOTICE**
+**CRITICAL LEGAL NOTICE**
 
 This project operates under extraordinary legal circumstances:
 
@@ -510,11 +510,11 @@ This project operates under extraordinary legal circumstances:
 
 ### Key Takeaways
 
-- ❌ **Not affiliated with Anthropic** — Independent project
-- ⚠️ **No commercial use recommended** — High legal risk
-- 🔴 **May shut down suddenly** — If Anthropic enforces copyrights
-- 📋 **You are liable** — Not the maintainers
-- ⚖️ **Good faith defense** — Based on Anthropic's self-distribution error
+- **Not affiliated with Anthropic** — Independent project
+- **No commercial use recommended** — High legal risk
+- **May shut down suddenly** — If Anthropic enforces copyrights
+- **You are liable** — Not the maintainers
+- **Good faith defense** — Based on Anthropic's self-distribution error
 
 ---
 
