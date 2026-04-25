@@ -91,9 +91,7 @@ bun run src/main.tsx session --provider ollama --model llama3
 ### Video
 Preview (inline):
 
-<video src="assets/claude.mp4" controls width="720">
-	Your browser does not support the <code>video</code> element. Download the demo at the link above.
-</video>
+https://github.com/user-attachments/assets/f7d84050-a61c-4b20-a988-edaa93a4deb8
 
 
 ### Set API Keys
