@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.1.123
+
+### New Features
+
+- **Multi-provider system** with dynamic model fetching from Anthropic, OpenAI, Google, and xAI APIs
+- New **yolo modes** for permission management:
+  - `/yolo` - Full unrestricted access
+  - `/yolo-lite` - Moderate permissions
+  - `/yolo-max` - Maximum restrictions
+- New **commands**:
+  - `/enable-computer` - Enable/disable computer use
+  - `/path` - Set project paths
+  - `/skill` - Manage skills
+  - `/start-searxng` - Start SearXNG instance
+- New **tools**:
+  - `ComputerUseTool` - Computer and browser control
+  - `JsonPathTool` - JSON path queries
+  - `ResearchTool` - Web research with source ranking
+  - `SearXNGTool` - Private search via SearXNG
+
+### Developer
+
+- Updated `.gitignore` with additional patterns
+- Added documentation for local SearXNG setup
+
+---
+
 ## 2.1.122 (Unreleased)
 
 ### Legal & Compliance
