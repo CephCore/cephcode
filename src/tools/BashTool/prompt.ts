@@ -361,6 +361,11 @@ export function getSimplePrompt(): string {
     ...prependBullets(toolPreferenceItems),
     `While the ${BASH_TOOL_NAME} tool can do similar things, it’s better to use the built-in tools as they provide a better user experience and make it easier to review tool calls and give permission.`,
     '',
+    ...(process.env.ENABLE_COMPUTER_USE === '1' ? [
+      '# GUI Applications',
+      'IMPORTANT: The Bash tool CANNOT open graphical user interface (GUI) applications like Notepad, Calculator, etc. on the desktop. If you need to open or interact with GUI applications, you MUST use the "computer" tool.',
+      ''
+    ] : []),
     '# Instructions',
     ...prependBullets(instructionItems),
     getSimpleSandboxSection(),

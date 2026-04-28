@@ -7,6 +7,7 @@ export const CONTEXT_1M_BETA_HEADER = 'context-1m-2025-08-07'
 export const CONTEXT_MANAGEMENT_BETA_HEADER = 'context-management-2025-06-27'
 export const STRUCTURED_OUTPUTS_BETA_HEADER = 'structured-outputs-2025-12-15'
 export const WEB_SEARCH_BETA_HEADER = 'web-search-2025-03-05'
+export const COMPUTER_USE_BETA_HEADER = 'computer-2024-10-22'
 // Tool search beta headers differ by provider:
 // - Claude API / Foundry: advanced-tool-use-2025-11-20
 // - Vertex AI / Bedrock: tool-search-tool-2025-10-19
@@ -39,6 +40,7 @@ export const BEDROCK_EXTRA_PARAMS_HEADERS = new Set([
   INTERLEAVED_THINKING_BETA_HEADER,
   CONTEXT_1M_BETA_HEADER,
   TOOL_SEARCH_BETA_HEADER_3P,
+  COMPUTER_USE_BETA_HEADER,
 ])
 
 /**

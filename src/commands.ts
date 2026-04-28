@@ -45,6 +45,7 @@ import status from './commands/status/index.js'
 import tasks from './commands/tasks/index.js'
 import teleport from './commands/teleport/index.js'
 import providerSelect from './commands/provider-select/index.js'
+import enableComputer from './commands/enable-computer/index.js'
 /* eslint-disable @typescript-eslint/no-require-imports */
 const agentsPlatform =
   process.env.USER_TYPE === 'ant'
@@ -124,6 +125,7 @@ import sandboxToggle from './commands/sandbox-toggle/index.js'
 import chrome from './commands/chrome/index.js'
 import stickers from './commands/stickers/index.js'
 import advisor from './commands/advisor.js'
+import startSearxng from './commands/start-searxng/index.js'
 import { logError } from './utils/log.js'
 import { toError } from './utils/errors.js'
 import { logForDebugging } from './utils/debug.js'
@@ -149,6 +151,8 @@ import exportCommand from './commands/export/index.js'
 import model from './commands/model/index.js'
 import tag from './commands/tag/index.js'
 import outputStyle from './commands/output-style/index.js'
+import setpath from './commands/path/index.js'
+import skill from './commands/skill/index.js'
 import remoteEnv from './commands/remote-env/index.js'
 import upgrade from './commands/upgrade/index.js'
 import {
@@ -248,6 +252,7 @@ const COMMANDS = memoize((): Command[] => [
   diff,
   doctor,
   effort,
+  enableComputer,
   exit,
   fast,
   files,
@@ -263,6 +268,8 @@ const COMMANDS = memoize((): Command[] => [
   mobile,
   model,
   outputStyle,
+  setpath,
+  skill,
   providerSelect,
   remoteEnv,
   plugin,
@@ -276,6 +283,7 @@ const COMMANDS = memoize((): Command[] => [
   stats,
   status,
   statusline,
+  startSearxng,
   stickers,
   tag,
   theme,
@@ -309,6 +317,10 @@ const COMMANDS = memoize((): Command[] => [
   hooks,
   exportCommand,
   sandboxToggle,
+  yolo,
+  yoloLite,
+  yoloMax,
+  yoloGod,
   ...(!isUsing3PServices() ? [logout, login()] : []),
   passes,
   ...(peersCmd ? [peersCmd] : []),

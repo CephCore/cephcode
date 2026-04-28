@@ -88,6 +88,7 @@
     "minimatch": "^10.2.5",
     "modifiers-napi": "^0.0.1",
     "node-fetch": "^3.3.2",
+    "node-pty": "0.10.1",
     "open": "^11.0.0",
     "openai": "^4.104.0",
     "p-map": "^7.0.4",

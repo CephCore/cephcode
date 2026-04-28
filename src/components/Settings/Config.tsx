@@ -22,6 +22,7 @@ import { ModelPicker } from '../ModelPicker.js';
 import { modelDisplayString, isOpus1mMergeEnabled } from '../../utils/model/model.js';
 import { isBilledAsExtraUsage } from '../../utils/extraUsage.js';
 import { ClaudeMdExternalIncludesDialog } from '../ClaudeMdExternalIncludesDialog.js';
+import { SearchApiKeysDialog } from './SearchApiKeysDialog.js';
 import { ChannelDowngradeDialog, type ChannelDowngradeChoice } from '../ChannelDowngradeDialog.js';
 import { Dialog } from '../design-system/Dialog.js';
 import { Select } from '../CustomSelect/index.js';
@@ -35,7 +36,7 @@ import { useTabHeaderFocus } from '../design-system/Tabs.js';
 import { useIsInsideModal } from '../../context/modalContext.js';
 import { SearchBox } from '../SearchBox.js';
 import { isSupportedTerminal, hasAccessToIDEExtensionDiffFeature } from '../../utils/ide.js';
-import { getInitialSettings, getSettingsForSource, updateSettingsForSource } from '../../utils/settings/settings.js';
+import { getInitialSettings, getSettingsForSource, updateSettingsForSource, getSettings_DEPRECATED } from '../../utils/settings/settings.js';
 import { getUserMsgOptIn, setUserMsgOptIn } from '../../bootstrap/state.js';
 import { DEFAULT_OUTPUT_STYLE_NAME } from 'src/constants/outputStyles.js';
 import { isEnvTruthy, isRunningOnHomespace } from 'src/utils/envUtils.js';
@@ -81,7 +82,7 @@ type Setting = (SettingBase & {
   onChange(value: string): void;
   type: 'managedEnum';
 });
-type SubMenu = 'Theme' | 'Model' | 'TeammateModel' | 'ExternalIncludes' | 'OutputStyle' | 'ChannelDowngrade' | 'Language' | 'EnableAutoUpdates';
+type SubMenu = 'Theme' | 'Model' | 'TeammateModel' | 'ExternalIncludes' | 'OutputStyle' | 'ChannelDowngrade' | 'Language' | 'EnableAutoUpdates' | 'SearchApiKeys';
 export function Config({
   onClose,
   context,
@@ -973,7 +974,21 @@ export function Config({
         };
       });
     }
-  }] : []), ...(shouldShowExternalIncludesToggle ? [{
+  }] : []), {
+    id: 'searchApiKeys',
+    label: 'Search API Keys (Tavily/Brave)',
+    value: (() => {
+      const settings = getSettings_DEPRECATED();
+      const hasTavily = !!settings?.env?.TAVILY_API_KEY;
+      const hasBrave = !!settings?.env?.BRAVE_API_KEY;
+      if (hasTavily && hasBrave) return 'Both configured';
+      if (hasTavily) return 'Tavily only';
+      if (hasBrave) return 'Brave only';
+      return 'Not configured';
+    })(),
+    type: 'managedEnum' as const,
+    onChange() {}
+  }, ...(shouldShowExternalIncludesToggle ? [{
     id: 'showExternalIncludesDialog',
     label: 'External CLAUDE.md includes',
     value: (() => {
@@ -1297,7 +1312,7 @@ export function Config({
       }
       return;
     }
-    if (setting_0.id === 'theme' || setting_0.id === 'model' || setting_0.id === 'teammateDefaultModel' || setting_0.id === 'showExternalIncludesDialog' || setting_0.id === 'outputStyle' || setting_0.id === 'language') {
+    if (setting_0.id === 'theme' || setting_0.id === 'model' || setting_0.id === 'teammateDefaultModel' || setting_0.id === 'showExternalIncludesDialog' || setting_0.id === 'outputStyle' || setting_0.id === 'language' || setting_0.id === 'searchApiKeys') {
       // managedEnum items open a submenu — isDirty is set by the submenu's
       // completion callback, not here (submenu may be cancelled).
       switch (setting_0.id) {
@@ -1323,6 +1338,10 @@ export function Config({
           return;
         case 'language':
           setShowSubmenu('Language');
+          setTabsHidden(true);
+          return;
+        case 'searchApiKeys':
+          setShowSubmenu('SearchApiKeys');
           setTabsHidden(true);
           return;
       }
@@ -1578,6 +1597,18 @@ export function Config({
             <Byline>
               <KeyboardShortcutHint shortcut="Enter" action="confirm" />
               <ConfigurableShortcutHint action="confirm:no" context="Settings" fallback="Esc" description="cancel" />
+            </Byline>
+          </Text>
+        </> : showSubmenu === 'SearchApiKeys' ? <>
+          <SearchApiKeysDialog onDone={() => {
+        isDirty.current = true;
+        setShowSubmenu(null);
+        setTabsHidden(false);
+      }} />
+          <Text dimColor>
+            <Byline>
+              <KeyboardShortcutHint shortcut="Enter" action="save" />
+              <ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="cancel" />
             </Byline>
           </Text>
         </> : showSubmenu === 'EnableAutoUpdates' ? <Dialog title="Enable Auto-Updates" onCancel={() => {

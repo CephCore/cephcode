@@ -1,46 +1,42 @@
 <div align="center">
 
-# Claude Code By Dek1MillionToken — Legal Notice Required
+# Claude Code By Dek1MillionToken: Agentic AI Research Framework
 
-**READ LEGAL DISCLAIMER BEFORE USING**
+> **An Experimental Study on Multi-Provider Agentic Architectures**
 
-</div>
-
-Before using this software, you **MUST** read and accept:  
-- **[NOTICE.md](NOTICE.md)** — Quick legal summary (required reading)  
-- **[LEGAL.md](LEGAL.md)** — Full legal disclaimer and liability terms  
-
-This project contains code from Anthropic's **accidental March 31, 2026 npm source disclosure** and operates in a legal gray area. By using this software, you assume all risk of copyright claims and agree to indemnify the maintainers.
-
----
-
-
-
-# Claude Code By Dek1MillionToken
-
-**AI-Powered Coding Assistant with Multi-Provider Support**
-
-[![Version](https://img.shields.io/badge/version-2.1.121-blue.svg)](https://github.com/JunusNattapong/ClaudeCode/releases)
-[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE.md)
+[![Research Status](https://img.shields.io/badge/Status-Research--Only-blueviolet)](RESEARCH_MISSION.md)
+[![Educational Content](https://img.shields.io/badge/License-Educational--Use-green)](LEGAL.md)
 [![Bun](https://img.shields.io/badge/runtime-Bun%20%7C%20Node.js-ffdf00.svg)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6.svg)](https://www.typescriptlang.org/)
 
-*A terminal-based AI coding assistant that unifies 12+ AI providers into one seamless workflow.*
+</div>
 
-[Getting Started](#getting-started) · [Providers](#supported-providers) · [Commands](#commands) · [Configuration](#configuration) · [Documentation](#documentation)
+Before using this research framework, you **MUST** read:
 
-
-
+- **[RESEARCH_MISSION.md](RESEARCH_MISSION.md)** — Our academic goals and methodology
+- **[NOTICE.md](NOTICE.md)** — The Unfiltered Truth about source liberation
+- **[LEGAL.md](LEGAL.md)** — The Code Manifesto and user sovereignty
 
 ---
 
+## 🧪 Research & Education Mission
+
+This project is an **academic fork** of the proprietary Claude Code CLI, serving as a case study for the **[RESEARCH_MISSION.md](RESEARCH_MISSION.md)**. We are exploring the boundaries of how different LLMs (Large Language Models) can be orchestrated to perform complex software engineering tasks.
+
+### Key Research Areas
+
+- **Provider Interoperability**: How models like GPT-4o, Gemini 1.5 Pro, and Groq Llama-3 handle tool-use calls designed for Claude.
+- **Architectural Analysis**: A deep-dive into high-performance TUI and Agentic logic.
+- **Fair Use Study**: Exploring the legal and technical implications of accidentally disclosed source code in the modern AI era.
+
 ## What is Claude Code By Dek1MillionToken?
 
-Claude Code By Dek1MillionToken is a fork of Anthropic's Claude Code CLI that adds **unified multi-provider routing**, **provider-specific adapters**, and an **extensible plugin architecture**. Switch between Anthropic Claude, OpenAI GPT, Google Gemini, OpenRouter, local Ollama, and more — all from one terminal interface.
+Claude Code By Dek1MillionToken is a research-focused evolution of the Claude Code CLI that adds **unified multi-provider routing**, **provider-specific adapters**, and an **extensible plugin architecture**.
+ Switch between Anthropic Claude, OpenAI GPT, Google Gemini, OpenRouter, local Ollama, and more — all from one terminal interface.
 
 > **Legal Notice**: Please review the [Legal Disclaimer & Attribution](LEGAL.md) for important information about third-party components, licensing, and liability limitations before using this software.
 
-### Why Dek1MillionToken?
+### Why Claude Code By Dek1MillionToken?
 
 - **One CLI, every provider** — No more switching tools for different AI models
 - **Provider-native adapters** — Each provider gets optimized handling, not just OpenAI-compatible wrappers
@@ -567,7 +563,9 @@ This project operates under extraordinary legal circumstances:
 
 Copyright © Anthropic PBC. All rights reserved. See [LICENSE.md](LICENSE.md) for details.
 
-**Important Legal Information:** This project is a fork of Anthropic's Claude Code. By using this software, you accept the [Legal Disclaimer & Attribution](LEGAL.md) which covers third-party components, licensing, warranties, and liability limitations.
+### Final Note on Freedom
+
+This project is a fork of Anthropic's Claude Code. By using this software, you accept the [Legal Disclaimer & Attribution](LEGAL.md) which covers third-party components, licensing, warranties, and liability limitations.
 
 ---
 

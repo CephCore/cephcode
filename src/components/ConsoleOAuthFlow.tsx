@@ -14,8 +14,9 @@ import { getOauthAccountInfo, validateForceLoginOrg } from '../utils/auth.js';
 import { writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { openBrowser } from '../utils/browser.js';
+import { PROVIDER_CONFIG_PATH } from '../services/ai/ProviderManager.js';
 
-const PROVIDER_CONFIG_PATH = join(process.env.HOME || process.env.USERPROFILE || '', '.claude-code-provider.json');
+// Using centralized PROVIDER_CONFIG_PATH from ProviderManager.js
 import { logError } from '../utils/log.js';
 import { getSettings_DEPRECATED } from '../utils/settings/settings.js';
 import { Select } from './CustomSelect/select.js';

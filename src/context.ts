@@ -138,8 +138,13 @@ export const getSystemContext = memoize(
       has_injection: injection !== null,
     })
 
+    const computerUseHint = process.env.ENABLE_COMPUTER_USE === '1'
+      ? 'You have the capability to control the computer desktop GUI using the "computer" tool. Use it to open applications (like Notepad), click buttons, type text, and take screenshots. Prefer this tool for any task involving desktop windows or mouse/keyboard interaction.'
+      : null
+
     return {
       ...(gitStatus && { gitStatus }),
+      ...(computerUseHint && { computerUseHint }),
       ...(feature('BREAK_CACHE_COMMAND') && injection
         ? {
             cacheBreaker: `[CACHE_BREAKER: ${injection}]`,

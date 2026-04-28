@@ -1,4 +1,6 @@
 // Anthropic SDK types replaced with common types
+import type Anthropic from '@anthropic-ai/sdk'
+import type { BetaTool, BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
 import type { ToolUseBlock, ToolResultBlockParam } from '../types/common.js'
 import { createHash } from 'crypto'
 import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from 'src/constants/prompts.js'
@@ -61,6 +63,8 @@ import type { SystemPrompt } from './systemPromptType.js'
 import { getToolSchemaCache } from './toolSchemaCache.js'
 import { windowsPathToPosixPath } from './windowsPaths.js'
 import { zodToJsonSchema } from './zodToJsonSchema.js'
+import { getScreenDimensions } from '../tools/ComputerUseTool/screenshot.js'
+import { buildDisplayConfig } from '../tools/ComputerUseTool/scaling.js'
 
 // Extended BetaTool type with strict mode and defer_loading support
 type BetaToolWithExtras = BetaTool & {
@@ -145,6 +149,24 @@ export async function toolToAPISchema(
     'inputJSONSchema' in tool && tool.inputJSONSchema
       ? `${tool.name}:${jsonStringify(tool.inputJSONSchema)}`
       : tool.name
+
+  if (
+    tool.name === 'computer' &&
+    (getAPIProvider() === 'firstParty' || getAPIProvider() === 'bedrock' || getAPIProvider() === 'vertex')
+  ) {
+    const screen = await getScreenDimensions()
+    const config = buildDisplayConfig(screen.width, screen.height)
+    
+    // Return official Anthropic computer tool spec
+    return {
+      type: 'computer_20251124' as any,
+      name: 'computer',
+      display_width_px: config.apiWidth,
+      display_height_px: config.apiHeight,
+      display_number: 1,
+    } as any
+  }
+
   const cache = getToolSchemaCache()
   let base = cache.get(cacheKey)
   if (!base) {

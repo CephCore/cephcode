@@ -1,10 +1,9 @@
 import type { Command } from '../../commands.js'
 
 const yoloLite = {
-  type: 'local',
+  type: 'local-jsx',
   name: 'yolo-lite',
   description: 'Enable YOLO Lite mode (auto-allow with safety checks)',
-  supportsNonInteractive: true,
   load: () => import('./yolo-lite.js'),
 } satisfies Command
 

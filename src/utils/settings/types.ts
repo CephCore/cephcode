@@ -37,6 +37,44 @@ export const EnvironmentVariablesSchema = lazySchema(() =>
 )
 
 /**
+ * Schema for YOLO Guardian safety rules
+ */
+export const YoloGuardianSchema = lazySchema(() =>
+  z
+    .object({
+      enabled: z
+        .boolean()
+        .optional()
+        .describe('Enable YOLO Guardian safety checks'),
+      customBashPatterns: z
+        .array(z.string())
+        .optional()
+        .describe('Custom dangerous bash command patterns (regex)'),
+      customPowerShellPatterns: z
+        .array(z.string())
+        .optional()
+        .describe('Custom dangerous PowerShell command patterns (regex)'),
+      customFilePatterns: z
+        .array(z.string())
+        .optional()
+        .describe('Custom sensitive file patterns (regex)'),
+      requireConfirmation: z
+        .boolean()
+        .optional()
+        .describe('Require confirmation for all dangerous operations'),
+      autoBackup: z
+        .boolean()
+        .optional()
+        .describe('Auto-backup sensitive files before editing'),
+      customDenyMessages: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Custom deny messages for specific patterns (pattern -> message)'),
+    })
+    .passthrough(),
+)
+
+/**
  * Schema for permissions section
  */
 export const PermissionsSchema = lazySchema(() =>
@@ -80,6 +118,9 @@ export const PermissionsSchema = lazySchema(() =>
         .array(z.string())
         .optional()
         .describe('Additional directories to include in the permission scope'),
+      yoloGuardian: YoloGuardianSchema()
+        .optional()
+        .describe('YOLO Guardian safety settings'),
     })
     .passthrough(),
 )

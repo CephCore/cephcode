@@ -20,6 +20,7 @@ import {
   TOOL_SEARCH_BETA_HEADER_1P,
   TOOL_SEARCH_BETA_HEADER_3P,
   WEB_SEARCH_BETA_HEADER,
+  COMPUTER_USE_BETA_HEADER,
 } from '../constants/betas.js'
 import { OAUTH_BETA_HEADER } from '../constants/oauth.js'
 import { isClaudeAISubscriber } from './auth.js'
@@ -253,6 +254,13 @@ export const getAllModelBetas = memoize((model: string): string[] => {
   }
   if (has1mContext(model)) {
     betaHeaders.push(CONTEXT_1M_BETA_HEADER)
+  }
+  if (
+    process.env.ENABLE_COMPUTER_USE === '1' &&
+    process.platform === 'win32' &&
+    COMPUTER_USE_BETA_HEADER
+  ) {
+    betaHeaders.push(COMPUTER_USE_BETA_HEADER)
   }
   if (
     !isEnvTruthy(process.env.DISABLE_INTERLEAVED_THINKING) &&

@@ -1,0 +1,227 @@
+import React, { useState, useCallback } from 'react'
+import { Box, Text, useInput } from '../../ink.js'
+import { Dialog } from '../design-system/Dialog.js'
+import { getSettings_DEPRECATED, updateSettingsForSource } from '../../utils/settings/settings.js'
+import { logEvent, type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../../services/analytics/index.js'
+
+type Props = {
+  onDone(): void
+}
+
+export function SearchApiKeysDialog({ onDone }: Props): React.ReactNode {
+  const settings = getSettings_DEPRECATED() || {}
+  const env = settings.env || {}
+
+  const [searxngUrl, setSearxngUrl] = useState(env.SEARXNG_URL || '')
+  const [tavilyKey, setTavilyKey] = useState(env.TAVILY_API_KEY || '')
+  const [braveKey, setBraveKey] = useState(env.BRAVE_API_KEY || '')
+  const [focusedField, setFocusedField] = useState<'searxng' | 'tavily' | 'brave' | 'buttons'>('searxng')
+  const [showTavily, setShowTavily] = useState(false)
+  const [showBrave, setShowBrave] = useState(false)
+
+  const handleSave = useCallback(() => {
+    // Update settings with new API keys and URLs
+    const newEnv = {
+      ...env,
+      ...(searxngUrl.trim() && { SEARXNG_URL: searxngUrl.trim() }),
+      ...(tavilyKey.trim() && { TAVILY_API_KEY: tavilyKey.trim() }),
+      ...(braveKey.trim() && { BRAVE_API_KEY: braveKey.trim() }),
+    }
+
+    // Remove keys if empty
+    if (!searxngUrl.trim()) {
+      delete newEnv.SEARXNG_URL
+    }
+    if (!tavilyKey.trim()) {
+      delete newEnv.TAVILY_API_KEY
+    }
+    if (!braveKey.trim()) {
+      delete newEnv.BRAVE_API_KEY
+    }
+
+    updateSettingsForSource('userSettings', {
+      env: newEnv,
+    })
+
+    logEvent('tengu_search_api_keys_updated', {
+      hasSearXNG: String(!!searxngUrl.trim()) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      hasTavily: String(!!tavilyKey.trim()) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      hasBrave: String(!!braveKey.trim()) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    })
+
+    onDone()
+  }, [searxngUrl, tavilyKey, braveKey, env, onDone])
+
+  const handleCancel = useCallback(() => {
+    logEvent('tengu_search_api_keys_cancelled', {})
+    onDone()
+  }, [onDone])
+
+  useInput((input, key) => {
+    if (key.tab) {
+      // Cycle through fields
+      if (focusedField === 'searxng') {
+        setFocusedField('tavily')
+      } else if (focusedField === 'tavily') {
+        setFocusedField('brave')
+      } else if (focusedField === 'brave') {
+        setFocusedField('buttons')
+      } else {
+        setFocusedField('searxng')
+      }
+      return
+    }
+
+    if (key.return && focusedField === 'buttons') {
+      handleSave()
+      return
+    }
+
+    if (key.escape) {
+      handleCancel()
+      return
+    }
+
+    // Handle character input for text fields
+    if (focusedField === 'searxng' || focusedField === 'tavily' || focusedField === 'brave') {
+      let setter: (value: string) => void
+      let current: string
+
+      if (focusedField === 'searxng') {
+        setter = setSearxngUrl
+        current = searxngUrl
+      } else if (focusedField === 'tavily') {
+        setter = setTavilyKey
+        current = tavilyKey
+      } else {
+        setter = setBraveKey
+        current = braveKey
+      }
+
+      if (key.backspace || key.delete) {
+        setter(current.slice(0, -1))
+      } else if (input && !key.ctrl && !key.meta) {
+        setter(current + input)
+      }
+    }
+  })
+
+  const maskKey = (key: string, show: boolean): string => {
+    if (!key) return '(not set)'
+    if (show) return key
+    return '*'.repeat(Math.min(key.length, 20))
+  }
+
+  return (
+    <Dialog title="Search Configuration" onEscape={handleCancel}>
+      <Box flexDirection="column" gap={1} paddingX={1}>
+        <Text dimColor>
+          Configure search providers for inResearch. Priority: SearXNG (free) →
+          DuckDuckGo (free) → Tavily → Brave (API keys optional).
+        </Text>
+
+        <Box flexDirection="column" marginY={1}>
+          {/* SearXNG URL */}
+          <Box flexDirection="column" marginBottom={1}>
+            <Text
+              bold={focusedField === 'searxng'}
+              color={focusedField === 'searxng' ? 'suggestion' : undefined}
+            >
+              {focusedField === 'searxng' ? '> ' : '  '}SearXNG Base URL (optional)
+              {searxngUrl && ' (set)'}
+            </Text>
+            <Box marginLeft={2}>
+              <Text dimColor={!searxngUrl}>
+                {searxngUrl || 'http://localhost:8888'}
+              </Text>
+            </Box>
+            {focusedField === 'searxng' && (
+              <Text dimColor marginLeft={2}>
+                Enter SearXNG URL (e.g., http://localhost:8888) • Tab to move
+              </Text>
+            )}
+          </Box>
+
+          {/* Tavily API Key */}
+          <Box flexDirection="column" marginBottom={1}>
+            <Text
+              bold={focusedField === 'tavily'}
+              color={focusedField === 'tavily' ? 'suggestion' : undefined}
+            >
+              {focusedField === 'tavily' ? '> ' : '  '}Tavily API Key (optional)
+              {tavilyKey && ' (set)'}
+            </Text>
+            <Box marginLeft={2}>
+              <Text dimColor={!tavilyKey}>
+                {maskKey(tavilyKey, showTavily)}
+              </Text>
+              {tavilyKey && (
+                <Text
+                  dimColor
+                  onPress={() => setShowTavily(!showTavily)}
+                >
+                  {' '}
+                  [{showTavily ? 'hide' : 'show'}]
+                </Text>
+              )}
+            </Box>
+            {focusedField === 'tavily' && (
+              <Text dimColor marginLeft={2}>
+                Type to enter key • Backspace to delete • Tab to move
+              </Text>
+            )}
+          </Box>
+
+          {/* Brave API Key */}
+          <Box flexDirection="column">
+            <Text
+              bold={focusedField === 'brave'}
+              color={focusedField === 'brave' ? 'suggestion' : undefined}
+            >
+              {focusedField === 'brave' ? '> ' : '  '}Brave API Key (optional)
+              {braveKey && ' (set)'}
+            </Text>
+            <Box marginLeft={2}>
+              <Text dimColor={!braveKey}>
+                {maskKey(braveKey, showBrave)}
+              </Text>
+              {braveKey && (
+                <Text
+                  dimColor
+                  onPress={() => setShowBrave(!showBrave)}
+                >
+                  {' '}
+                  [{showBrave ? 'hide' : 'show'}]
+                </Text>
+              )}
+            </Box>
+            {focusedField === 'brave' && (
+              <Text dimColor marginLeft={2}>
+                Type to enter key • Backspace to delete • Tab to move
+              </Text>
+            )}
+          </Box>
+        </Box>
+
+        <Box flexDirection="row" gap={2} marginTop={1}>
+          <Text
+            bold={focusedField === 'buttons'}
+            color={focusedField === 'buttons' ? 'suggestion' : undefined}
+            backgroundColor={
+              focusedField === 'buttons' ? 'suggestion' : undefined
+            }
+          >
+            {focusedField === 'buttons' ? '> ' : '  '}Save
+          </Text>
+          <Text onPress={handleCancel}>Cancel</Text>
+        </Box>
+
+        <Box marginTop={1}>
+          <Text dimColor>
+            Tab: switch field • Enter: save • Esc: cancel
+          </Text>
+        </Box>
+      </Box>
+    </Dialog>
+  )
+}

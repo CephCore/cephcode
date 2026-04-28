@@ -28,6 +28,7 @@ import { getCurrentSessionTitle } from '../utils/sessionStorage.js';
 import { doesMostRecentAssistantMessageExceed200k, getCurrentUsage } from '../utils/tokens.js';
 import { roughTokenCountEstimationForMessages } from '../services/tokenEstimation.js';
 import { getCurrentWorktreeSession } from '../utils/worktree.js';
+import { fileHistoryGetSessionFileDiffStats } from '../utils/fileHistory.js';
 import { isVimModeEnabled } from './PromptInput/utils.js';
 import { getTotalCost, getTotalDuration } from '../cost-tracker.js';
 import { getBranch } from '../utils/git.js';
@@ -160,6 +161,12 @@ function StatusLineInner({
   // would leak into this session's statusline (anthropics/claude-code#37596).
   const mainLoopModel = useMainLoopModel();
   const [currentBranch, setCurrentBranch] = React.useState<string | null>(null);
+  const fileHistory = useAppState(s => s.fileHistory);
+  const [modifiedFiles, setModifiedFiles] = React.useState<Array<{
+    path: string;
+    added: number;
+    removed: number;
+  }>>([]);
   const mcpCount = useAppState(s => s.mcp.clients.length) as number;
   const thinkingEnabled = useAppState(s => s.thinkingEnabled);
   const [currentTime, setCurrentTime] = React.useState(new Date());
@@ -223,8 +230,14 @@ function StatusLineInner({
         previousStateRef.current.messageId = currentMessageId;
         previousStateRef.current.exceeds200kTokens = exceeds200kTokens;
       }
-      const branch = await getBranch();
+      const [branch, sessionFileDiffs] = await Promise.all([getBranch(), fileHistoryGetSessionFileDiffStats(fileHistory)]);
       setCurrentBranch(branch);
+      const nextModifiedFiles = sessionFileDiffs.map(fileStats => ({
+        path: fileStats.path,
+        added: fileStats.insertions,
+        removed: fileStats.deletions
+      }));
+      setModifiedFiles(nextModifiedFiles.slice(0, 5));
       const statusInput = buildStatusLineCommandInput(permissionModeRef.current, exceeds200kTokens, settingsRef.current, msgs, Array.from(addedDirsRef.current.keys()), mainLoopModelRef.current, vimModeRef.current);
       const text = await executeStatusLineCommand(statusInput, controller.signal, undefined, logResult);
       if (!controller.signal.aborted) {
@@ -239,7 +252,7 @@ function StatusLineInner({
     } catch {
       // Silently ignore errors in status line updates
     }
-  }, [messagesRef, setAppState]);
+  }, [fileHistory, messagesRef, setAppState]);
 
   // Stable debounced schedule function — no deps, uses refs
   const scheduleUpdate = useCallback(() => {
@@ -325,8 +338,10 @@ function StatusLineInner({
   // Get padding from settings or default to 0
   const paddingX = settings?.statusLine?.padding ?? 0;
 
+  const filteredStatusLineText = statusLineText && /mode on \([^)]*cycle\)/i.test(statusLineText) ? undefined : statusLineText;
+
   // Build default statusline if no custom statusline is configured
-  const defaultStatusLine = !statusLineText ? (() => {
+  const defaultStatusLine = !filteredStatusLineText ? (() => {
     const runtimeModel = getRuntimeMainLoopModel({
       permissionMode,
       mainLoopModel,
@@ -356,6 +371,8 @@ function StatusLineInner({
 
     const contextWindowSize = getContextWindowForModel(runtimeModel, getSdkBetas());
     const contextPercentages = calculateContextPercentages(usageForContext, contextWindowSize);
+    const cacheReadTokens = usageForContext.cache_read_input_tokens ?? 0;
+    const cacheWriteTokens = usageForContext.cache_creation_input_tokens ?? 0;
     const cwd = getCwd();
     const projectName = cwd.split(/[/\\]/).pop() || cwd;
 
@@ -365,145 +382,78 @@ function StatusLineInner({
     const cost = getTotalCost();
     const duration = getTotalDuration();
 
-    // Format duration as HH:MM:SS
+// Format duration compact
     const formatDuration = (ms: number): string => {
       const seconds = Math.floor(ms / 1000);
       const minutes = Math.floor(seconds / 60);
       const hours = Math.floor(minutes / 60);
-      if (hours > 0) {
-        return `${hours}h ${minutes % 60}m`;
-      }
-      return `${minutes}m ${seconds % 60}s`;
+      if (hours > 0) return `${hours}h${minutes % 60}m`;
+      if (minutes > 0) return `${minutes}m${seconds % 60}s`;
+      return `${seconds}s`;
     };
 
-    // Format cost
-    const formatCost = (usd: number): string => {
-      if (usd < 0.01) return `<$0.01`;
-      return `$${usd.toFixed(2)}`;
-    };
+    // Format cost compact
+    const formatCost = (usd: number): string => usd < 0.01 ? '<$0.01' : `$${usd.toFixed(2)}`;
 
-    // Progress bar width (20 chars)
-    const progressBarWidth = 20;
     const usedPercentage = contextPercentages.used ?? 0;
-    const filledWidth = Math.floor((usedPercentage / 100) * progressBarWidth);
-    const emptyWidth = progressBarWidth - filledWidth;
-    const progressBar = '█'.repeat(filledWidth) + '░'.repeat(emptyWidth);
-
-    // Dynamic color based on usage
-    const getProgressColor = (pct: number) => {
-      if (pct < 50) return chalk.green;
-      if (pct < 80) return chalk.yellow;
-      return chalk.red;
-    };
-    const color = getProgressColor(usedPercentage);
-
-    const renderModeIndicator = () => {
-      switch (permissionMode) {
-        case 'bypassPermissions':
-        case 'dontAsk':
-          return <Ansi>{chalk.bgWhite.black.bold(' YOLO ')}</Ansi>;
-        case 'ask':
-          return <Ansi>{chalk.bgWhite.black.bold(' ASK ')}</Ansi>;
-        case 'yoloLite':
-          return <Ansi>{chalk.bgWhite.black.bold(' LITE ')}</Ansi>;
-        case 'yolo':
-          return <Ansi>{chalk.bgWhite.black.bold(' YOLO ')}</Ansi>;
-        case 'yoloMax':
-          return <Ansi>{chalk.bgWhite.black.bold(' MAX ')}</Ansi>;
-        case 'yoloGod':
-          return <Ansi>{chalk.bgWhite.black.bold(' GOD ')}</Ansi>;
-        case 'acceptEdits':
-          return <Ansi>{chalk.bgWhite.black.bold(' ACCEPT ')}</Ansi>;
-        case 'plan':
-          return <Ansi>{chalk.bgWhite.black.bold(' PLAN ')}</Ansi>;
-        case 'auto':
-          return <Ansi>{chalk.bgWhite.black.bold(' AUTO ')}</Ansi>;
-        default:
-          return null;
-      }
-    };
-
-    const modeIndicator = renderModeIndicator();
-
-    const renderProgressBar = (percentage: number) => {
-      const width = 10;
-      const filled = Math.round((percentage / 100) * width);
-      return chalk.white('█'.repeat(filled)) + chalk.gray.dim('.'.repeat(width - filled));
-    };
+    const approxContextTokens =
+      (usageForContext.input_tokens ?? 0) +
+      (usageForContext.cache_creation_input_tokens ?? 0) +
+      (usageForContext.cache_read_input_tokens ?? 0);
 
     const timeStrLong = `${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}:${currentTime.getSeconds().toString().padStart(2, '0')}`;
 
-    return (
+return (
       <Box flexDirection="column" gap={0} marginTop={0}>
-        {/* Row 1: Core Identity & Context */}
+        {/* Row 1: Compact status */}
         <Box gap={0} marginBottom={0} flexWrap="nowrap">
           <Text>
-            <Ansi>{thinkingEnabled ? (currentTime.getSeconds() % 2 === 0 ? chalk.white.bold('● ') : chalk.gray.dim('● ')) : chalk.gray.dim('● ')}</Ansi>
-            <Ansi>{chalk.gray.dim('PROJECT ')}</Ansi>
-            <Ansi>{chalk.white.bold(`${projectName} `)}</Ansi>
+            <Ansi>{thinkingEnabled ? (currentTime.getSeconds() % 2 === 0 ? chalk.white.bold('●') : chalk.gray.dim('●')) : chalk.gray.dim('●')}</Ansi>
+            <Ansi>{chalk.gray.dim(' ')}</Ansi>
+            <Ansi>{chalk.white.dim(`${projectName} `)}</Ansi>
             <Ansi>{chalk.gray.dim('|')}</Ansi>
-            <Ansi>{chalk.gray.dim(' MODEL ')}</Ansi>
-            <Ansi>{chalk.white.bold(`${renderModelName(runtimeModel)} `)}</Ansi>
+            <Ansi>{chalk.white.dim(`${renderModelName(runtimeModel)} `)}</Ansi>
             <Ansi>{chalk.gray.dim('|')}</Ansi>
-            <Ansi>{chalk.gray.dim(' CTX ')}</Ansi>
-            <Ansi>{`${renderProgressBar(usedPercentage)} ${chalk.white(`${usedPercentage.toFixed(0)}% `)}`}</Ansi>
+            <Ansi>{chalk.gray.dim(`~${(approxContextTokens / 1000).toFixed(1)}k `)}</Ansi>
+            <Ansi>{chalk.gray.dim(`${usedPercentage.toFixed(0)}% `)}</Ansi>
             <Ansi>{chalk.gray.dim('|')}</Ansi>
-            <Ansi>{chalk.gray.dim(' TIME ')}</Ansi>
-            <Ansi>{chalk.white.bold(`${timeStrLong} `)}</Ansi>
+            <Ansi>{chalk.white(`${formatCost(cost)} `)}</Ansi>
+            <Ansi>{chalk.gray.dim('|')}</Ansi>
+            <Ansi>{chalk.gray.dim(`${timeStrLong} `)}</Ansi>
           </Text>
         </Box>
 
         <Box gap={0} marginTop={0} flexWrap="nowrap">
           <Text>
-            <Ansi>{chalk.gray.dim('● ')}</Ansi>
-            {permissionMode !== 'bypassPermissions' && permissionMode !== 'dontAsk' && (
-              <>
-                <Ansi>{chalk.gray.dim('MODE ')}</Ansi>
-                {(() => {
-                  switch (permissionMode) {
-                    case 'acceptEdits': return <Ansi>{chalk.white.bold('ACCEPT ')}</Ansi>;
-                    case 'plan': return <Ansi>{chalk.white.bold('PLAN ')}</Ansi>;
-                    case 'auto': return <Ansi>{chalk.white.bold('AUTO ')}</Ansi>;
-                    case 'ask': return <Ansi>{chalk.white.bold('ASK ')}</Ansi>;
-                    case 'yoloLite': return <Ansi>{chalk.white.bold('YOLO-LITE ')}</Ansi>;
-                    case 'yolo': return <Ansi>{chalk.white.bold('YOLO ')}</Ansi>;
-                    case 'yoloMax': return <Ansi>{chalk.white.bold('YOLO-MAX ')}</Ansi>;
-                    case 'yoloGod': return <Ansi>{chalk.white.bold('YOLO-GOD ')}</Ansi>;
-                    case 'bypassPermissions': return <Ansi>{chalk.white.bold('BYPASS ')}</Ansi>;
-                    case 'dontAsk': return <Ansi>{chalk.white.bold('DONT-ASK ')}</Ansi>;
-                    default: return <Ansi>{chalk.white.bold('NORMAL ')}</Ansi>;
-                  }
-                })()}
-                <Ansi>{chalk.gray.dim('| ')}</Ansi>
-              </>
-            )}
-            <Ansi>{chalk.gray.dim('DEFAULT ')}</Ansi>
-            {(() => {
-              const defaultMode = settings?.permissions?.defaultMode;
-              switch (defaultMode) {
-                case 'bypassPermissions':
-                case 'dontAsk':
-                case 'yolo': return <Ansi>{chalk.white.bold('YOLO ')}</Ansi>;
-                case 'acceptEdits': return <Ansi>{chalk.white.bold('ACCEPT ')}</Ansi>;
-                case 'plan': return <Ansi>{chalk.white.bold('PLAN ')}</Ansi>;
-                case 'auto': return <Ansi>{chalk.white.bold('AUTO ')}</Ansi>;
-                case 'default': return <Ansi>{chalk.gray.bold('NORMAL ')}</Ansi>;
-                default: return <Ansi>{chalk.gray.bold('NORMAL ')}</Ansi>;
-              }
-            })()}
-            <Ansi>{chalk.gray.dim('| ')}</Ansi>
-            <Ansi>{chalk.gray.dim('BRANCH ')}</Ansi>
+            <Ansi>{chalk.gray.dim('●')}</Ansi>
+            <Ansi>{chalk.gray.dim(' ')}</Ansi>
+            <Ansi>{chalk.gray.dim('In ')}</Ansi>
+            <Ansi>{chalk.white(`${(inputTokens / 1000).toFixed(1)}k `)}</Ansi>
+            <Ansi>{chalk.gray.dim('Out ')}</Ansi>
+            <Ansi>{chalk.white(`${(outputTokens / 1000).toFixed(1)}k `)}</Ansi>
+            <Ansi>{chalk.gray.dim('Cache ')}</Ansi>
+            <Ansi>{chalk.white(`${((cacheReadTokens + cacheWriteTokens) / 1000).toFixed(1)}k `)}</Ansi>
+            <Ansi>{chalk.gray.dim('|')}</Ansi>
             <Ansi>{chalk.white.bold(`${gitBranch || 'none'} `)}</Ansi>
-            <Ansi>{chalk.gray.dim('| ')}</Ansi>
-            <Ansi>{chalk.gray.dim('TOKENS ')}</Ansi>
-            <Ansi>{chalk.white(`↓${inputTokens.toLocaleString()} `)}</Ansi>
-            <Ansi>{chalk.white(`↑${outputTokens.toLocaleString()} `)}</Ansi>
-            <Ansi>{chalk.gray.dim('| ')}</Ansi>
-            <Ansi>{chalk.gray.dim('COST ')}</Ansi>
-            <Ansi>{chalk.white.bold(`${formatCost(cost)} `)}</Ansi>
-            <Ansi>{chalk.gray(`${formatDuration(duration)} `)}</Ansi>
+            <Ansi>{chalk.gray(`${formatDuration(duration)}`)}</Ansi>
           </Text>
         </Box>
+
+        {modifiedFiles.length > 0 && (
+          <Box flexDirection="column" gap={0} marginTop={0}>
+            <Text>
+              <Ansi>{chalk.gray.dim('● ')}</Ansi>
+              <Ansi>{chalk.white.bold('Modified Files ')}</Ansi>
+            </Text>
+            {modifiedFiles.map(file => (
+              <Text key={file.path}>
+                <Ansi>{chalk.gray(`  ${file.path} `)}</Ansi>
+                <Ansi>{chalk.green(`+${file.added} `)}</Ansi>
+                <Ansi>{chalk.red(`-${file.removed}`)}</Ansi>
+              </Text>
+            ))}
+          </Box>
+        )}
       </Box>
     );
   })() : null;
@@ -514,9 +464,9 @@ function StatusLineInner({
   // (same trick as PromptInputFooterLeftSide).
   return (
     <Box paddingX={paddingX} flexDirection="column" gap={0} marginTop={0}>
-      {statusLineText && (
+      {filteredStatusLineText && (
         <Box paddingLeft={1} marginBottom={0} justifyContent="flex-start">
-          <Ansi>{chalk.gray.dim(statusLineText)}</Ansi>
+          <Ansi>{chalk.gray.dim(filteredStatusLineText)}</Ansi>
         </Box>
       )}
       {defaultStatusLine || (isFullscreenEnvEnabled() ? <Text> </Text> : null)}

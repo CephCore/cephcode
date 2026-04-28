@@ -32,6 +32,7 @@ import { type ModelAlias, isModelAlias } from './aliases.js'
 import { capitalize } from '../stringUtils.js'
 import { getAntModelOverrideConfig, resolveAntModel } from './antModels.js'
 import { PROVIDER_REGISTRY } from '../../services/ai/providerRegistry.js'
+import { PROVIDER_CONFIG_PATH } from '../../services/ai/ProviderManager.js'
 
 export type ModelShortName = string
 export type ModelName = string
@@ -52,8 +53,7 @@ export function isNonCustomOpusModel(model: ModelName): boolean {
 
 export function getProviderConfig(): { provider?: string; model?: string; apiKeys?: Record<string, string> } | null {
   try {
-    const configPath = join(process.env.HOME || process.env.USERPROFILE || '', '.claude-code-provider.json')
-    const configData = readFileSync(configPath, 'utf8')
+    const configData = readFileSync(PROVIDER_CONFIG_PATH, 'utf8')
     return JSON.parse(configData)
   } catch {
     return null

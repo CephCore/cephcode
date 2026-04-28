@@ -8,7 +8,8 @@
       "Bash(__NEW_LINE_74d75f38f294a516__ pwd:*)",
       "Bash(git remote:*)",
       "Bash(git branch:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "WebSearch"
     ]
   }
 }

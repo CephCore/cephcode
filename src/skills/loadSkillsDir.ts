@@ -63,6 +63,7 @@ import { isRestrictedToPluginOnly } from '../utils/settings/pluginOnlyPolicy.js'
 import { HooksSchema, type HooksSettings } from '../utils/settings/types.js'
 import { createSignal } from '../utils/signal.js'
 import { registerMCPSkillBuilders } from './mcpSkillBuilders.js'
+import { loadProjectSkills } from './loadProjectSkills.js'
 
 export type LoadedFrom =
   | 'commands_DEPRECATED'
@@ -681,6 +682,7 @@ export const getSkillDirCommands = memoize(
       userSkills,
       projectSkillsNested,
       additionalSkillsNested,
+      simpleProjectSkills,
       legacyCommands,
     ] = await Promise.all([
       isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_POLICY_SKILLS)
@@ -706,6 +708,10 @@ export const getSkillDirCommands = memoize(
             ),
           )
         : Promise.resolve([]),
+      // Load simple .md files from .claude/skills/ (no directory structure required)
+      projectSettingsEnabled && !skillsLocked
+        ? loadProjectSkills(cwd)
+        : Promise.resolve([]),
       // Legacy commands-as-skills goes through markdownConfigLoader with
       // subdir='commands', which our agents-only guard there skips. Block
       // here when skills are locked — these ARE skills, regardless of the
@@ -719,6 +725,7 @@ export const getSkillDirCommands = memoize(
       ...userSkills,
       ...projectSkillsNested.flat(),
       ...additionalSkillsNested.flat(),
+      ...simpleProjectSkills.map(skill => ({ skill, filePath: cwd })),
       ...legacyCommands,
     ]
 

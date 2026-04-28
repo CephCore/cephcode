@@ -23,6 +23,7 @@ import type { ThemeName } from './theme.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { PROVIDER_REGISTRY } from '../services/ai/providerRegistry.js';
+import { PROVIDER_CONFIG_PATH } from '../services/ai/ProviderManager.js';
 export type Property = {
   label?: string;
   value: React.ReactNode | Array<string>;
@@ -240,11 +241,6 @@ export function buildAccountProperties(): Property[] {
   }
   return properties;
 }
-
-const PROVIDER_CONFIG_PATH = join(
-  process.env.HOME || process.env.USERPROFILE || '',
-  '.claude-code-provider.json'
-);
 
 function getProviderConfig() {
   try {

@@ -60,6 +60,12 @@ export type DiffStats =
     }
   | undefined
 
+export type SessionFileDiffStat = {
+  path: string
+  insertions: number
+  deletions: number
+}
+
 export function fileHistoryEnabled(): boolean {
   if (getIsNonInteractiveSession()) {
     return fileHistoryEnabledSdk()
@@ -481,6 +487,55 @@ export async function fileHistoryGetDiffStats(
     deletions += r.stats?.deletions || 0
   }
   return { filesChanged, insertions, deletions }
+}
+
+export async function fileHistoryGetSessionFileDiffStats(
+  state: FileHistoryState,
+): Promise<SessionFileDiffStat[]> {
+  if (!fileHistoryEnabled() || state.snapshots.length === 0) {
+    return []
+  }
+
+  const results = await Promise.all(
+    Array.from(state.trackedFiles, async trackingPath => {
+      try {
+        const filePath = maybeExpandFilePath(trackingPath)
+        const backupFileName = getBackupFileNameFirstVersion(trackingPath, state)
+
+        if (backupFileName === undefined) {
+          return null
+        }
+
+        const stats = await computeDiffStatsForFile(
+          filePath,
+          backupFileName === null ? undefined : backupFileName,
+        )
+
+        if (stats?.insertions || stats?.deletions) {
+          return {
+            path: filePath,
+            insertions: stats.insertions,
+            deletions: stats.deletions,
+          }
+        }
+
+        if (backupFileName === null && (await pathExists(filePath))) {
+          return {
+            path: filePath,
+            insertions: stats?.insertions ?? 0,
+            deletions: stats?.deletions ?? 0,
+          }
+        }
+
+        return null
+      } catch (error) {
+        logError(error)
+        return null
+      }
+    }),
+  )
+
+  return results.filter((result): result is SessionFileDiffStat => result !== null)
 }
 
 /**

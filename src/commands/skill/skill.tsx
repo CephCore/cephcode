@@ -1,0 +1,74 @@
+import chalk from 'chalk'
+import figures from 'figures'
+import React from 'react'
+import { listProjectSkills } from '../../skills/loadProjectSkills.js'
+import type { LocalJSXCommandContext } from '../../commands.js'
+import { MessageResponse } from '../../components/MessageResponse.js'
+import { Box, Text } from '../../ink.js'
+import type { LocalJSXCommandOnDone } from '../../types/command.js'
+import { getCwdState } from '../../bootstrap/state.js'
+
+export async function call(
+  onDone: LocalJSXCommandOnDone,
+  context: LocalJSXCommandContext,
+  args?: string,
+): Promise<React.ReactNode> {
+  const cwd = getCwdState()
+  const skillName = args?.trim()
+
+  if (!skillName) {
+    // List all skills
+    const skills = await listProjectSkills(cwd)
+    
+    if (skills.length === 0) {
+      const message = `No skills found in .claude/skills/`
+      onDone(message)
+      return (
+        <MessageResponse>
+          <Text>{message}</Text>
+        </MessageResponse>
+      )
+    }
+
+    const skillList = skills
+      .map(skill => {
+        const name = chalk.bold(skill.name)
+        const description = skill.description
+        const whenToUse = skill.whenToUse ? chalk.dim(`· ${skill.whenToUse}`) : ''
+        return `${figures.pointer} ${name}: ${description} ${whenToUse}`
+      })
+      .join('\n')
+
+    const message = `Found ${skills.length} skill${skills.length > 1 ? 's' : ''}:\n\n${skillList}`
+    onDone(message)
+    
+    return (
+      <MessageResponse>
+        <Text>{message}</Text>
+      </MessageResponse>
+    )
+  }
+
+  // Show specific skill info
+  const skills = await listProjectSkills(cwd)
+  const skill = skills.find(s => s.name === skillName)
+
+  if (!skill) {
+    const message = `Skill not found: ${chalk.bold(skillName)}`
+    onDone(message)
+    return (
+      <MessageResponse>
+        <Text>{message}</Text>
+      </MessageResponse>
+    )
+  }
+
+  const message = `${chalk.bold(skill.name)}\n${skill.description}${skill.whenToUse ? `\n\nWhen to use: ${skill.whenToUse}` : ''}`
+  onDone(message)
+  
+  return (
+    <MessageResponse>
+      <Text>{message}</Text>
+    </MessageResponse>
+  )
+}

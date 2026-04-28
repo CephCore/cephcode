@@ -155,6 +155,8 @@ export type AppState = DeepImmutable<{
   replBridgeInitialName: string | undefined
   // Always-on bridge: first-time remote dialog pending (set by /remote-control command)
   showRemoteCallout: boolean
+  // Computer Use tool enabled (controlled by /enableComputer or --computer)
+  computerUseEnabled: boolean
 }> & {
   // Unified task state - excluded from DeepImmutable because TaskState contains function types
   tasks: { [taskId: string]: TaskState }
@@ -580,5 +582,6 @@ export function getDefaultAppState(): AppState {
     effortValue: undefined,
     activeOverlays: new Set<string>(),
     fastMode: false,
+    computerUseEnabled: process.env.ENABLE_COMPUTER_USE === '1',
   }
 }

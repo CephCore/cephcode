@@ -31,6 +31,37 @@ export function hasUltrathinkKeyword(text: string): boolean {
 }
 
 /**
+ * Check if text contains the "research" keyword.
+ */
+export function hasResearchKeyword(text: string): boolean {
+  return /\bresearch\b/i.test(text)
+}
+
+/**
+ * Find positions of "research" keyword in text (for UI highlighting/notification)
+ */
+export function findResearchTriggerPositions(text: string): Array<{
+  word: string
+  start: number
+  end: number
+}> {
+  const positions: Array<{ word: string; start: number; end: number }> = []
+  const matches = text.matchAll(/\bresearch\b/gi)
+
+  for (const match of matches) {
+    if (match.index !== undefined) {
+      positions.push({
+        word: match[0],
+        start: match.index,
+        end: match.index + match[0].length,
+      })
+    }
+  }
+
+  return positions
+}
+
+/**
  * Find positions of "ultrathink" keyword in text (for UI highlighting/notification)
  */
 export function findThinkingTriggerPositions(text: string): Array<{

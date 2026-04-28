@@ -1,10 +1,9 @@
 import type { Command } from '../../commands.js'
 
 const yolo = {
-  type: 'local',
+  type: 'local-jsx',
   name: 'yolo',
   description: 'Manage YOLO mode tiers and view stats',
-  supportsNonInteractive: true,
   load: () => import('./yolo.js'),
 } satisfies Command
 

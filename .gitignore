@@ -1,24 +1,37 @@
 # Dependencies
 node_modules/
+.pnp
+.pnp.js
 
 # Build output
 dist/
 .next/
 build/
 out/
+bin/
 
 # Logs
 *.log
 logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
 # Environment variables
 .env
 .env.local
 .env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # OS files
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+desktop.ini
 
 # IDE
 .vscode/
@@ -26,12 +39,15 @@ Thumbs.db
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
 
-# Claude Code / Kilo
+# Claude Code / Research Tools
 .claude/
-
-# Claude Code / Kilo CLI
-.claude/
+.searxng/
+research-dossiers/
+.provider.json
+.claude-code-provider.json
 
 # Testing
 coverage/

@@ -18,6 +18,7 @@ Official documentation for Claude Code — the AI-powered coding assistant CLI f
 ### Usage & Features
 - **[Commands Reference](COMMANDS.md)** - Complete list of slash commands and their usage
 - **[Provider System](PROVIDERS.md)** - Multi-provider AI setup (Anthropic, OpenAI, Google, OpenRouter, Ollama)
+- **[inResearch Setup](INSEARCH_SETUP.md)** - Configuring search providers (SearXNG, DuckDuckGo, Tavily, Brave)
 - **[Permissions System](PERMISSIONS.md)** - Security model, permission rules, and sandboxing
 - **[MCP Integration](MCP.md)** - Model Context Protocol server integration
 - **[Bridge Mode](BRIDGE_MODE.md)** - Remote collaboration and session sharing

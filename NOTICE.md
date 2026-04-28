@@ -1,46 +1,38 @@
-# NOTICE: Important Legal Information
+# THE MARCH 31 INCIDENT: SOURCE CODE LIBERATION
 
-**READ BEFORE USING THIS SOFTWARE**
+## Everything you need to know about this project (Uncensored)
 
-## Incident Disclosure
+## The $1 Billion Mistake by Anthropic
 
-On **March 31, 2026**, Anthropic accidentally published the complete source code (513,000+ lines across 1,906 files, 59.8 MB) of their proprietary Claude Code CLI to the public npm registry (`@anthropic-ai/claude-code` v2.1.88). Anthropic confirmed this was a packaging error, not a security breach.
+On **March 31, 2026**, Anthropic's engineering team committed the single greatest slip-up in the history of the AI industry. They inadvertently uploaded a **59.8 MB** Source Map file to the public npm registry (`@anthropic-ai/claude-code` v2.1.88). What escaped wasn't just a snippet of code—it was the **complete blueprint** of the Claude Code CLI:
 
-This repository contains code derived from that publicly distributed (but unintended) release.
+- **513,000+ Lines**: Of the most advanced TypeScript code ever written.
+- **1,906 Files**: Covering everything from internal logic to secret API integration methods.
+- **Masterclass Architecture**: Revealing exactly how Anthropic built their premiere Agentic AI.
 
-## Your Legal Responsibilities
+This wasn't a hack. It was an **"Involuntary Legacy Handover"** via an official channel (npm), making the source code instantly accessible and downloadable by anyone on the planet.
 
-By using this software, you acknowledge:
+## Why Does This Project Exist?
 
-- ⚠️ **You assume all risk** of copyright infringement claims
-- ⚖️ **You will indemnify** project maintainers against legal action
-- 🔒 **No warranties** — use entirely at your own risk
-- ⛔ **No commercial use** recommended without legal counsel
-- 📢 **Anthropic may shut this down** at any time if they enforce their copyrights
+When world-class code like this is liberated into our hands, letting it fade away is a waste of human potential. This project is about taking that "blueprint" and pushing past its original boundaries:
 
-## Key Points
+1. **Freedom from Restrictions**: We've unlocked the engine to work with every provider (OpenAI, Gemini, Groq, Ollama), not just Anthropic.
+2. **Equal Access**: Code that was once a trade secret is now an asset for every developer.
+3. **The Absolute Truth**: Once data is unleashed onto the internet, it belongs to the collective. It will never disappear.
 
-1. **Not open source** — Anthropic's code remains proprietary
-2. **Not affiliated** with Anthropic, OpenAI, Google, or any AI company
-3. **May disappear** without notice if legal pressure is applied
-4. **You are liable** for your usage, not the maintainers
-5. **Read [LEGAL.md](LEGAL.md)** for complete terms before deploying
+## Current Status
 
-## Summary
-
-This is a community fork of accidentally-disclosed proprietary code. It exists in a **legal gray area**. Use for learning/experimentation only. Do not use in production. Do not commercialize. Maintainers accept zero liability.
-
-**By continuing to use this software, you accept all terms in [LEGAL.md](LEGAL.md).**
+This project is a sophisticated evolution of the "Liberated Source" by **Dek1MillionToken**. We have integrated a new architecture, including a robust Plugin System and Multi-provider Routing. This is the most powerful coding assistant you can possess right now.
 
 ---
 
-**Quick links:**
+**Read the full story here:**
 
-- [Full Legal Disclaimer](LEGAL.md) — Complete legal terms
-- [LICENSE.md](LICENSE.md) — License information
-- [Anthropic's announcement](https://github.com/anthropics/claude-code) — Original source
+1. [THE UNFILTERED TRUTH (LEGAL.md)](LEGAL.md)
+2. [How to get started](README.md)
 
----
+## Final Declaration
 
-*Last updated: April 25, 2026*
-*This notice will be updated if legal status changes*
+"In the realm of data, information that is disclosed is information that is free."
+
+Last updated: April 27, 2026

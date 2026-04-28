@@ -18,7 +18,7 @@ import {
   type ProviderRegistryEntry,
 } from '../../services/ai/providerRegistry.js'
 import { clearProviderModelsCache, fetchProviderModels } from '../../services/ai/providerModels.js'
-import { ProviderManager } from '../../services/ai/ProviderManager.js'
+import { ProviderManager, PROVIDER_CONFIG_PATH } from '../../services/ai/ProviderManager.js'
 
 type SerializableProviderRegistryEntry = Omit<ProviderRegistryEntry, 'provider'>
 
@@ -48,21 +48,16 @@ function getSerializableProviderInfo(
   return serializable
 }
 
-const CONFIG_PATH = join(
-  process.env.HOME || process.env.USERPROFILE || '',
-  '.claude-code-provider.json',
-)
-
 async function loadConfig(): Promise<ProviderConfig | null> {
   try {
-    return JSON.parse(await readFile(CONFIG_PATH, 'utf8')) as ProviderConfig
+    return JSON.parse(await readFile(PROVIDER_CONFIG_PATH, 'utf8')) as ProviderConfig
   } catch {
     return null
   }
 }
 
 async function saveConfig(config: ProviderConfig): Promise<void> {
-  await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2))
+  await writeFile(PROVIDER_CONFIG_PATH, JSON.stringify(config, null, 2))
 }
 
 function help(): string {
@@ -183,7 +178,7 @@ async function runProviderCommand(args: string): Promise<ProviderCommandRunResul
     return {
       result: {
         type: 'text',
-        value: `Current provider: ${config.provider}\nCurrent model: ${config.model}\nSaved API keys: ${Object.keys(config.apiKeys ?? {}).join(', ') || 'none'}\nConfig: ${CONFIG_PATH}`,
+        value: `Current provider: ${config.provider}\nCurrent model: ${config.model}\nSaved API keys: ${Object.keys(config.apiKeys ?? {}).join(', ') || 'none'}\nConfig: ${PROVIDER_CONFIG_PATH}`,
       },
     }
   }
@@ -248,8 +243,8 @@ async function runProviderCommand(args: string): Promise<ProviderCommandRunResul
       result: {
         type: 'text',
         value: setProvider
-          ? `Saved API key for ${provider}\nSet provider to ${nextProvider}\nSet model to ${nextModel}\nConfig: ${CONFIG_PATH}`
-          : `Saved API key for ${provider} to ${CONFIG_PATH}`,
+          ? `Saved API key for ${provider}\nSet provider to ${nextProvider}\nSet model to ${nextModel}\nConfig: ${PROVIDER_CONFIG_PATH}`
+          : `Saved API key for ${provider} to ${PROVIDER_CONFIG_PATH}`,
       },
       appliedConfig: setProvider ? nextConfig : undefined,
     }
@@ -269,7 +264,7 @@ async function runProviderCommand(args: string): Promise<ProviderCommandRunResul
     return {
       result: {
         type: 'text',
-        value: `Reset provider to ${config.provider} (${config.model})\nConfig: ${CONFIG_PATH}`,
+        value: `Reset provider to ${config.provider} (${config.model})\nConfig: ${PROVIDER_CONFIG_PATH}`,
       },
       appliedConfig: config,
     }
@@ -315,7 +310,7 @@ async function runProviderCommand(args: string): Promise<ProviderCommandRunResul
     return {
       result: {
         type: 'text',
-        value: `Set provider to ${provider}\nSet model to ${model}\nConfig: ${CONFIG_PATH}`,
+        value: `Set provider to ${provider}\nSet model to ${model}\nConfig: ${PROVIDER_CONFIG_PATH}`,
       },
       appliedConfig: config,
     }
@@ -464,7 +459,7 @@ function ProviderPicker({
     }))
 
     onDone(
-      `Set provider to ${provider}\nModel: ${currentModel}\nConfig: ${CONFIG_PATH}`,
+      `Set provider to ${provider}\nModel: ${currentModel}\nConfig: ${PROVIDER_CONFIG_PATH}`,
       { display: 'system' },
     )
   }

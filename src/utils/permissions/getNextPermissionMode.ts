@@ -56,30 +56,24 @@ export function getNextPermissionMode(
       if (canCycleToAuto(toolPermissionContext)) {
         return 'auto'
       }
-      return 'yoloLite'
+      return 'default'
 
     case 'auto':
-      return 'yoloLite'
+      return 'default'
 
     case 'yoloLite':
-      return 'yolo'
-
     case 'yolo':
-      return 'yoloMax'
-
     case 'yoloMax':
-      return 'yoloGod'
-
     case 'yoloGod':
+      // YOLO modes removed from shift+tab cycle - go back to default
       return 'default'
 
     case 'bypassPermissions':
-      return 'yoloLite'
+      return 'default'
 
     case 'dontAsk':
       // Not exposed in UI cycle yet, but return default if somehow reached
       return 'default'
-
 
     default:
       // Covers any future modes — always fall back to default

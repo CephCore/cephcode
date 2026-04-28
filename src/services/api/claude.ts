@@ -241,6 +241,7 @@ import {
   getProviderRegistryEntry,
   DEFAULT_PROVIDER,
 } from '../ai/providerRegistry.js'
+import { PROVIDER_CONFIG_PATH } from '../ai/ProviderManager.js'
 import { parseToolCalls } from '../ai/toolCallParser.js'
 import {
   API_ERROR_MESSAGE_PREFIX,
@@ -284,10 +285,13 @@ type ProviderConfig = {
   }
 }
 
-const PROVIDER_CONFIG_PATH = join(
-  process.env.HOME || process.env.USERPROFILE || '',
-  '.claude-code-provider.json',
-)
+function getProviderConfig(): ProviderConfig | null {
+  try {
+    return JSON.parse(readFileSync(PROVIDER_CONFIG_PATH, 'utf8')) as ProviderConfig
+  } catch {
+    return null
+  }
+}
 
 function isOpenAICompatibleProvider(
   provider: ProviderId,

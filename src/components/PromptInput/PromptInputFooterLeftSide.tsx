@@ -323,6 +323,27 @@ function ModeIndicator({
   const isViewingTeammate = viewSelectionMode === 'viewing-agent' && viewedTask?.type === 'in_process_teammate';
   const isViewingCompletedTeammate = isViewingTeammate && viewedTask != null && viewedTask.status !== 'running';
   const hasBackgroundTasks = runningTaskCount > 0 || isViewingTeammate;
+  const settings = useAppState(s_8 => s_8.settings);
+  const initialDisplayedModeRef = useRef(settings?.permissions?.defaultMode ?? 'default');
+  const [displayedMode, setDisplayedMode] = useState(initialDisplayedModeRef.current);
+  const hasCommittedDisplayedModeRef = useRef(false);
+
+  useEffect(() => {
+    if (hasCommittedDisplayedModeRef.current) {
+      setDisplayedMode(currentMode);
+      return;
+    }
+
+    if (currentMode === initialDisplayedModeRef.current) {
+      hasCommittedDisplayedModeRef.current = true;
+      setDisplayedMode(currentMode);
+      return;
+    }
+
+    // Keep the configured default visible during startup if runtime mode
+    // briefly hydrates to a stale value from a prior session.
+    setDisplayedMode(initialDisplayedModeRef.current);
+  }, [currentMode]);
 
   // Count primary items (permission mode or coordinator mode, background tasks, and teams)
   const primaryItemCount = (isCoordinator || hasActiveMode ? 1 : 0) + (hasBackgroundTasks ? 1 : 0) + (hasTeams ? 1 : 0);
@@ -345,13 +366,13 @@ function ModeIndicator({
   // the local permission mode shown here doesn't reflect the agent's state.
   // Rendered before the tasks pill so a long pill label (e.g. ultraplan URL)
   // doesn't push the mode indicator off-screen.
-  const modePart = (currentMode === 'bypassPermissions' || currentMode === 'dontAsk') ? null : (
-    <Text key={`mode-${currentMode || 'default'}`}>
+  const modePart = (displayedMode === 'bypassPermissions' || displayedMode === 'dontAsk' || displayedMode === undefined) ? null : (
+    <Text key={`mode-${displayedMode || 'default'}`}>
         <Text color="ansi:white" dimColor>● </Text>
         <Text color="ansi:white" bold>{(() => {
-          if (currentMode === 'default') return 'normal';
-          if (currentMode === 'dontAsk' || currentMode === 'bypassPermissions') return 'bypass';
-          return permissionModeTitle(currentMode);
+          if (displayedMode === 'default') return 'normal';
+          if (displayedMode === 'dontAsk' || displayedMode === 'bypassPermissions') return 'bypass';
+          return permissionModeTitle(displayedMode);
         })().toLowerCase()}</Text>
         <Text color="ansi:white" dimColor> on</Text>
         {shouldShowModeHint && <Text dimColor>
