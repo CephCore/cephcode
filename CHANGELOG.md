@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.1.124
+
+### Fixed
+
+- Consolidated browser automation around the public `browser` tool and removed duplicate experimental browser tool wiring.
+- Kept `computer` focused on desktop screenshot, mouse, keyboard, and window actions instead of duplicating browser actions.
+- Fixed Bun build handling for lazy browser automation dependencies.
+- Fixed `src/main.tsx --version` to return the release version without booting the full CLI.
+- Updated documentation links after moving legal docs into `docs/`.
+
+### Developer
+
+- Prepared release metadata for `2.1.124`.
+- Added headless browser mode support for local automation checks.
+
+---
+
 ## 2.1.123
 
 ### New Features
@@ -32,16 +49,16 @@
 ### Legal & Compliance
 
 - **Added comprehensive legal documentation** addressing Anthropic's accidental source disclosure (March 31, 2026)
-- Created [NOTICE.md](NOTICE.md) — 2-minute required reading on legal status and risks
-- Created [LEGAL.md](LEGAL.md) — Full legal disclaimer covering:
+- Created [NOTICE.md](docs/NOTICE.md) — 2-minute required reading on legal status and risks
+- Created [LEGAL.md](docs/LEGAL.md) — Full legal disclaimer covering:
   - Copyright status of accidentally disclosed proprietary code
   - Liability limitation and user indemnification
   - DMCA takedown procedures
   - Export controls and compliance
   - Warranty disclaimers (AS-IS basis)
 - Updated [README.md](README.md) with prominent legal notices and compliance section
-- Added [INDEX.md](INDEX.md) for easy navigation of legal documents
-- All users **must review** NOTICE.md and LEGAL.md before using this software
+- Added [INDEX.md](docs/INDEX.md) for easy navigation of legal documents
+- All users **must review** [NOTICE.md](docs/NOTICE.md) and [LEGAL.md](docs/LEGAL.md) before using this software
 
 ### Developer
 

@@ -108,6 +108,8 @@ function buildGenericConfig(): ComputerUseToolConfig {
             '- mouse_move: Move cursor to [x, y] coordinates',
             '- scroll: Scroll up/down/left/right at [x, y]',
             '- left_click_drag: Drag from start_coordinate to coordinate',
+            '- list_windows: List all open windows with titles and positions',
+            '- focus_window: Bring a window to front by title query',
             '- wait: Wait for specified duration in seconds',
             '',
             'Always take a screenshot first to see what is on screen.',
@@ -133,6 +135,8 @@ function buildGenericConfig(): ComputerUseToolConfig {
                   'left_mouse_down',
                   'left_mouse_up',
                   'hold_key',
+                  'list_windows',
+                  'focus_window',
                   'wait',
                 ],
                 description: 'The action to perform on the computer',
@@ -176,6 +180,11 @@ function buildGenericConfig(): ComputerUseToolConfig {
                 type: 'number',
                 description:
                   'Duration in seconds for "hold_key" or "wait" actions',
+              },
+              window_query: {
+                type: 'string',
+                description:
+                  'Window title or ID to focus (for "focus_window" action)',
               },
             },
             required: ['action'],

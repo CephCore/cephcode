@@ -14,32 +14,39 @@ import { getScaledDimensions } from './scaling.js'
 // ── Screenshot ───────────────────────────────────────────────────────────────
 
 /**
- * Capture a screenshot of the primary display.
+ * Capture a screenshot of a specific region or the full primary display.
  * Uses PowerShell + System.Drawing (built into Windows).
  *
- * Flow:
- *   1. Get screen bounds via System.Windows.Forms.Screen
- *   2. Create bitmap, copy screen pixels
- *   3. Resize to fit API constraints (max 1568px long edge)
- *   4. Encode as JPEG, convert to base64
- *   5. Return base64 string + dimensions
+ * @param region - Optional [x1, y1, x2, y2] region to capture. If omitted, captures full screen.
  */
-export async function captureScreenshot(): Promise<{
+export async function captureScreenshot(region?: [number, number, number, number]): Promise<{
   base64: string
   width: number
   height: number
   originalWidth: number
   originalHeight: number
 }> {
+  const isRegion = !!region
+  const [rx1, ry1, rx2, ry2] = region || [0, 0, 0, 0]
+
   // PowerShell script that captures, resizes, and base64-encodes the screen
   const psScript = `
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-# Get primary screen dimensions
-$screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-$sw = $screen.Width
-$sh = $screen.Height
+# Capture area
+if ($${isRegion}) {
+    $sw = ${rx2} - ${rx1}
+    $sh = ${ry2} - ${ry1}
+    $sx = ${rx1}
+    $sy = ${ry1}
+} else {
+    $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+    $sw = $screen.Width
+    $sh = $screen.Height
+    $sx = $screen.X
+    $sy = $screen.Y
+}
 
 # Calculate scale factor (max 1568px long edge, ~1.15MP)
 $longEdge = [Math]::Max($sw, $sh)
@@ -53,7 +60,7 @@ $th = [Math]::Round($sh * $scale)
 # Capture screen
 $bmp = New-Object System.Drawing.Bitmap($sw, $sh)
 $gfx = [System.Drawing.Graphics]::FromImage($bmp)
-$gfx.CopyFromScreen($screen.Location, [System.Drawing.Point]::Empty, $screen.Size)
+$gfx.CopyFromScreen($sx, $sy, 0, 0, New-Object System.Drawing.Size($sw, $sh))
 $gfx.Dispose()
 
 # Resize for API

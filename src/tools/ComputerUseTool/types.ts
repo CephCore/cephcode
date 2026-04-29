@@ -32,6 +32,9 @@ export type ComputerAction =
   | 'cursor_position'
   // Enhanced actions (computer_20251124+)
   | 'zoom'
+  // Window management
+  | 'list_windows'
+  | 'focus_window'
 
 // ── Tool Input ──────────────────────────────────────────────────────────────
 
@@ -63,6 +66,10 @@ export interface ComputerToolInput {
 
   /** Region to zoom into [x1, y1, x2, y2] (for "zoom" action) */
   region?: [number, number, number, number]
+
+  /** Window title or ID for "focus_window" action */
+  window_query?: string
+
 }
 
 // ── Tool Result ─────────────────────────────────────────────────────────────

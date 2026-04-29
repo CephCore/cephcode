@@ -28,6 +28,8 @@ import {
   getCursorPosition,
   readClipboard,
   writeClipboard,
+  listWindows,
+  focusWindow,
 } from './input.js'
 import { scaleToScreen } from './scaling.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -196,8 +198,8 @@ export async function handleComputerAction(
       // ── Zoom ────────────────────────────────────────────────────
       case 'zoom': {
         // Zoom captures a region at full resolution
-        // For now, we just take a full screenshot (TODO: implement region capture)
-        const result = await captureScreenshot()
+        const region = input.region
+        const result = await captureScreenshot(region)
         return [
           {
             type: 'image',
@@ -208,6 +210,26 @@ export async function handleComputerAction(
             },
           },
         ]
+      }
+
+      // ── Window Management ───────────────────────────────────────
+      case 'list_windows': {
+        const windows = await listWindows()
+        if (windows.length === 0) {
+          return textResult('No visible windows found.')
+        }
+        const winList = windows
+          .map(w => `- "${w.title}" at (${w.x}, ${w.y}) size ${w.w}x${w.h}`)
+          .join('\n')
+        return textResult(`Visible windows:\n${winList}`)
+      }
+
+      case 'focus_window': {
+        if (!input.window_query) {
+          return textResult('Error: focus_window requires window_query')
+        }
+        await focusWindow(input.window_query)
+        return textResult(`Attempted to focus window matching: "${input.window_query}"`)
       }
 
       default:

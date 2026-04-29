@@ -31,7 +31,6 @@ const getVerifyPlanExecutionTool = () => process.env.CLAUDE_CODE_VERIFY_PLAN ===
 const getOverflowTestTool = () => feature("OVERFLOW_TEST_TOOL") ? require("./tools/OverflowTestTool/OverflowTestTool.js").OverflowTestTool : null;
 const getCtxInspectTool = () => feature("CONTEXT_COLLAPSE") ? require("./tools/CtxInspectTool/CtxInspectTool.js").CtxInspectTool : null;
 const getTerminalCaptureTool = () => feature("TERMINAL_PANEL") ? require("./tools/TerminalCaptureTool/TerminalCaptureTool.js").TerminalCaptureTool : null;
-const getWebBrowserTool = () => feature("WEB_BROWSER_TOOL") ? require("./tools/WebBrowserTool/WebBrowserTool.js").WebBrowserTool : null;
 const getSnipTool = () => feature("HISTORY_SNIP") ? require("./tools/SnipTool/SnipTool.js").SnipTool : null;
 const getListPeersTool = () => feature("UDS_INBOX") ? require("./tools/ListPeersTool/ListPeersTool.js").ListPeersTool : null;
 const getWorkflowTool = () => {
@@ -70,6 +69,7 @@ import { TaskGetTool } from "./tools/TaskGetTool/TaskGetTool.js";
 import { TaskUpdateTool } from "./tools/TaskUpdateTool/TaskUpdateTool.js";
 import { TaskListTool } from "./tools/TaskListTool/TaskListTool.js";
 import { SearXNGTool } from "./tools/SearXNGTool/SearXNGTool.js";
+import { BrowserTool } from "./tools/BrowserTool/BrowserTool.js";
 import uniqBy from "lodash-es/uniqBy.js";
 import { isToolSearchEnabledOptimistic } from "./utils/toolSearch.js";
 import { isTodoV2Enabled } from "./utils/tasks.js";
@@ -145,7 +145,6 @@ export function getAllBaseTools(): Tools {
   const overflowTestTool = getOverflowTestTool();
   const ctxInspectTool = getCtxInspectTool();
   const terminalCaptureTool = getTerminalCaptureTool();
-  const webBrowserTool = getWebBrowserTool();
   const snipTool = getSnipTool();
   const listPeersTool = getListPeersTool();
   const workflowTool = getWorkflowTool();
@@ -171,7 +170,6 @@ export function getAllBaseTools(): Tools {
     ...(process.env.USER_TYPE === "ant" ? [ConfigTool] : []),
     ...(process.env.USER_TYPE === "ant" ? [TungstenTool] : []),
     ...(suggestBackgroundPRTool ? [suggestBackgroundPRTool] : []),
-    ...(webBrowserTool ? [webBrowserTool] : []),
     ...(isTodoV2Enabled()
       ? [TaskCreateTool, TaskGetTool, TaskUpdateTool, TaskListTool]
       : []),
@@ -205,6 +203,7 @@ export function getAllBaseTools(): Tools {
     SearXNGTool,
     ResearchTool,
     ...(getComputerUseTool() ? [getComputerUseTool()] : []),
+    BrowserTool,
   ];
 }
 

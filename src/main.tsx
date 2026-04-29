@@ -16,8 +16,14 @@ try {
 
 // Define MACRO for build (normally replaced by macro processor)
 globalThis.MACRO = {
-  VERSION: '2.1.121'
+  VERSION: '2.1.124'
 };
+
+const startupArgs = process.argv.slice(2);
+if (startupArgs.length === 1 && ['--version', '-v', '-V'].includes(startupArgs[0] ?? '')) {
+  console.log(`${globalThis.MACRO.VERSION} (Claude Code)`);
+  process.exit(0);
+}
 
 // These side-effects must run before all other imports:
 // 1. profileCheckpoint marks entry before heavy module evaluation begins

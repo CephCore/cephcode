@@ -58,6 +58,28 @@ public class Win32Input {
     [StructLayout(LayoutKind.Sequential)]
     public struct POINT { public int X; public int Y; }
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+
+    [DllImport("user32.dll")]
+    public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
     // Mouse event flags
     public const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
     public const uint MOUSEEVENTF_LEFTUP = 0x0004;
@@ -352,4 +374,67 @@ export async function readClipboard(): Promise<string> {
 /** Write text to clipboard */
 export async function writeClipboard(text: string): Promise<void> {
   await runPS(`Set-Clipboard -Value '${text.replace(/'/g, "''")}'`)
+}
+
+// ── Window Management ────────────────────────────────────────────────────────
+
+/** List all visible windows with titles and coordinates */
+export async function listWindows(): Promise<Array<{ title: string; x: number; y: number; w: number; h: number }>> {
+  logForDebugging('[ComputerUse] listWindows()')
+  const script = `${WIN32_TYPES}
+$windows = New-Object System.Collections.Generic.List[Object]
+$enumProc = [Win32Input+EnumWindowsProc] {
+    param($hWnd, $lParam)
+    if ([Win32Input]::IsWindowVisible($hWnd)) {
+        $sb = New-Object System.Text.StringBuilder 256
+        [Win32Input]::GetWindowText($hWnd, $sb, $sb.Capacity) | Out-Null
+        $title = $sb.ToString()
+        if (-not [string]::IsNullOrWhiteSpace($title)) {
+            $rect = New-Object Win32Input+RECT
+            if ([Win32Input]::GetWindowRect($hWnd, [ref]$rect)) {
+                $windows.Add(@{
+                    title = $title
+                    x = $rect.Left
+                    y = $rect.Top
+                    w = $rect.Right - $rect.Left
+                    h = $rect.Bottom - $rect.Top
+                })
+            }
+        }
+    }
+    return $true
+}
+[Win32Input]::EnumWindows($enumProc, [IntPtr]::Zero) | Out-Null
+$windows | ConvertTo-Json -Compress
+`
+  const result = await runPS(script)
+  if (!result) return []
+  try {
+    const parsed = JSON.parse(result)
+    return Array.isArray(parsed) ? parsed : [parsed]
+  } catch {
+    return []
+  }
+}
+
+/** Focus a window by title query */
+export async function focusWindow(query: string): Promise<boolean> {
+  logForDebugging(`[ComputerUse] focusWindow("${query}")`)
+  const script = `${WIN32_TYPES}
+$enumProc = [Win32Input+EnumWindowsProc] {
+    param($hWnd, $lParam)
+    $sb = New-Object System.Text.StringBuilder 256
+    [Win32Input]::GetWindowText($hWnd, $sb, $sb.Capacity) | Out-Null
+    $title = $sb.ToString()
+    if ($title -like "*${query.replace(/\*/g, '').replace(/'/g, "''")}*") {
+        [Win32Input]::ShowWindow($hWnd, 9) | Out-Null # SW_RESTORE
+        [Win32Input]::SetForegroundWindow($hWnd) | Out-Null
+        return $false # Stop enumeration
+    }
+    return $true
+}
+[Win32Input]::EnumWindows($enumProc, [IntPtr]::Zero) | Out-Null
+`
+  await runPS(script)
+  return true
 }

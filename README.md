@@ -1,11 +1,11 @@
 <div align="center">
 
-# Claude Code By Dek1MillionToken: Agentic AI Research Framework
+# Claude Code: Agentic AI Research Framework
 
 > **An Experimental Study on Multi-Provider Agentic Architectures**
 
 [![Research Status](https://img.shields.io/badge/Status-Research--Only-blueviolet)](RESEARCH_MISSION.md)
-[![Educational Content](https://img.shields.io/badge/License-Educational--Use-green)](LEGAL.md)
+[![Educational Content](https://img.shields.io/badge/License-Educational--Use-green)](docs/LEGAL.md)
 [![Bun](https://img.shields.io/badge/runtime-Bun%20%7C%20Node.js-ffdf00.svg)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6.svg)](https://www.typescriptlang.org/)
 
@@ -14,8 +14,8 @@
 Before using this research framework, you **MUST** read:
 
 - **[RESEARCH_MISSION.md](RESEARCH_MISSION.md)** — Our academic goals and methodology
-- **[NOTICE.md](NOTICE.md)** — The Unfiltered Truth about source liberation
-- **[LEGAL.md](LEGAL.md)** — The Code Manifesto and user sovereignty
+- **[NOTICE.md](docs/NOTICE.md)** — The Unfiltered Truth about source liberation
+- **[LEGAL.md](docs/LEGAL.md)** — The Code Manifesto and user sovereignty
 
 ---
 
@@ -34,7 +34,7 @@ This project is an **academic fork** of the proprietary Claude Code CLI, serving
 Claude Code By Dek1MillionToken is a research-focused evolution of the Claude Code CLI that adds **unified multi-provider routing**, **provider-specific adapters**, and an **extensible plugin architecture**.
  Switch between Anthropic Claude, OpenAI GPT, Google Gemini, OpenRouter, local Ollama, and more — all from one terminal interface.
 
-> **Legal Notice**: Please review the [Legal Disclaimer & Attribution](LEGAL.md) for important information about third-party components, licensing, and liability limitations before using this software.
+> **Legal Notice**: Please review the [Legal Disclaimer & Attribution](docs/LEGAL.md) for important information about third-party components, licensing, and liability limitations before using this software.
 
 ### Why Claude Code By Dek1MillionToken?
 
@@ -51,18 +51,18 @@ Claude Code By Dek1MillionToken is a research-focused evolution of the Claude Co
 
 | Provider | Models | API Key | Tool Calling | Streaming |
 |----------|--------|---------|-------------|-----------|
-| **Anthropic** | Claude Opus 4.7, Sonnet 4.6, Haiku 4.5 | `ANTHROPIC_API_KEY` | Native | Full SSE |
-| **OpenAI** | GPT-5.5, GPT-5.5 Pro | `OPENAI_API_KEY` | Native | Full SSE |
-| **DeepSeek** | DeepSeek V4 Pro, V4 Flash | `DEEPSEEK_API_KEY` | Native | Full SSE |
+| **Anthropic** | Claude Sonnet 4, Claude Opus 4.1, Haiku 3.5 | `ANTHROPIC_API_KEY` | Native | Full SSE |
+| **OpenAI** | GPT-4.1, GPT-4.1 Mini, GPT-4.1 Nano | `OPENAI_API_KEY` | Native | Full SSE |
+| **DeepSeek** | DeepSeek V3, V4 | `DEEPSEEK_API_KEY` | Native | Full SSE |
 | **OpenRouter** | 100+ models | `OPENROUTER_API_KEY` | Native | Partial |
-| **OpenCode** | Claude, GPT, Gemini, Kimi, GLM, MiniMax | `OPENCODE_API_KEY` | Native | Partial |
-| **Cline** | Claude, GPT, Gemini, MiniMax | `CLINE_API_KEY` | Native | Partial |
-| **Groq** | Llama 4, Mixtral | `GROQ_API_KEY` | Native | Partial |
-| **xAI** | Grok 4, 4.20, 4.3 | `XAI_API_KEY` | Native | Partial |
-| **Mistral** | Mistral Large 4, Small 4 | `MISTRAL_API_KEY` | Native | Partial |
+| **OpenCode** | Claude, GPT, Gemini, Kimi, GLM | `OPENCODE_API_KEY` | Native | Partial |
+| **Cline** | Claude, GPT, Gemini | `CLINE_API_KEY` | Native | Partial |
+| **Groq** | Llama 3.3, Mixtral | `GROQ_API_KEY` | Native | Partial |
+| **xAI** | Grok 3, Grok 2 | `XAI_API_KEY` | Native | Partial |
+| **Mistral** | Mistral Large 2, Codestral | `MISTRAL_API_KEY` | Native | Partial |
 | **KiloCode** | 500+ models | `KILOCODE_API_KEY` | Native | Partial |
 | **Ollama** | Local models (Llama, DeepSeek) | None required | Native | Partial |
-| **Copilot** | GPT-5.5, GPT-4o | GitHub CLI | Native | Full |
+| **Copilot** | GPT-4.1, GPT-4o | GitHub CLI | Native | Full |
 
 ---
 
@@ -103,10 +103,10 @@ bun run src/main.tsx session --provider ollama --model llama3
 ```
 
 ### Video
+
 Preview (inline):
 
-https://github.com/user-attachments/assets/f7d84050-a61c-4b20-a988-edaa93a4deb8
-
+<https://github.com/user-attachments/assets/f7d84050-a61c-4b20-a988-edaa93a4deb8>
 
 ### Set API Keys
 
@@ -437,6 +437,7 @@ DEBUG=provider:anthropic bun run src/main.tsx session  # Module-specific
 ```
 
 In-session diagnostics:
+
 - `/status` — Show internal state
 - `/doctor` — Run diagnostics
 - `/doctor --fix` — Auto-fix issues
@@ -482,6 +483,7 @@ bun run --cwd /path/to/project dev
 ```
 
 Tips:
+
 - Quote paths on PowerShell to avoid globbing and to handle spaces.
 - Use the `--cwd` flag when you need an atomic single-command invocation.
 
@@ -544,8 +546,8 @@ This project operates under extraordinary legal circumstances:
 
 **Before using, you MUST read:**
 
-1. **[NOTICE.md](NOTICE.md)** — 2-minute summary of legal risks
-2. **[LEGAL.md](LEGAL.md)** — Complete disclaimer, indemnification, and liability terms
+1. **[NOTICE.md](docs/NOTICE.md)** — 2-minute summary of legal risks
+2. **[LEGAL.md](docs/LEGAL.md)** — Complete disclaimer, indemnification, and liability terms
 
 **By using this software, you agree to indemnify the maintainers** and assume all risk of copyright infringement claims.
 
@@ -565,7 +567,7 @@ Copyright © Anthropic PBC. All rights reserved. See [LICENSE.md](LICENSE.md) fo
 
 ### Final Note on Freedom
 
-This project is a fork of Anthropic's Claude Code. By using this software, you accept the [Legal Disclaimer & Attribution](LEGAL.md) which covers third-party components, licensing, warranties, and liability limitations.
+This project is a fork of Anthropic's Claude Code. By using this software, you accept the [Legal Disclaimer & Attribution](docs/LEGAL.md) which covers third-party components, licensing, warranties, and liability limitations.
 
 ---
 

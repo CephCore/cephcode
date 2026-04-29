@@ -63,6 +63,8 @@ const inputSchema = lazySchema(() =>
       scroll_amount: z.any().describe('Scroll amount'),
       start_coordinate: z.any().describe('Start [x, y] for drag'),
       duration: z.any().describe('Duration in seconds'),
+      region: z.any().describe('Region to zoom into [x1, y1, x2, y2]'),
+      window_query: z.any().describe('Window title or ID to focus'),
     }).passthrough()
   )
 )
@@ -96,7 +98,13 @@ export const ComputerUseTool = buildTool({
   },
 
   async prompt(): Promise<string> {
-    const config = await getDisplayConfig()
+    const config = await getDisplayConfig().catch(() => ({
+      screenWidth: 0,
+      screenHeight: 0,
+      scaleFactor: 1,
+      apiWidth: 1280,
+      apiHeight: 800,
+    }))
     return `Control the computer screen to complete tasks autonomously.
 
 IMPORTANT: Always take a screenshot FIRST to see what is currently on screen before performing any actions.
@@ -118,7 +126,9 @@ Available actions:
 - hold_key: Hold a key for duration seconds (key, duration required)
 - wait: Wait for duration seconds
 - cursor_position: Get the current mouse cursor position
-
+- zoom: Capture a specific region [x1, y1, x2, y2] at full resolution (region required)
+- list_windows: List all open windows with their titles and positions
+- focus_window: Bring a window to the front by title query (window_query required)
 Screen dimensions: ${config.apiWidth}x${config.apiHeight} pixels
 Coordinates are in pixels relative to the top-left corner (0, 0).
 
@@ -129,23 +139,24 @@ Tips:
 - Use keyboard shortcuts instead of clicking when possible (more reliable)
 - For text input fields, click first, then use "type" action
 - For dropdowns, try using keyboard (arrow keys) after clicking
+- Use the separate browser tool for websites and selector-based web automation
 - Take a screenshot after each step to verify the outcome`
   },
 
   isEnabled(): boolean {
     return (
-      process.env.ENABLE_COMPUTER_USE === '1' &&
-      process.platform === 'win32'
+      (process.env.ENABLE_COMPUTER_USE === '1' && process.platform === 'win32') ||
+      (process.env.ENABLE_COMPUTER_USE === '1' && process.env.CI === 'true')
     )
   },
 
   isReadOnly(input: Input): boolean {
-    // Only screenshot and cursor_position are truly read-only
-    return input.action === 'screenshot' || input.action === 'cursor_position'
+    // Only screenshot and cursor_position and list_windows are truly read-only
+    return input.action === 'screenshot' || input.action === 'cursor_position' || input.action === 'list_windows'
   },
 
   isConcurrencySafe(input: Input): boolean {
-    return input.action === 'screenshot' || input.action === 'cursor_position'
+    return input.action === 'screenshot' || input.action === 'cursor_position' || input.action === 'list_windows'
   },
 
   toAutoClassifierInput(input: Input) {
@@ -181,6 +192,12 @@ Tips:
         return `Move to (${input.coordinate?.join(', ') ?? '?'})`
       case 'scroll':
         return `Scroll ${input.scroll_direction ?? 'down'}`
+      case 'zoom':
+        return `Zoom into region ${input.region?.join(', ') ?? '?'}`
+      case 'list_windows':
+        return 'List open windows'
+      case 'focus_window':
+        return `Focus window "${input.window_query ?? '?'}"`
       default:
         return input.action
     }
@@ -201,6 +218,12 @@ Tips:
         return `Pressing ${input.key ?? 'key'}`
       case 'scroll':
         return `Scrolling ${input.scroll_direction ?? 'down'}`
+      case 'zoom':
+        return 'Zooming into region'
+      case 'list_windows':
+        return 'Listing open windows'
+      case 'focus_window':
+        return `Focusing window "${input.window_query ?? '?'}"`
       default:
         return `Performing ${input.action}`
     }
@@ -210,7 +233,7 @@ Tips:
     // Computer use always requires explicit user approval
     return {
       behavior: 'ask' as const,
-      message: `Computer Use: ${input.action}${input.coordinate ? ` at (${input.coordinate.join(', ')})` : ''}${input.text ? ` text="${input.text.substring(0, 50)}"` : ''}${input.key ? ` key="${input.key}"` : ''}`,
+      message: `Computer Use: ${input.action}${input.coordinate ? ` at (${input.coordinate.join(', ')})` : ''}${input.text ? ` text="${input.text.substring(0, 50)}"` : ''}${input.key ? ` key="${input.key}"` : ''}${input.window_query ? ` window="${input.window_query}"` : ''}`,
     }
   },
 
@@ -224,6 +247,8 @@ Tips:
     if (input.text) parts.push(`"${input.text.substring(0, 50)}"`)
     if (input.key) parts.push(input.key)
     if (input.scroll_direction) parts.push(input.scroll_direction)
+    if (input.window_query) parts.push(`"${input.window_query}"`)
+    if (input.region) parts.push(`[${input.region.join(', ')}]`)
     return React.createElement(Text, null, parts.join(' '))
   },
 
@@ -263,8 +288,6 @@ Tips:
   async call(
     input: any,
   ): Promise<{ data: Out }> {
-    const config = await getDisplayConfig()
-
     // Helper to normalize coordinates from various formats [x,y], {x,y}, "x,y"
     const normalizeCoord = (c: any): [number, number] | undefined => {
       if (!c) return undefined
@@ -288,6 +311,8 @@ Tips:
     const action = String(input.action || '').toLowerCase()
     logForDebugging(`[ComputerUse] Action: ${action}`)
 
+    const config = await getDisplayConfig()
+
     // Map input to ComputerToolInput with extreme normalization
     const toolInput: ComputerToolInput = {
       action: action as any,
@@ -298,6 +323,8 @@ Tips:
       scroll_amount: input.scroll_amount !== undefined && input.scroll_amount !== null ? Number(input.scroll_amount) : undefined,
       start_coordinate: normalizeCoord(input.start_coordinate),
       duration: input.duration !== undefined && input.duration !== null ? Number(input.duration) : undefined,
+      region: Array.isArray(input.region) ? [Number(input.region[0]), Number(input.region[1]), Number(input.region[2]), Number(input.region[3])] : undefined,
+      window_query: input.window_query ? String(input.window_query) : undefined,
     }
 
     // Execute the action
@@ -316,7 +343,7 @@ Tips:
     }
 
     // Auto-screenshot after every action (except screenshot itself)
-    if (input.action !== 'screenshot' && !screenshotData) {
+    if (action !== 'screenshot' && !screenshotData) {
       try {
         // Small delay to let the screen update
         await new Promise(resolve => setTimeout(resolve, 300))
