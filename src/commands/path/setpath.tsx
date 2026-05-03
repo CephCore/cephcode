@@ -51,6 +51,14 @@ export async function call(
   // Set the new working directory using setCwd which resolves symlinks
   setCwd(resolvedPath)
 
+  // Also change the actual process working directory so the shell follows
+  try {
+    process.chdir(resolvedPath)
+  } catch (error) {
+    // If process.chdir fails, we still have setCwd set, so just log it
+    console.warn(`Failed to change process directory: ${error}`)
+  }
+
   const message = `Working directory changed from ${chalk.bold(previousCwd)} to ${chalk.bold(resolvedPath)}`
   onDone(message)
 

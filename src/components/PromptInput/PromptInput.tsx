@@ -98,6 +98,7 @@ import {
 } from '../../utils/thinking.js';
 import { findTokenBudgetPositions } from '../../utils/tokenBudget.js';
 import { findDebugTriggerPositions, findExplainTriggerPositions, findFixTriggerPositions, findUltraplanTriggerPositions, findUltrareviewTriggerPositions } from '../../utils/ultraplan/keyword.js';
+import { formatTotalCost } from '../../cost-tracker.js';
 import { AutoModeOptInDialog } from '../AutoModeOptInDialog.js';
 import { BridgeDialog } from '../BridgeDialog.js';
 import { ConfigurableShortcutHint } from '../ConfigurableShortcutHint.js';
@@ -1500,6 +1501,20 @@ function PromptInput({
     }
   }, [helpOpen]);
 
+  // Handler for chat:stats - show session usage statistics
+  const handleShowStats = useCallback(() => {
+    addNotification({
+      key: 'session-stats',
+      jsx: <Box flexDirection="column">
+            <Text bold color="cyan">Session Usage Statistics</Text>
+            <Ansi>{formatTotalCost()}</Ansi>
+          </Box>,
+      priority: 'immediate',
+      timeoutMs: 15000
+    });
+    logEvent('tengu_stats_shown', {});
+  }, [addNotification]);
+
   // Handler for chat:cycleMode - cycle through permission modes
   const handleCycleMode = useCallback(() => {
     // When viewing a teammate, cycle their mode instead of the leader's
@@ -1759,8 +1774,9 @@ function PromptInput({
     'chat:modelPicker': handleModelPicker,
     'chat:thinkingToggle': handleThinkingToggle,
     'chat:cycleMode': handleCycleMode,
-    'chat:imagePaste': handleImagePaste
-  }), [handleUndo, handleNewline, handleExternalEditor, handleStash, handleModelPicker, handleThinkingToggle, handleCycleMode, handleImagePaste]);
+    'chat:imagePaste': handleImagePaste,
+    'chat:stats': handleShowStats
+  }), [handleUndo, handleNewline, handleExternalEditor, handleStash, handleModelPicker, handleThinkingToggle, handleCycleMode, handleImagePaste, handleShowStats]);
   useKeybindings(chatHandlers, {
     context: 'Chat',
     isActive: !isModalOverlayActive

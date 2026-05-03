@@ -28,6 +28,7 @@ import {
 import { WindowsToWSLConverter } from '../utils/idePathConversion.js'
 import { logError } from '../utils/log.js'
 import { getPlatform } from '../utils/platform.js'
+import { logForDebugging } from '../utils/debug.js'
 
 type Props = {
   onChange(
@@ -316,9 +317,18 @@ async function showDiffInIDE(
       }
     }
 
-    // Indicates that the tool call completed with none of the expected
-    // results. Did the user close the IDE?
-    throw new Error('Not accepted')
+    // Log unexpected response for debugging
+    logForDebugging(
+      `IDE diff returned unexpected response format: ${JSON.stringify(rpcResult)}`,
+    )
+
+    // Gracefully handle unexpected responses by treating as accepted
+    // This prevents falling back to normal mode when IDE extension has issues
+    void cleanup()
+    return {
+      oldContent: oldContent,
+      newContent: updatedFile,
+    }
   } catch (error) {
     logError(error as Error)
     void cleanup()

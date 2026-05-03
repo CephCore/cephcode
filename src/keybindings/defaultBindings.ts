@@ -84,6 +84,7 @@ export const DEFAULT_BINDINGS: KeybindingBlock[] = [
       'ctrl+x ctrl+e': 'chat:externalEditor',
       'ctrl+g': 'chat:externalEditor',
       'ctrl+s': 'chat:stash',
+      'meta+i': 'chat:stats',
       // Image paste shortcut (platform-specific key defined above)
       [IMAGE_PASTE_KEY]: 'chat:imagePaste',
       ...(feature('MESSAGE_ACTIONS')

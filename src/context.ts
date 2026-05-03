@@ -16,6 +16,7 @@ import { execFileNoThrow } from './utils/execFileNoThrow.js'
 import { getBranch, getDefaultBranch, getIsGit, gitExe } from './utils/git.js'
 import { shouldIncludeGitInstructions } from './utils/gitSettings.js'
 import { logError } from './utils/log.js'
+import { detectCapabilities, formatCapabilitiesAsContext } from './utils/capabilities.js'
 
 const MAX_STATUS_CHARS = 2000
 
@@ -127,6 +128,11 @@ export const getSystemContext = memoize(
         ? null
         : await getGitStatus()
 
+    // Discover system capabilities proactively
+    const capabilitiesContext = !isEnvTruthy(process.env.CLAUDE_CODE_REMOTE)
+      ? formatCapabilitiesAsContext(await detectCapabilities())
+      : null
+
     // Include system prompt injection if set (for cache breaking, ant-only)
     const injection = feature('BREAK_CACHE_COMMAND')
       ? getSystemPromptInjection()
@@ -144,6 +150,7 @@ export const getSystemContext = memoize(
 
     return {
       ...(gitStatus && { gitStatus }),
+      ...(capabilitiesContext && { capabilities: capabilitiesContext }),
       ...(computerUseHint && { computerUseHint }),
       ...(feature('BREAK_CACHE_COMMAND') && injection
         ? {

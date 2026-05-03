@@ -34,25 +34,33 @@ async function getBrowser(input?: BrowserActionInput) {
   if (!browserContext) {
     try { mkdirSync(SESSION_DIR, { recursive: true }) } catch {}
     const { chromium } = await import('playwright')
-    browserContext = await chromium.launchPersistentContext(SESSION_DIR, {
-      headless: shouldRunHeadless(input),
-      viewport: { width: 1366, height: 768 },
-      timezoneId: 'Asia/Bangkok',
-      locale: 'th-TH',
-      args: [
-        '--no-sandbox',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-infobars',
-        '--window-size=1366,768',
-      ],
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    })
+    logForDebugging('BrowserTool: Launching persistent context at ' + SESSION_DIR)
+    try {
+      browserContext = await chromium.launchPersistentContext(SESSION_DIR, {
+        headless: shouldRunHeadless(input),
+        viewport: { width: 1280, height: 800 },
+        timezoneId: 'Asia/Bangkok',
+        locale: 'th-TH',
+        args: [
+          '--disable-blink-features=AutomationControlled',
+          '--no-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu', // Often helps on Windows
+        ],
+      })
+      logForDebugging('BrowserTool: Context launched successfully')
+    } catch (error: any) {
+      logForDebugging('BrowserTool: Failed to launch context: ' + error.message)
+      throw error
+    }
   }
 
   if (!pageInstance) {
+    logForDebugging('BrowserTool: Getting first page')
     const pages = browserContext.pages()
     pageInstance = pages.length > 0 ? pages[0] : await browserContext.newPage()
 
+    logForDebugging('BrowserTool: Page acquired, adding init scripts')
     await pageInstance.addInitScript(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined })
       Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] })
@@ -91,7 +99,20 @@ export async function handleBrowserAction(input: BrowserActionInput): Promise<Br
   const timeout = input.timeout || 8000
 
   try {
+    logForDebugging(`BrowserTool: Handling action "${input.action}"`)
     ;({ page, context } = await getBrowser(input))
+
+    if (!page) {
+      logForDebugging('BrowserTool: No page available!')
+      throw new Error('Browser page could not be initialized')
+    }
+
+    // Check if the page is closed/crashed
+    if (page.isClosed()) {
+      logForDebugging('BrowserTool: Page is closed, creating new one')
+      page = await context.newPage()
+      pageInstance = page
+    }
     switch (input.action) {
 
       // ═══════════════════════════════════════════════════════════
@@ -99,6 +120,7 @@ export async function handleBrowserAction(input: BrowserActionInput): Promise<Br
       // ═══════════════════════════════════════════════════════════
       case 'navigate': {
         if (!input.url) throw new Error('URL required')
+        logForDebugging(`BrowserTool: Navigating to ${input.url}`)
         await page.waitForTimeout(humanDelay(200, 500))
         await page.goto(input.url, { waitUntil: 'domcontentloaded', timeout: 30000 })
         await page.waitForTimeout(humanDelay(500, 1500))
@@ -148,7 +170,7 @@ export async function handleBrowserAction(input: BrowserActionInput): Promise<Br
         if (!input.role) throw new Error('role required for click_role')
         const opts: any = {}
         if (input.name) opts.name = input.name
-        const loc2 = page.getByRole(input.role, opts)
+        const loc2 = page.getByRole(input.role as any, opts)
         await loc2.hover()
         await page.waitForTimeout(humanDelay(80, 250))
         await loc2.click({ delay: humanDelay(40, 120) })
@@ -423,9 +445,15 @@ export async function handleBrowserAction(input: BrowserActionInput): Promise<Br
           }
         }
 
+        logForDebugging(`BrowserTool: Searching ${engine} for "${query}"`)
         const selected = searchEngines[engine] || searchEngines.google
-        await page.goto(selected.url, { waitUntil: 'domcontentloaded', timeout: 30000 })
-        await page.waitForTimeout(humanDelay(1500, 3000)) // Wait for results to render
+        
+        logForDebugging(`BrowserTool: Navigating to ${selected.url}`)
+        await page.goto(selected.url, { waitUntil: 'domcontentloaded', timeout: 60000 })
+        logForDebugging('BrowserTool: Navigation complete, waiting for delay')
+        
+        await page.waitForTimeout(humanDelay(1500, 3000))
+        logForDebugging('BrowserTool: Extracting results')
 
         // Extract results using evaluate
         const results = await page.$$eval(selected.selector, (elements: any[], engineKey: string) => {

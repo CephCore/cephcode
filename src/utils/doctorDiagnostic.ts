@@ -42,6 +42,7 @@ import {
 } from './shellConfig.js'
 import { jsonParse } from './slowOperations.js'
 import { which } from './which.js'
+import { checkProviderConnectivity, type ConnectivityResult } from './connectivity.js'
 
 export type InstallationType =
   | 'npm-global'
@@ -68,6 +69,7 @@ export type DiagnosticInfo = {
     mode: 'system' | 'builtin' | 'embedded'
     systemPath: string | null
   }
+  connectivity?: ConnectivityResult[]
 }
 
 function getNormalizedPaths(): [invokedPath: string, execPath: string] {
@@ -619,6 +621,7 @@ export async function getDoctorDiagnostic(): Promise<DiagnosticInfo> {
     warnings,
     packageManager,
     ripgrepStatus,
+    connectivity: await checkProviderConnectivity().catch(() => [])
   }
 
   return diagnostic

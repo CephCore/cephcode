@@ -169,9 +169,20 @@ function StatusLineInner({
   const mainLoopProvider = useAppState(s => s.mainLoopProvider);
   const mainLoopProviderForSession = useAppState(s => s.mainLoopProviderForSession);
   const [currentTime, setCurrentTime] = React.useState(new Date());
+  const [currentCwd, setCurrentCwd] = React.useState(getCwd());
 
   React.useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Poll for CWD changes to update status line when /setpath is used
+  React.useEffect(() => {
+    const checkCwd = () => {
+      const newCwd = getCwd();
+      setCurrentCwd(prev => prev !== newCwd ? newCwd : prev);
+    };
+    const timer = setInterval(checkCwd, 500);
     return () => clearInterval(timer);
   }, []);
 
@@ -317,7 +328,7 @@ function StatusLineInner({
     const contextPercentages = calculateContextPercentages(usageForContext, contextWindowSize);
     const cacheReadTokens = usageForContext.cache_read_input_tokens ?? 0;
     const cacheWriteTokens = usageForContext.cache_creation_input_tokens ?? 0;
-    const cwd = getCwd();
+    const cwd = currentCwd;
     const projectName = cwd.split(/[/\\]/).pop() || cwd;
     const gitBranch = currentBranch;
     const cost = getTotalCost();
@@ -341,6 +352,9 @@ function StatusLineInner({
     return (
       <Box flexDirection="column" gap={0} marginTop={0}>
         <Box flexDirection="row" gap={0}>
+          <Box paddingX={1} backgroundColor="#111111">
+            <Text color="gray">{timeStr}</Text>
+          </Box>
           <Box paddingX={1} backgroundColor={thinkingEnabled ? 'green' : '#333333'}>
             <Text color={thinkingEnabled ? 'black' : 'white'} bold>{statusText}</Text>
           </Box>
@@ -361,9 +375,6 @@ function StatusLineInner({
               <Text color="white">MCP:{mcpCount}</Text>
             </Box>
           )}
-          <Box paddingX={1} backgroundColor="#111111" flexGrow={1} justifyContent="flex-end">
-            <Text color="gray">{timeStr}</Text>
-          </Box>
         </Box>
 
         <Box paddingX={1} marginTop={0}>

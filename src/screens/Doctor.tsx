@@ -485,8 +485,22 @@ export function Doctor(t0) {
     t40 = $[75];
   }
   let t41;
-  if ($[76] !== t23 || $[77] !== t30 || $[78] !== t35 || $[79] !== t36 || $[80] !== t37 || $[81] !== t38 || $[82] !== t39) {
-    t41 = <Pane>{t23}{t30}{t31}{t32}{t33}{t34}{t35}{t36}{t37}{t38}{t39}{t40}</Pane>;
+  let tConnectivity;
+  if (diagnostic.connectivity && diagnostic.connectivity.length > 0) {
+    tConnectivity = (
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold>AI Provider Connectivity</Text>
+        {diagnostic.connectivity.map((res, i) => (
+          <Text key={i}>
+            └ {res.provider}: {res.status === 'ok' ? <Text color="green">OK</Text> : res.status === 'error' ? <Text color="red">Error ({res.message})</Text> : <Text dimColor>Untested ({res.message})</Text>}
+          </Text>
+        ))}
+      </Box>
+    );
+  }
+
+  if ($[76] !== t23 || $[77] !== t30 || $[78] !== t35 || $[79] !== t36 || $[80] !== t37 || $[81] !== t38 || $[82] !== t39 || $[tConnectivity] !== tConnectivity) {
+    t41 = <Pane>{t23}{tConnectivity}{t30}{t31}{t32}{t33}{t34}{t35}{t36}{t37}{t38}{t39}{t40}</Pane>;
     $[76] = t23;
     $[77] = t30;
     $[78] = t35;

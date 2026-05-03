@@ -224,22 +224,38 @@ function detectSessionFileType(
   return null
 }
 
+const singleFileSchema = z.strictObject({
+  file_path: z.string().describe('The absolute path to the file to read'),
+  offset: semanticNumber(z.number().int().nonnegative().optional()).describe(
+    'The line number to start reading from. Only provide if the file is too large to read at once',
+  ),
+  limit: semanticNumber(z.number().int().positive().optional()).describe(
+    'The number of lines to read. Only provide if the file is too large to read at once.',
+  ),
+  pages: z
+    .string()
+    .optional()
+    .describe(
+      `Page range for PDF files (e.g., "1-5", "3", "10-20"). Only applicable to PDF files. Maximum ${PDF_MAX_PAGES_PER_READ} pages per request.`,
+    ),
+})
+
+const batchFileSchema = z.strictObject({
+  file_paths: z
+    .array(z.string())
+    .describe('Array of absolute paths to files to read in parallel'),
+  offset: semanticNumber(z.number().int().nonnegative().optional()).describe(
+    'The line number to start reading from (applied to all files)',
+  ),
+  limit: semanticNumber(z.number().int().positive().optional()).describe(
+    'The number of lines to read (applied to all files)',
+  ),
+})
+
 const inputSchema = lazySchema(() =>
-  z.strictObject({
-    file_path: z.string().describe('The absolute path to the file to read'),
-    offset: semanticNumber(z.number().int().nonnegative().optional()).describe(
-      'The line number to start reading from. Only provide if the file is too large to read at once',
-    ),
-    limit: semanticNumber(z.number().int().positive().optional()).describe(
-      'The number of lines to read. Only provide if the file is too large to read at once.',
-    ),
-    pages: z
-      .string()
-      .optional()
-      .describe(
-        `Page range for PDF files (e.g., "1-5", "3", "10-20"). Only applicable to PDF files. Maximum ${PDF_MAX_PAGES_PER_READ} pages per request.`,
-      ),
-  }),
+  z.union([singleFileSchema, batchFileSchema]).describe(
+    'Read a single file or multiple files in parallel. Use file_paths array to read multiple files at once for better performance.',
+  ),
 )
 type InputSchema = ReturnType<typeof inputSchema>
 
@@ -327,6 +343,19 @@ const outputSchema = lazySchema(() => {
       file: z.object({
         filePath: z.string().describe('The path to the file'),
       }),
+    }),
+    z.object({
+      type: z.literal('batch'),
+      files: z.array(
+        z.object({
+          filePath: z.string().describe('The path to the file'),
+          content: z.string().describe('The content of the file (or error message)'),
+          numLines: z.number().describe('Number of lines in the returned content'),
+          startLine: z.number().describe('The starting line number'),
+          totalLines: z.number().describe('Total number of lines in the file'),
+          success: z.boolean().describe('Whether this file was read successfully'),
+        }),
+      ).describe('Array of file read results'),
     }),
   ])
 })
@@ -494,7 +523,7 @@ export const FileReadTool = buildTool({
     return { result: true }
   },
   async call(
-    { file_path, offset = 1, limit = undefined, pages },
+    input,
     context,
     _canUseTool?,
     parentMessage?,
@@ -506,8 +535,63 @@ export const FileReadTool = buildTool({
       fileReadingLimits?.maxSizeBytes ?? defaults.maxSizeBytes
     const maxTokens = fileReadingLimits?.maxTokens ?? defaults.maxTokens
 
+    // Check if this is a batch read (file_paths) or single file read (file_path)
+    const isBatchRead = 'file_paths' in input && Array.isArray(input.file_paths)
+
+    if (isBatchRead) {
+      // Batch read: read multiple files in parallel
+      const { file_paths, offset = 1, limit = undefined } = input
+
+      // Telemetry
+      logEvent('tengu_file_read_batch', {
+        fileCount: file_paths.length,
+      })
+
+      // Read all files in parallel
+      const results = await Promise.all(
+        file_paths.map(async (file_path) => {
+          try {
+            const result = await readSingleFile(
+              file_path,
+              offset,
+              limit,
+              undefined, // no pages for batch read
+              maxSizeBytes,
+              maxTokens,
+              readFileState,
+              context,
+              parentMessage?.message.id,
+            )
+            return {
+              filePath: file_path,
+              success: true,
+              ...result,
+            }
+          } catch (error) {
+            return {
+              filePath: file_path,
+              success: false,
+              content: `Error: ${error instanceof Error ? error.message : String(error)}`,
+              numLines: 0,
+              startLine: 1,
+              totalLines: 0,
+            }
+          }
+        }),
+      )
+
+      return {
+        data: {
+          type: 'batch' as const,
+          files: results,
+        },
+      }
+    }
+
+    // Single file read (original logic)
+    const { file_path, offset = 1, limit = undefined, pages } = input
+
     // Telemetry: track when callers override default read limits.
-    // Only fires on override (low volume) — event count = override frequency.
     if (fileReadingLimits !== undefined) {
       logEvent('tengu_file_read_limits_override', {
         hasMaxTokens: fileReadingLimits.maxTokens !== undefined,
@@ -516,23 +600,9 @@ export const FileReadTool = buildTool({
     }
 
     const ext = path.extname(file_path).toLowerCase().slice(1)
-    // Use expandPath for consistent path normalization with FileEditTool/FileWriteTool
-    // (especially handles whitespace trimming and Windows path separators)
     const fullFilePath = expandPath(file_path)
 
-    // Dedup: if we've already read this exact range and the file hasn't
-    // changed on disk, return a stub instead of re-sending the full content.
-    // The earlier Read tool_result is still in context — two full copies
-    // waste cache_creation tokens on every subsequent turn. BQ proxy shows
-    // ~18% of Read calls are same-file collisions (up to 2.64% of fleet
-    // cache_creation). Only applies to text/notebook reads — images/PDFs
-    // aren't cached in readFileState so won't match here.
-    //
-    // Ant soak: 1,734 dedup hits in 2h, no Read error regression.
-    // Killswitch pattern: GB can disable if the stub message confuses
-    // the model externally.
-    // 3P default: killswitch off = dedup enabled. Client-side only — no
-    // server support needed, safe for Bedrock/Vertex/Foundry.
+    // Dedup check (existing logic)
     const dedupKillswitch = getFeatureValue_CACHED_MAY_BE_STALE(
       'tengu_read_dedup_killswitch',
       false,
@@ -540,10 +610,6 @@ export const FileReadTool = buildTool({
     const existingState = dedupKillswitch
       ? undefined
       : readFileState.get(fullFilePath)
-    // Only dedup entries that came from a prior Read (offset is always set
-    // by Read). Edit/Write store offset=undefined — their readFileState
-    // entry reflects post-edit mtime, so deduping against it would wrongly
-    // point the model at the pre-edit Read content.
     if (
       existingState &&
       !existingState.isPartialView &&
@@ -572,21 +638,16 @@ export const FileReadTool = buildTool({
       }
     }
 
-    // Discover skills from this file's path (fire-and-forget, non-blocking)
-    // Skip in simple mode - no skills available
+    // Discover skills from this file's path
     const cwd = getCwd()
     if (!isEnvTruthy(process.env.CLAUDE_CODE_SIMPLE)) {
       const newSkillDirs = await discoverSkillDirsForPaths([fullFilePath], cwd)
       if (newSkillDirs.length > 0) {
-        // Store discovered dirs for attachment display
         for (const dir of newSkillDirs) {
           context.dynamicSkillDirTriggers?.add(dir)
         }
-        // Don't await - let skill loading happen in the background
         addSkillDirectories(newSkillDirs).catch(() => {})
       }
-
-      // Activate conditional skills whose path patterns match this file
       activateConditionalSkillsForPaths([fullFilePath], cwd)
     }
 
@@ -609,8 +670,6 @@ export const FileReadTool = buildTool({
       // Handle file-not-found: suggest similar files
       const code = getErrnoCode(error)
       if (code === 'ENOENT') {
-        // macOS screenshots may use a thin space or regular space before
-        // AM/PM — try the alternate before giving up.
         const altPath = getAlternateScreenshotPath(fullFilePath)
         if (altPath) {
           try {
@@ -632,7 +691,6 @@ export const FileReadTool = buildTool({
             if (!isENOENT(altError)) {
               throw altError
             }
-            // Alt path also missing — fall through to friendly error
           }
         }
 
@@ -711,6 +769,27 @@ export const FileReadTool = buildTool({
           tool_use_id: toolUseID,
           type: 'tool_result',
           content,
+        }
+      }
+      case 'batch': {
+        // Format batch results as combined text
+        const combinedContent = data.files
+          .map((file) => {
+            if (!file.success) {
+              return `--- ${file.filePath} ---\nError: ${file.content}\n`
+            }
+            const lineInfo =
+              file.totalLines > 0
+                ? ` (lines ${file.startLine}-${file.startLine + file.numLines - 1} of ${file.totalLines})`
+                : ''
+            return `--- ${file.filePath}${lineInfo} ---\n${file.content}\n`
+          })
+          .join('\n')
+
+        return {
+          tool_use_id: toolUseID,
+          type: 'tool_result',
+          content: combinedContent,
         }
       }
     }
@@ -1180,4 +1259,122 @@ export async function readImageWithTokenBudget(
   }
 
   return result
+}
+
+/**
+ * Helper function for batch file reading.
+ * Reads a single text file and returns simplified result for batch processing.
+ * Only handles text files (not images, PDFs, or notebooks).
+ */
+async function readSingleFile(
+  file_path: string,
+  offset: number,
+  limit: number | undefined,
+  pages: string | undefined,
+  maxSizeBytes: number,
+  maxTokens: number,
+  readFileState: ToolUseContext['readFileState'],
+  context: ToolUseContext,
+  messageId: string | undefined,
+): Promise<{
+  content: string
+  numLines: number
+  startLine: number
+  totalLines: number
+}> {
+  const fullFilePath = expandPath(file_path)
+  const ext = path.extname(file_path).toLowerCase().slice(1)
+
+  // For batch reads, we only support text files
+  if (IMAGE_EXTENSIONS.has(ext)) {
+    throw new Error('Images not supported in batch read. Use single file read.')
+  }
+  if (isPDFExtension(ext)) {
+    throw new Error('PDFs not supported in batch read. Use single file read.')
+  }
+  if (ext === 'ipynb') {
+    throw new Error('Notebooks not supported in batch read. Use single file read.')
+  }
+
+  // Check for blocked device paths
+  if (isBlockedDevicePath(fullFilePath)) {
+    throw new Error('Cannot read device file.')
+  }
+
+  // Dedup check
+  const dedupKillswitch = getFeatureValue_CACHED_MAY_BE_STALE(
+    'tengu_read_dedup_killswitch',
+    false,
+  )
+  const existingState = dedupKillswitch
+    ? undefined
+    : readFileState.get(fullFilePath)
+  if (
+    existingState &&
+    !existingState.isPartialView &&
+    existingState.offset !== undefined &&
+    existingState.offset === offset &&
+    existingState.limit === limit
+  ) {
+    try {
+      const mtimeMs = await getFileModificationTimeAsync(fullFilePath)
+      if (mtimeMs === existingState.timestamp) {
+        return {
+          content: existingState.content,
+          numLines: existingState.content.split('\n').length,
+          startLine: offset,
+          totalLines: existingState.content.split('\n').length,
+        }
+      }
+    } catch {
+      // Fall through to full read
+    }
+  }
+
+  // Read text file
+  const lineOffset = offset === 0 ? 0 : offset - 1
+  const {
+    content,
+    lineCount,
+    totalLines,
+    mtimeMs,
+  } = await readFileInRange(
+    fullFilePath,
+    lineOffset,
+    limit,
+    limit === undefined ? maxSizeBytes : undefined,
+    context.abortController.signal,
+  )
+
+  // Validate tokens
+  await validateContentTokens(content, ext, maxTokens)
+
+  // Update state
+  readFileState.set(fullFilePath, {
+    content,
+    timestamp: Math.floor(mtimeMs),
+    offset,
+    limit,
+  })
+  context.nestedMemoryAttachmentTriggers?.add(fullFilePath)
+
+  // Notify listeners
+  for (const listener of fileReadListeners.slice()) {
+    listener(fullFilePath, content)
+  }
+
+  // Log
+  logFileOperation({
+    operation: 'read',
+    tool: 'FileReadTool',
+    filePath: fullFilePath,
+    content,
+  })
+
+  return {
+    content,
+    numLines: lineCount,
+    startLine: offset,
+    totalLines,
+  }
 }

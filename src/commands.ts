@@ -126,6 +126,7 @@ import sandboxToggle from './commands/sandbox-toggle/index.js'
 import chrome from './commands/chrome/index.js'
 import stickers from './commands/stickers/index.js'
 import advisor from './commands/advisor.js'
+import capabilities from './commands/capabilities/index.js'
 import startSearxng from './commands/start-searxng/index.js'
 import { logError } from './utils/log.js'
 import { toError } from './utils/errors.js'
@@ -240,6 +241,7 @@ const COMMANDS = memoize((): Command[] => [
   agents,
   branch,
   btw,
+  capabilities,
   chrome,
   clear,
   color,

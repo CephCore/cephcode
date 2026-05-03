@@ -153,7 +153,20 @@ export class AnthropicAdapter {
         }
       }
 
-      if (chunk.choices && chunk.choices[0].finish_reason) {
+      if (chunk.usage) {
+        yield {
+          type: 'message_delta',
+          delta: {
+            stop_reason: chunk.choices?.[0]?.finish_reason ? this.mapFinishReason(chunk.choices[0].finish_reason) : 'stop'
+          },
+          usage: {
+            output_tokens: chunk.usage.completion_tokens ?? 0,
+            input_tokens: chunk.usage.prompt_tokens ?? 0,
+            cache_creation_input_tokens: chunk.usage.cache_creation_input_tokens ?? 0,
+            cache_read_input_tokens: chunk.usage.cache_read_input_tokens ?? 0
+          }
+        }
+      } else if (chunk.choices && chunk.choices[0].finish_reason) {
         if (activeIndex !== null) {
           yield { type: 'content_block_stop', index: activeIndex }
           activeIndex = null
@@ -164,7 +177,7 @@ export class AnthropicAdapter {
             stop_reason: this.mapFinishReason(chunk.choices[0].finish_reason)
           },
           usage: {
-            output_tokens: chunk.usage?.completion_tokens ?? 0
+            output_tokens: 0 // Will be updated if chunk.usage is present in a later chunk
           }
         }
       }
@@ -256,6 +269,9 @@ export class AnthropicAdapter {
             parameters: t.input_schema
           }
         }))
+      }),
+      ...(params.stream && {
+        stream_options: { include_usage: true }
       })
     }
   }

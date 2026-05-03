@@ -1,4 +1,4 @@
-import { buildTool } from '../../Tool.js'
+import { buildTool, findToolByName } from '../../Tool.js'
 import { lazySchema } from '../../utils/lazySchema.js'
 import { z } from 'zod/v4'
 import { logError } from '../../utils/log.js'
@@ -304,42 +304,122 @@ Please perform deep research for the query.
       }).map((t: any) => t.name))
       console.log('[ResearchTool] Aggressive Filter - Allowed tools:', synthesisTools.map((t: any) => t.name))
 
-      const queryStream = queryModelWithStreaming({
-        messages: [userMessage as any],
-        systemPrompt: asSystemPrompt([
-          'You are a research assistant synthesizing search results.',
-          'Use the provided search results as the primary evidence.',
-          'Use additional project/file/code tools only when needed.',
-          'Cite source URLs for factual claims.',
-          'Format your response with clear sections.',
-          enableTruthCheck ? 'Pay attention to conflicting information between sources and note discrepancies.' : '',
-        ].filter(Boolean)),
-        thinkingConfig: context.options.thinkingConfig,
-        tools: synthesisTools as any,
-        signal: context.abortController.signal,
-        options: {
-          getToolPermissionContext: async () => appState.toolPermissionContext,
-          model: context.options.mainLoopModel,
-          isNonInteractiveSession: context.options.isNonInteractiveSession,
-          hasAppendSystemPrompt: !!context.options.appendSystemPrompt,
-          querySource: 'research_tool',
-          agents: context.options.agentDefinitions?.activeAgents,
-          mcpTools: appState.mcp?.tools,
-          agentId: context.agentId,
-          effortValue: appState.effortValue,
-        } as any,
-      })
-
       let answer = ''
       let eventCount = 0
-      for await (const event of queryStream) {
-        eventCount++
-        if (
-          event.type === 'content_block_delta' &&
-          event.delta &&
-          event.delta.type === 'text_delta'
-        ) {
-          answer += event.delta.text
+      const synthesisMessages = [userMessage as any]
+      let iterations = 0
+      const MAX_SYNTHESIS_ITERATIONS = 5
+
+      while (iterations < MAX_SYNTHESIS_ITERATIONS) {
+        iterations++
+        console.log(`[ResearchTool] Synthesis iteration ${iterations}...`)
+        
+        const queryStream = queryModelWithStreaming({
+          messages: synthesisMessages,
+          systemPrompt: asSystemPrompt([
+            'You are a research assistant synthesizing search results.',
+            'Use the provided search results as the primary evidence.',
+            'Use additional project/file/code tools only when needed.',
+            'Cite source URLs for factual claims.',
+            'Format your response with clear sections.',
+            enableTruthCheck ? 'Pay attention to conflicting information between sources and note discrepancies.' : '',
+          ].filter(Boolean)),
+          thinkingConfig: context.options.thinkingConfig,
+          tools: synthesisTools as any,
+          signal: context.abortController.signal,
+          options: {
+            getToolPermissionContext: async () => appState.toolPermissionContext,
+            model: context.options.mainLoopModel,
+            isNonInteractiveSession: context.options.isNonInteractiveSession,
+            hasAppendSystemPrompt: !!context.options.appendSystemPrompt,
+            querySource: 'research_tool',
+            agents: context.options.agentDefinitions?.activeAgents,
+            mcpTools: appState.mcp?.tools,
+            agentId: context.agentId,
+            effortValue: appState.effortValue,
+          } as any,
+        })
+
+        let hasToolUseInThisIteration = false
+        const currentAssistantContent: any[] = []
+        let currentAssistantText = ''
+
+        for await (const event of queryStream) {
+          eventCount++
+          if (
+            event.type === 'content_block_delta' &&
+            event.delta &&
+            event.delta.type === 'text_delta'
+          ) {
+            answer += event.delta.text
+            currentAssistantText += event.delta.text
+          } else if (event.type === 'tool_use') {
+            hasToolUseInThisIteration = true
+            console.log(`[ResearchTool] Sub-agent using tool: ${event.name}`)
+            
+            // Add what we have so far to the assistant message
+            if (currentAssistantText) {
+              currentAssistantContent.push({ type: 'text', text: currentAssistantText })
+              currentAssistantText = ''
+            }
+            
+            currentAssistantContent.push({
+              type: 'tool_use',
+              id: event.id,
+              name: event.name,
+              input: event.input
+            })
+
+            // Execute the tool
+            const toolToCall = findToolByName(context.options.tools, event.name)
+            if (toolToCall) {
+              try {
+                // Call the tool. We pass context, canUseTool etc. from our own call arguments
+                const toolResult = await toolToCall.call(
+                  event.input, 
+                  context, 
+                  context.canUseTool || ((() => ({ behavior: 'allow' })) as any), // Fallback if not provided
+                  context.parentMessage || ({} as any)
+                )
+                
+                // Add the tool result to the messages for the next iteration
+                synthesisMessages.push({
+                  role: 'assistant',
+                  content: currentAssistantContent.splice(0) // Move content out
+                } as any)
+                
+                synthesisMessages.push({
+                  role: 'user',
+                  content: [{
+                    type: 'tool_result',
+                    tool_use_id: event.id,
+                    content: typeof toolResult.data === 'string' ? toolResult.data : JSON.stringify(toolResult.data)
+                  }]
+                } as any)
+              } catch (error: any) {
+                console.error(`[ResearchTool] Error executing sub-tool ${event.name}:`, error)
+                synthesisMessages.push({
+                  role: 'assistant',
+                  content: currentAssistantContent.splice(0)
+                } as any)
+                synthesisMessages.push({
+                  role: 'user',
+                  content: [{
+                    type: 'tool_result',
+                    tool_use_id: event.id,
+                    content: `Error: ${error.message}`,
+                    is_error: true
+                  }]
+                } as any)
+              }
+            } else {
+              console.warn(`[ResearchTool] Tool ${event.name} not found for sub-agent`)
+            }
+          }
+        }
+
+        if (!hasToolUseInThisIteration) {
+          break // No more tool calls, we are done
         }
       }
 

@@ -9,7 +9,7 @@ export const FILE_UNCHANGED_STUB =
 
 export const MAX_LINES_TO_READ = 2000
 
-export const DESCRIPTION = 'Read a file from the local filesystem.'
+export const DESCRIPTION = 'Read a file or multiple files from the local filesystem. Supports batch reading multiple files in parallel for better performance.'
 
 export const LINE_FORMAT_INSTRUCTION =
   '- Results are returned using cat -n format, with line numbers starting at 1'
