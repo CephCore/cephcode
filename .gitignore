@@ -55,6 +55,8 @@ coverage/
 
 # Bun
 bun.lockb
+bun-linux-x64/
+*.bun.zip
 
 # TypeScript
 *.tsbuildinfo

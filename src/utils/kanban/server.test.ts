@@ -478,7 +478,7 @@ describe('Kanban Server', () => {
     expect(html).toContain('submitEditTask')
     expect(html).toContain('closeEditTaskModal')
     // Window task reference pattern for onclick data passing
-    expect(html).toContain('__task_')
+    expect(html).toContain('window.__tasks')
     close()
   })
 

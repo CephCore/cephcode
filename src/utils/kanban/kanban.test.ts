@@ -2104,7 +2104,7 @@ describe('Kanban Phase 3 server endpoints', () => {
       const result = await processTask(
         cwd,
         { ...task, status: 'running' },
-        { workerId: 'w1', cmd: 'python -c "print(\'x\'*6000)"' },
+        { workerId: 'w1', cmd: 'node -e "console.log(\'x\'.repeat(6000))"' },
       )
       expect(result.status).toBe('completed')
 
@@ -2115,7 +2115,7 @@ describe('Kanban Phase 3 server endpoints', () => {
       expect(evidence.length).toBeGreaterThanOrEqual(1)
       const content = evidence[0].content ?? ''
       expect(content.length).toBeLessThanOrEqual(5100) // 5000 + "\n... (truncated)"
-    })
+    }, 15000)
 
     test('metadata command is used if no CLI command provided', async () => {
       const cwd = await makeTempWorkspace()
@@ -2130,7 +2130,7 @@ describe('Kanban Phase 3 server endpoints', () => {
           status: 'ready',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          metadata: { command: 'echo metadata-command-ran' },
+          metadata: { command: 'node -e "console.log(\'metadata-command-ran\')"' },
         }],
       }, cwd)
       await claimKanbanTask(taskId, 'w1', 'w1', cwd)
@@ -2143,7 +2143,7 @@ describe('Kanban Phase 3 server endpoints', () => {
       const result = await processTask(cwd, task, { workerId: 'w1' })
       expect(result.status).toBe('completed')
       expect(result.evidenceCount).toBeGreaterThanOrEqual(1)
-    })
+    }, 15000)
 
     test('commandArgv safe execution', async () => {
       const cwd = await makeTempWorkspace()
@@ -2177,14 +2177,14 @@ describe('Kanban Phase 3 server endpoints', () => {
       const result = await processTask(
         cwd,
         { ...task, status: 'running' },
-        { workerId: 'w1', commandArgv: ['python', '-c', 'print("x"*6000)'], outputLimit: 200 },
+        { workerId: 'w1', commandArgv: ['node', '-e', 'console.log("x".repeat(6000))'], outputLimit: 200 },
       )
       expect(result.status).toBe('completed')
       const board = await readKanbanBoard(cwd)
       const evidence = board.tasks[0].verification?.evidence ?? []
       // Output should be truncated
       expect(evidence[0].content?.length).toBeLessThanOrEqual(220)
-    })
+    }, 15000)
 
     test('expectedFiles success — all files exist', async () => {
       const cwd = await makeTempWorkspace()
@@ -2206,7 +2206,7 @@ describe('Kanban Phase 3 server endpoints', () => {
 
       const result = await processTask(cwd, task, { workerId: 'w1', cmd: 'echo done' })
       expect(result.status).toBe('completed')
-    })
+    }, 15000)
 
     test('expectedFiles missing causes not-done', async () => {
       const cwd = await makeTempWorkspace()

@@ -257,6 +257,13 @@ export const AgentTool = buildTool({
     // In-process teammates get a no-op setAppState; setAppStateForTasks
     // reaches the root store so task registration/progress/kill stay visible.
     const rootSetAppState = toolUseContext.setAppStateForTasks ?? toolUseContext.setAppState;
+    const parentKanbanTaskId = (() => {
+      const parentAgentId = toolUseContext.agentId;
+      if (!parentAgentId) return undefined;
+      const parentTask = appState.tasks[parentAgentId];
+      if (!isLocalAgentTask(parentTask)) return undefined;
+      return parentTask.kanbanTaskId;
+    })();
 
     // Check if user is trying to use agent teams without access
     if (team_name && !isAgentSwarmsEnabled()) {
@@ -691,6 +698,7 @@ export const AgentTool = buildTool({
         prompt,
         selectedAgent,
         setAppState: rootSetAppState,
+        parentKanbanTaskId,
         // Don't link to parent's abort controller -- background agents should
         // survive when the user presses ESC to cancel the main thread.
         // They are killed explicitly via chat:killAgents.
@@ -822,6 +830,7 @@ export const AgentTool = buildTool({
             prompt,
             selectedAgent,
             setAppState: rootSetAppState,
+            parentKanbanTaskId,
             toolUseId: toolUseContext.toolUseId,
             autoBackgroundMs: getAutoBackgroundMs() || undefined
           });
