@@ -82,6 +82,12 @@ export function YoloModePicker({ onDone, defaultTier }: Props) {
       toolPermissionContext: newContext,
     }));
 
+    if (selectedTier === 'yoloGod') {
+      process.env.CLAUDE_CODE_YOLO_GOD = 'true';
+    } else {
+      delete process.env.CLAUDE_CODE_YOLO_GOD;
+    }
+
     const tierConfig = YOLO_TIERS.find((t) => t.mode === selectedTier)!;
     logEvent('tengu_yolo_mode_activated', {
       mode: selectedTier as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,

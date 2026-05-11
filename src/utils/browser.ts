@@ -45,24 +45,32 @@ export async function openBrowser(url: string): Promise<boolean> {
     const platform = process.platform
 
     if (platform === 'win32') {
+      // Try multiple methods for Windows
       if (browserEnv) {
-        // browsers require shell, else they will treat this as a file:/// handle
-        const { code } = await execFileNoThrow(browserEnv, [`"${url}"`])
-        return code === 0
+        // Use specified browser
+        const { code } = await execFileNoThrow(browserEnv, [url])
+        if (code === 0) return true
       }
-      const { code } = await execFileNoThrow(
+
+      // Try start command (most reliable on Windows)
+      const { code: startCode } = await execFileNoThrow('cmd', ['/c', 'start', '', url])
+      if (startCode === 0) return true
+
+      // Fallback to rundll32
+      const { code: rundllCode } = await execFileNoThrow(
         'rundll32',
         ['url,OpenURL', url],
         {},
       )
-      return code === 0
+      return rundllCode === 0
     } else {
       const command =
         browserEnv || (platform === 'darwin' ? 'open' : 'xdg-open')
       const { code } = await execFileNoThrow(command, [url])
       return code === 0
     }
-  } catch (_) {
+  } catch (error) {
+    console.error('Failed to open browser:', error)
     return false
   }
 }

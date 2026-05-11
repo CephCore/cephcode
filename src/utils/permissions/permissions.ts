@@ -1142,9 +1142,14 @@ export async function checkRuleBasedPermissions(
   // 1g. Safety checks (e.g. .git/, .claude/, .vscode/, shell configs) are
   // bypass-immune — they must prompt even when a PreToolUse hook returned
   // allow. checkPathSafetyForAutoEdit returns {type:'safetyCheck'} for these.
+  // EXCEPT for Yolo mode - bypass everything
+  const isYoloMode = appState.toolPermissionContext.mode === 'yolo' ||
+    appState.toolPermissionContext.mode === 'yoloMax' ||
+    appState.toolPermissionContext.mode === 'yoloGod'
   if (
     toolPermissionResult?.behavior === 'ask' &&
-    toolPermissionResult.decisionReason?.type === 'safetyCheck'
+    toolPermissionResult.decisionReason?.type === 'safetyCheck' &&
+    !isYoloMode
   ) {
     return toolPermissionResult
   }

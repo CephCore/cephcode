@@ -137,22 +137,24 @@ function _temp2(s_0) {
 function _temp(s) {
   return s.mainLoopModel;
 }
-function syncSelectedProviderModel(model: string | null, isGlobal = false): void {
+function syncSelectedProviderModel(model: string | null, _isGlobal = false): void {
   const providerManager = ProviderManager.getInstance();
-  if (!isGlobal) {
+  
+  // Always save to global config by default for better UX
+  const currentConfig = providerManager.getSelectedProviderConfig(true);
+  if (!currentConfig.provider) {
     providerManager.setSessionModel(model);
     return;
   }
-
-  const currentConfig = providerManager.getSelectedProviderConfig(true);
-  if (!currentConfig.provider) {
-    return;
-  }
+  
   const providerEntry = getProviderRegistryEntry(currentConfig.provider);
   providerManager.saveSelectedProviderConfig({
     ...currentConfig,
     model: model ?? providerEntry.defaultModel ?? currentConfig.model,
   });
+  
+  // Also set it for the current session
+  providerManager.setSessionModel(model);
 }
 function SetModelAndClose({
   args,

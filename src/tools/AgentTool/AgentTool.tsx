@@ -4,7 +4,7 @@ import { buildTool, type ToolDef, toolMatchesName } from 'src/Tool.js';
 import type { Message as MessageType, NormalizedUserMessage } from 'src/types/message.js';
 import { getQuerySourceForAgent } from 'src/utils/promptCategory.js';
 import { z } from 'zod/v4';
-import { clearInvokedSkillsForAgent, getSdkAgentProgressSummariesEnabled } from '../../bootstrap/state.js';
+import { clearInvokedSkillsForAgent, getIsInteractive, getSdkAgentProgressSummariesEnabled } from '../../bootstrap/state.js';
 import { enhanceSystemPromptWithEnvDetails, getSystemPrompt } from '../../constants/prompts.js';
 import { isCoordinatorMode } from '../../coordinator/coordinatorMode.js';
 import { startAgentSummarization } from '../../services/AgentSummary/agentSummary.js';
@@ -22,6 +22,8 @@ import { logForDebugging } from '../../utils/debug.js';
 import { isEnvTruthy } from '../../utils/envUtils.js';
 import { AbortError, errorMessage, toError } from '../../utils/errors.js';
 import type { CacheSafeParams } from '../../utils/forkedAgent.js';
+import { kanbanBoardExists } from '../../utils/kanban/store.js';
+import { openKanbanDashboard } from '../../utils/kanban/server.js';
 import { lazySchema } from '../../utils/lazySchema.js';
 import { createUserMessage, extractTextContent, isSyntheticMessage, normalizeMessages } from '../../utils/messages.js';
 import { getAgentModel } from '../../utils/model/agent.js';
@@ -193,6 +195,9 @@ import type { AgentToolProgress, ShellProgress } from '../../types/tools.js';
 // AgentTool forwards both its own progress events and shell progress
 // events from the sub-agent so the SDK receives tool_progress updates during bash/powershell runs.
 export type Progress = AgentToolProgress | ShellProgress;
+
+let kanbanAutoOpened = false;
+
 export const AgentTool = buildTool({
   async prompt({
     agents,
@@ -248,6 +253,16 @@ export const AgentTool = buildTool({
     isolation,
     cwd
   }: AgentToolInput, toolUseContext, canUseTool, assistantMessage, onProgress?) {
+    // Auto-open Kanban dashboard once per session when a subagent is launched
+    if (!kanbanAutoOpened && getIsInteractive() && !isInForkChild(toolUseContext.messages)) {
+      void kanbanBoardExists().then(exists => {
+        if (exists) {
+          void openKanbanDashboard().catch(() => {});
+          kanbanAutoOpened = true;
+        }
+      }).catch(() => {});
+    }
+
     const startTime = Date.now();
     const model = isCoordinatorMode() ? undefined : modelParam;
 

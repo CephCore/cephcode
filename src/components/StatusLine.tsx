@@ -5,6 +5,7 @@ import { memo, useCallback, useEffect, useRef } from 'react';
 import { logEvent } from 'src/services/analytics/index.js';
 import { getProviderRegistryEntry } from 'src/services/ai/providerRegistry.js';
 import { useAppState, useSetAppState } from 'src/state/AppState.js';
+import { ProviderManager } from 'src/services/ai/ProviderManager.js';
 import type { PermissionMode } from 'src/utils/permissions/PermissionMode.js';
 import { getKairosActive, getMainThreadAgentType, getOriginalCwd, getSdkBetas, getSessionId } from '../bootstrap/state.js';
 import { DEFAULT_OUTPUT_STYLE_NAME } from '../constants/outputStyles.js';
@@ -156,7 +157,7 @@ function coloredBar(percent: number, width: number = 10): string {
   let colorFn: typeof chalk.hex;
   if (percent > 85) colorFn = chalk.hex('#ff4444');       // red
   else if (percent > 70) colorFn = chalk.hex('#ffaa00');  // yellow/warning
-  else colorFn = chalk.hex('#44aa44');                      // green
+  else colorFn = chalk.white;                              // white
 
   const emptyFn = chalk.hex('#555555');
   return colorFn('█'.repeat(filled)) + emptyFn('░'.repeat(empty));
@@ -167,6 +168,7 @@ interface ToolActivity {
   name: string;
   target?: string;
   status: 'running' | 'completed' | 'error';
+  isMcp?: boolean;
 }
 
 interface AgentActivity {
@@ -236,11 +238,13 @@ function extractActivity(messages: Message[]): {
     for (const block of content as ActivityBlock[]) {
       // Tool use => running tool
       if (block.type === 'tool_use' && block.id && block.name) {
+        const isMcpTool = block.name.startsWith('mcp__');
         const toolEntry: ToolActivity = {
           id: block.id,
           name: block.name,
           target: extractTarget(block.name, block.input),
           status: 'running',
+          isMcp: isMcpTool,
         };
 
         if (block.name === 'Task' || block.name === 'Agent') {
@@ -369,6 +373,7 @@ function StatusLineInner({
   const mainLoopProvider = useAppState(s => s.mainLoopProvider);
   const mainLoopProviderForSession = useAppState(s => s.mainLoopProviderForSession);
   const [currentCwd, setCurrentCwd] = React.useState(getCwd());
+  const fullscreenEnabled = isFullscreenEnvEnabled();
 
   // Poll for CWD changes to update status line when /setpath is used
   React.useEffect(() => {
@@ -562,10 +567,10 @@ function StatusLineInner({
 
     const showActivity = runningTools.length > 0 || runningAgents.length > 0 || sortedCompletedTools.length > 0;
 
-    // ── Provider label for non-default providers ──
-    const activeProvider = mainLoopProviderForSession ?? mainLoopProvider;
+    // ── Provider label for all providers ──
+    const activeProvider = mainLoopProviderForSession ?? mainLoopProvider ?? (typeof window === 'undefined' ? ProviderManager.getInstance().getActiveProviderName() : undefined);
     let providerLabel = '';
-    if (activeProvider && activeProvider !== 'anthropic') {
+    if (activeProvider) {
       const entry = getProviderRegistryEntry(activeProvider);
       if (entry) providerLabel = chalk.dim(`[${entry.label}]`);
     }
@@ -573,21 +578,18 @@ function StatusLineInner({
     // ── Line 1: Identity — model, provider, project, branch ──
     const line1 =
       (thinkingEnabled
-        ? chalk.hex('#44ff44')(`● ${statusText}`)
+        ? chalk.white(`● ${statusText}`)
         : chalk.hex('#666666')(`● ${statusText}`)) +
       '  ' +
+      (providerLabel ? providerLabel + ' ' : '') +
       chalk.cyan(modelName) +
-      (providerLabel ? ' ' + providerLabel : '') +
       '  ' +
       chalk.white(projectName) +
       ' ' + branchText;
 
-    // ── Line 2: Status — context bar, tokens, rate limits, cost, duration ──
-    const contextTokStr = usedPercentage > 80
-      ? chalk.hex('#ff4444')(`${(approxContextTokens / 1000).toFixed(0)}k ${usedPercentage.toFixed(0)}%`)
-      : usedPercentage > 60
-        ? chalk.hex('#ffaa00')(`${(approxContextTokens / 1000).toFixed(0)}k ${usedPercentage.toFixed(0)}%`)
-        : chalk.hex('#aaaaaa')(`${(approxContextTokens / 1000).toFixed(0)}k ${usedPercentage.toFixed(0)}%`);
+    // ── Line 2: Status — context bar, capacity, rate limits, cost, duration ──
+    // Show context window capacity: "Xk / Yk max"
+    const contextTokStr = chalk.dim(`${(approxContextTokens / 1000).toFixed(1)}k / ${(contextWindowSize / 1000).toFixed(0)}k max`);
 
     const rawUtil = getRawUtilization();
     const rateParts: string[] = [];
@@ -617,7 +619,7 @@ function StatusLineInner({
     let line2BulletColor: typeof chalk.hex;
     if (usedPercentage > 85) line2BulletColor = chalk.hex('#ff4444');
     else if (usedPercentage > 70) line2BulletColor = chalk.hex('#ffaa00');
-    else line2BulletColor = chalk.hex('#44aa44');
+    else line2BulletColor = chalk.white;
 
     const line2 =
       line2BulletColor('●') +
@@ -637,10 +639,17 @@ function StatusLineInner({
     if (showActivity) {
       const parts: string[] = [];
       for (const t of runningTools.slice(-3)) {
-        parts.push(
-          chalk.yellow('◐') + ' ' + chalk.cyan(t.name) +
-          (t.target ? chalk.dim(`: ${truncate(t.target.replace(/\\/g, '/'), 25)}`) : '')
-        );
+        if (t.isMcp) {
+          parts.push(
+            chalk.hex('#AA88FF')('◈') + ' ' + chalk.hex('#CC99FF')(t.name.replace(/^mcp__/, 'mcp:')) +
+            (t.target ? chalk.dim(`: ${truncate(t.target.replace(/\\/g, '/'), 25)}`) : '')
+          );
+        } else {
+          parts.push(
+            chalk.yellow('◐') + ' ' + chalk.cyan(t.name) +
+            (t.target ? chalk.dim(`: ${truncate(t.target.replace(/\\/g, '/'), 25)}`) : '')
+          );
+        }
       }
       if ((runningTools.length > 0 || runningAgents.length > 0) && sortedCompletedTools.length > 0) {
         parts.push('  │  ');
@@ -706,7 +715,7 @@ function StatusLineInner({
           <Ansi>{chalk.gray.dim(filteredStatusLineText)}</Ansi>
         </Box>
       )}
-      {defaultStatusLine || (isFullscreenEnvEnabled() ? <Text> </Text> : null)}
+      {defaultStatusLine || (fullscreenEnabled ? <Text> </Text> : null)}
     </Box>
   );
 }

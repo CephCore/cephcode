@@ -19,11 +19,12 @@ export class ChatGPTSessionProvider implements ProviderInterface {
   }
 
   async createClient(options: ProviderInitOptions): Promise<ProviderClient> {
-    const apiKey = options.apiKey ?? process.env[this.envKey]
+    // Support both CHATGPT_SUBSCRIPTION_KEY (manual) and CHATGPT_SESSION_TOKEN (OAuth)
+    const apiKey = options.apiKey ?? process.env[this.envKey] ?? process.env.CHATGPT_SESSION_TOKEN
 
     if (!apiKey) {
       throw new Error(
-        `Missing API key for ${this.providerId}. Set ${this.envKey}. ` +
+        `Missing API key for ${this.providerId}. Use OAuth flow (/providers) or set ${this.envKey}. ` +
         `Get your subscription key from https://platform.openai.com/settings/organization/overview`,
       )
     }

@@ -10,6 +10,7 @@ import {
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { existsSync, renameSync, mkdirSync } from 'fs'
 import { ChatGPTSessionProvider } from './providers/ChatGPTSessionProvider.js'
+import { getGlobalConfig } from '../../utils/config.js'
 
 const LEGACY_PROVIDER_CONFIG_PATH = join(process.env.HOME || process.env.USERPROFILE || '', '.claude-code-provider.json')
 const PREVIOUS_PROVIDER_CONFIG_PATH = join(getClaudeConfigHomeDir(), '.provider.json')
@@ -225,6 +226,20 @@ export class ProviderManager {
     }
     const providerEntry = PROVIDER_REGISTRY[providerName]
     const config = this.getSelectedProviderConfig()
+
+    // Special handling for OpenAI subscriber (ChatGPT OAuth)
+    if (providerName === 'openai' && (config.providerConfig as any)?.openaiType === 'subscriber') {
+      // First check CHATGPT_SESSION_TOKEN from OAuth flow
+      if (process.env.CHATGPT_SESSION_TOKEN) {
+        return process.env.CHATGPT_SESSION_TOKEN
+      }
+      // Also check global config for stored OAuth tokens
+      const globalConfig = getGlobalConfig() as any
+      if (globalConfig?.openaiOAuthTokens?.accessToken) {
+        return globalConfig.openaiOAuthTokens.accessToken
+      }
+    }
+
     return config.apiKeys?.[providerName] || (providerEntry?.envKey ? process.env[providerEntry.envKey] : undefined) || undefined
   }
 

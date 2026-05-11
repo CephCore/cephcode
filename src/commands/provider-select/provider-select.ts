@@ -19,6 +19,8 @@ import {
 } from '../../services/ai/providerRegistry.js'
 import { clearProviderModelsCache, fetchProviderModels } from '../../services/ai/providerModels.js'
 import { ProviderManager, getProjectProviderConfigPath, getEffectiveProviderConfigPath, PROVIDER_CONFIG_PATH } from '../../services/ai/ProviderManager.js'
+import { OpenAIOAuthFlow } from '../../components/OpenAIOAuthFlow.js'
+import type { OpenAIOAuthTokens } from '../../services/openaiOAuth/index.js'
 
 type SerializableProviderRegistryEntry = Omit<ProviderRegistryEntry, 'provider'>
 
@@ -403,6 +405,9 @@ function ProviderPicker({
   const [anthropicType, setAnthropicType] = React.useState<'direct' | 'bedrock' | 'vertex' | 'foundry' | 'subscriber' | null>(null)
   const [googleType, setGoogleType] = React.useState<'direct' | 'vertex' | null>(null)
   const [openaiType, setOpenaiType] = React.useState<'direct' | 'subscriber' | 'azure' | null>(null)
+  const [searchQuery, setSearchQuery] = React.useState('')
+  const [searchCursorOffset, setSearchCursorOffset] = React.useState(0)
+  const [showOpenAIOAuth, setShowOpenAIOAuth] = React.useState(false)
   const setAppState = useSetAppState()
   const currentSessionModel = useAppState(s => (s.mainLoopModelForSession || s.mainLoopModel) as string | null)
 
@@ -420,6 +425,19 @@ function ProviderPicker({
       }
     })
   }, [])
+
+  const filteredOptions = React.useMemo(() => {
+    const query = searchQuery.toLowerCase().trim()
+    if (!query) return PROVIDER_KEYS
+    return PROVIDER_KEYS.filter(key => {
+      const info = getProviderInfo(key)
+      return (
+        key.toLowerCase().includes(query) ||
+        info.label.toLowerCase().includes(query) ||
+        info.envKey.toLowerCase().includes(query)
+      )
+    })
+  }, [searchQuery])
 
   async function handleGhLogin() {
     setIsGhLogin(true)
@@ -467,6 +485,43 @@ function ProviderPicker({
     }
   }
 
+  // Store OpenAI OAuth token
+  async function saveOpenAIToken(token: string) {
+    if (!provider) return
+
+    const currentConfig = await loadConfig()
+    const nextConfig: ProviderConfig = {
+      provider,
+      model: (currentSessionModel as string) || currentConfig?.model || getDefaultModelForProvider(provider) || '',
+      providerConfig: {
+        ...getSerializableProviderInfo(provider),
+        openaiType: 'subscriber',
+      } as any,
+      apiKeys: {
+        ...(currentConfig?.apiKeys ?? {}),
+        openai: token,
+      },
+    }
+
+    await saveConfig(nextConfig)
+    clearProviderModelsCache(provider)
+
+    // Set the session token in environment for immediate use
+    process.env.CHATGPT_SESSION_TOKEN = token
+
+    // Invalidate provider config cache to force reload
+    const providerManager = ProviderManager.getInstance()
+    providerManager.invalidateConfigCache()
+
+    const currentModel = nextConfig.model || getDefaultModelForProvider(provider)
+    applyProviderSelectionToSession(setAppState, { model: currentModel, provider }, false)
+
+    onDone(
+      `Set provider to ${provider} (ChatGPT Plus)\nModel: ${currentModel}\n(Session only)`,
+      { display: 'system' },
+    )
+  }
+
   async function saveProviderSelection(apiKey?: string) {
     if (!provider) return
 
@@ -509,7 +564,7 @@ function ProviderPicker({
   }
 
   if (!provider) {
-    const options = PROVIDER_KEYS.map(key => {
+    const options = filteredOptions.map(key => {
       const info = getProviderInfo(key)
       return {
         label: `${info.label} (${key})`,
@@ -522,20 +577,56 @@ function ProviderPicker({
       }
     })
 
-    return React.createElement(Select, {
-      options,
-      visibleOptionCount: 10,
-      onChange: value => {
-        setProvider(value as ProviderKey)
-        setApiKeyInput('')
-        setApiKeyCursorOffset(0)
-        setApiKeyError(null)
-      },
-      onCancel: () => {
-        setShowChangeKey(false)
-        onDone('Provider selection cancelled', { display: 'system' })
-      },
-    })
+    return React.createElement(
+      Box,
+      { flexDirection: 'column' },
+      React.createElement(
+        Text,
+        { marginBottom: 1 },
+        'Select AI Provider:',
+      ),
+      React.createElement(TextInput, {
+        value: searchQuery,
+        onChange: value => {
+          setSearchQuery(value)
+          setSearchCursorOffset(value.length)
+        },
+        onSubmit: () => {
+          // Enter on search input moves to selection
+        },
+        onExit: () => {
+          setSearchQuery('')
+          setSearchCursorOffset(0)
+          onDone('Provider selection cancelled', { display: 'system' })
+        },
+        placeholder: 'Search providers... (type to filter)',
+        focus: true,
+        showCursor: true,
+        columns: 50,
+        cursorOffset: searchCursorOffset,
+        onChangeCursorOffset: setSearchCursorOffset,
+      }),
+      React.createElement(Box, { marginTop: 1 }),
+      React.createElement(Select, {
+        options,
+        visibleOptionCount: 10,
+        highlightText: searchQuery,
+        onChange: value => {
+          setProvider(value as ProviderKey)
+          setApiKeyInput('')
+          setApiKeyCursorOffset(0)
+          setApiKeyError(null)
+          setSearchQuery('')
+          setSearchCursorOffset(0)
+        },
+        onCancel: () => {
+          setShowChangeKey(false)
+          setSearchQuery('')
+          setSearchCursorOffset(0)
+          onDone('Provider selection cancelled', { display: 'system' })
+        },
+      }),
+    )
   }
 
   const info = getProviderInfo(provider)
@@ -568,6 +659,8 @@ function ProviderPicker({
         },
         onCancel: () => {
           setProvider(null)
+          setSearchQuery('')
+          setSearchCursorOffset(0)
         },
       }),
     )
@@ -590,13 +683,17 @@ function ProviderPicker({
         ],
         visibleOptionCount: 2,
         onChange: value => setGoogleType(value as any),
-        onCancel: () => setProvider(null),
+        onCancel: () => {
+          setProvider(null)
+          setSearchQuery('')
+          setSearchCursorOffset(0)
+        },
       }),
     )
   }
 
   // Sub-menu for OpenAI implementation type
-  if (provider === 'openai' && !openaiType && !showChangeKey) {
+  if (provider === 'openai' && !openaiType && !showChangeKey && !showOpenAIOAuth) {
     return React.createElement(
       Box,
       { flexDirection: 'column' },
@@ -612,10 +709,44 @@ function ProviderPicker({
           { label: 'Azure OpenAI', value: 'azure', description: 'Use Azure OpenAI credentials' },
         ],
         visibleOptionCount: 3,
-        onChange: value => setOpenaiType(value as any),
-        onCancel: () => setProvider(null),
+        onChange: value => {
+          if (value === 'subscriber') {
+            setShowOpenAIOAuth(true)
+          } else {
+            setOpenaiType(value as any)
+          }
+        },
+        onCancel: () => {
+          setProvider(null)
+          setSearchQuery('')
+          setSearchCursorOffset(0)
+        },
       }),
     )
+  }
+
+  // OpenAI OAuth flow for ChatGPT Plus (Web)
+  if (provider === 'openai' && showOpenAIOAuth) {
+    return React.createElement(OpenAIOAuthFlow, {
+      onDone: (tokens: OpenAIOAuthTokens | null) => {
+        setShowOpenAIOAuth(false)
+        if (tokens?.accessToken) {
+          setOpenaiType('subscriber')
+          // Store the session token
+          void saveOpenAIToken(tokens.accessToken)
+        } else {
+          // Cancelled, go back to type selection
+          setOpenaiType(null)
+        }
+      },
+      onCancel: () => {
+        setShowOpenAIOAuth(false)
+        setOpenaiType(null)
+        setProvider(null)
+        setSearchQuery('')
+        setSearchCursorOffset(0)
+      },
+    })
   }
 
   const hasExistingKey = Boolean(config?.apiKeys?.[provider] || process.env[info.envKey])
@@ -654,6 +785,8 @@ function ProviderPicker({
         onCancel: () => {
           setProvider(null)
           setShowChangeKey(false)
+          setSearchQuery('')
+          setSearchCursorOffset(0)
         },
       }),
     )
@@ -725,6 +858,8 @@ function ProviderPicker({
           setAnthropicType(null)
           setGoogleType(null)
           setOpenaiType(null)
+          setSearchQuery('')
+          setSearchCursorOffset(0)
         },
         placeholder: `Paste ${info.envKey}`,
         mask: '*',
@@ -771,6 +906,8 @@ function ProviderPicker({
         onCancel: () => {
           setProvider(null)
           setShowChangeKey(false)
+          setSearchQuery('')
+          setSearchCursorOffset(0)
         },
       }),
     )

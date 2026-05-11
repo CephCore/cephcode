@@ -1,5 +1,6 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { CONTEXT_1M_BETA_HEADER } from '../constants/betas.js'
+import { getProviderRegistryEntry } from '../services/ai/providerRegistry.js'
 import { getGlobalConfig } from './config.js'
 import { isEnvTruthy } from './envUtils.js'
 import { getCanonicalName } from './model/model.js'
@@ -94,6 +95,13 @@ export function getContextWindowForModel(
       return antModel.contextWindow
     }
   }
+
+  // Look up from provider registry (supports all providers: OpenRouter, OpenAI, Google, etc.)
+  const contextFromRegistry = getContextWindowFromRegistry(model)
+  if (contextFromRegistry !== null) {
+    return contextFromRegistry
+  }
+
   return MODEL_CONTEXT_WINDOW_DEFAULT
 }
 
@@ -218,4 +226,71 @@ export function getModelMaxOutputTokens(model: string): {
  */
 export function getMaxThinkingTokensForModel(model: string): number {
   return getModelMaxOutputTokens(model).upperLimit - 1
+}
+
+/**
+ * Look up context window size from provider registry.
+ * Supports all providers (OpenRouter, OpenAI, Google, KiloCode, Ollama, etc.)
+ * Returns null if not found, allowing fallback to default.
+ */
+function getContextWindowFromRegistry(model: string): number | null {
+  const canonical = getCanonicalName(model)
+
+  // Map provider ID to registry lookup
+  const providerIdMap: Record<string, string> = {
+    'openrouter': 'openrouter',
+    'openai': 'openai',
+    'deepseek': 'deepseek',
+    'opencode': 'opencode',
+    'google': 'google',
+    'anthropic': 'anthropic',
+    'kilocode': 'kilocode',
+    'ollama': 'ollama',
+    'chatgpt': 'chatgpt',
+    'copilot': 'copilot',
+    'cline': 'cline',
+    'groq': 'groq',
+    'xai': 'xai',
+    'mistral': 'mistral',
+    'chatgpt_plus': 'chatgpt_plus',
+  }
+
+  // Try each provider to find matching model
+  for (const [_providerKey, providerId] of Object.entries(providerIdMap)) {
+    try {
+      const entry = getProviderRegistryEntry(providerId as any)
+      if (!entry) continue
+
+      const modelInfo = entry.models.find(
+        m => canonical.includes(m.id) || m.id.includes(canonical)
+      )
+
+      if (modelInfo?.capabilities.maxContext) {
+        const maxCtx = modelInfo.capabilities.maxContext
+        if (typeof maxCtx === 'number') {
+          return maxCtx
+        }
+      }
+    } catch {
+      // Provider not available, skip
+    }
+  }
+
+  // Also check all providers for exact match (for models like "deepseek-v4-pro")
+  const allProviders = ['openrouter', 'openai', 'deepseek', 'opencode', 'google', 'anthropic', 'kilocode', 'ollama', 'cline', 'groq', 'xai', 'mistral']
+  for (const providerId of allProviders) {
+    try {
+      const entry = getProviderRegistryEntry(providerId as any)
+      if (!entry) continue
+
+      const modelInfo = entry.models.find(m => m.id === model || m.id.endsWith(model))
+      if (modelInfo?.capabilities.maxContext && typeof modelInfo.capabilities.maxContext === 'number') {
+        return modelInfo.capabilities.maxContext
+      }
+    } catch {
+      continue
+    }
+  }
+
+  return null
 }

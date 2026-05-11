@@ -44,6 +44,8 @@ export type BrowserAction =
   | 'get_inputs'
   | 'evaluate'
   | 'search'
+  | 'request_help'
+  | 'vision_map'
 
 export interface BrowserActionInput {
   action: BrowserAction

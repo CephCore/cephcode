@@ -11,7 +11,7 @@ import * as lockfile from './lockfile.js'
 import { logError } from './log.js'
 import { createSignal } from './signal.js'
 import { jsonParse, jsonStringify } from './slowOperations.js'
-import { getTeamName } from './teammate.js'
+import { getAgentId, getTeamName } from './teammate.js'
 import { getTeammateContext } from './teammateContext.js'
 
 // Listeners for task list updates (used for immediate UI refresh in same process)
@@ -133,6 +133,11 @@ async function writeHighWaterMark(
 export function isTodoV2Enabled(): boolean {
   // Force-enable tasks in non-interactive mode (e.g. SDK users who want Task tools over TodoWrite)
   if (isEnvTruthy(process.env.CLAUDE_CODE_ENABLE_TASKS)) {
+    return true
+  }
+  // Enable tasks for agents/teammates even if session is marked non-interactive
+  // (Subagents often have isNonInteractiveSession: true to avoid UI interference)
+  if (getAgentId()) {
     return true
   }
   return !getIsNonInteractiveSession()

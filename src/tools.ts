@@ -76,6 +76,7 @@ import { TaskGetTool } from "./tools/TaskGetTool/TaskGetTool.js";
 import { TaskUpdateTool } from "./tools/TaskUpdateTool/TaskUpdateTool.js";
 import { TaskListTool } from "./tools/TaskListTool/TaskListTool.js";
 import { BrowserTool } from "./tools/BrowserTool/BrowserTool.js";
+import { CodeIndexTool } from "./tools/CodeIndexTool/CodeIndexTool.js";
 import uniqBy from "lodash-es/uniqBy.js";
 import { isToolSearchEnabledOptimistic } from "./utils/toolSearch.js";
 import { isTodoV2Enabled } from "./utils/tasks.js";
@@ -89,6 +90,8 @@ export {
   COORDINATOR_MODE_ALLOWED_TOOLS,
 } from "./constants/tools.js";
 import { feature } from "bun:bundle";
+
+const CODE_INDEX_FEATURE = 'CODE_INDEX'
 
 import type { ToolPermissionContext } from "./Tool.js";
 import { getDenyRuleForTool } from "./utils/permissions/permissions.js";
@@ -209,6 +212,7 @@ export function getAllBaseTools(): Tools {
     ResearchTool,
     ...(getComputerUseTool() ? [getComputerUseTool()] : []),
     BrowserTool,
+    ...(feature("CODE_INDEX") ? [CodeIndexTool] : []),
   ];
 }
 
