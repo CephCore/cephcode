@@ -401,7 +401,15 @@ export function getSnippetForTwoFileDiff(
   const cutoff = full.lastIndexOf('\n', DIFF_SNIPPET_MAX_BYTES)
   const kept =
     cutoff > 0 ? full.slice(0, cutoff) : full.slice(0, DIFF_SNIPPET_MAX_BYTES)
-  const remaining = countCharInString(full, '\n', kept.length) + 1
+  // G41: Count remaining content segments. Strip stray leading/trailing newlines
+  // so split doesn't produce empty elements at boundary edges. The replace only
+  // strips the one newline at each edge — consecutive newlines are preserved.
+  const remainingContent = full.slice(kept.length)
+  let remaining = 0
+  if (remainingContent) {
+    const normalized = remainingContent.replace(/^\n/, '').replace(/\n$/, '')
+    remaining = normalized ? normalized.split('\n').length : 0
+  }
   return `${kept}\n\n... [${remaining} lines truncated] ...`
 }
 

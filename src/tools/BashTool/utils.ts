@@ -154,7 +154,21 @@ export function formatOutput(content: string): {
   }
 
   const truncatedPart = content.slice(0, maxOutputLength)
-  const remainingLines = countCharInString(content, '\n', maxOutputLength) + 1
+  // G41: Count remaining content segments, stripping stray leading/trailing
+  // newlines so split doesn't produce empty elements at boundaries. Counting
+  // remaining content segments directly avoids fencepost errors when the
+  // truncation lands at or near a newline boundary (both `countCharInString + 1`
+  // and `split('\n').length` overcount when a boundary produces empty segments).
+  const remainingContent = content.slice(truncatedPart.length)
+  // G41: Count remaining content segments. Strip stray leading/trailing newlines
+  // so split doesn't produce empty elements at boundary edges. The replace
+  // only strips the one newline at each edge that's an artifact of truncation —
+  // consecutive newlines (blank lines) in the middle are preserved.
+  let remainingLines = 0
+  if (remainingContent) {
+    const normalized = remainingContent.replace(/^\n/, '').replace(/\n$/, '')
+    remainingLines = normalized ? normalized.split('\n').length : 0
+  }
   const truncated = `${truncatedPart}\n\n... [${remainingLines} lines truncated] ...`
 
   return {
