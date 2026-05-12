@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Claude Code - Documentation</title>
+  <title>Claude Code — Documentation</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -37,7 +37,9 @@
         <ul class="sidebar-nav">
           <li><a href="configuration.html" class="sidebar-link">Settings</a></li>
           <li><a href="providers.html" class="sidebar-link">AI Providers</a></li>
+          <li><a href="models.html" class="sidebar-link">Model Management</a></li>
           <li><a href="permissions.html" class="sidebar-link">Permissions</a></li>
+          <li><a href="automation.html" class="sidebar-link">Automation Modes</a></li>
         </ul>
       </div>
       <div class="sidebar-section">
@@ -51,7 +53,7 @@
         </ul>
       </div>
       <div class="sidebar-section">
-        <h3 class="sidebar-title">Learn from Claude Code</h3>
+        <h3 class="sidebar-title">Architecture</h3>
         <ul class="sidebar-nav">
           <li><a href="architecture.html" class="sidebar-link">Architecture</a></li>
           <li><a href="provider-pattern.html" class="sidebar-link">Provider Pattern</a></li>
@@ -71,6 +73,7 @@
       <div class="sidebar-section">
         <h3 class="sidebar-title">Reference</h3>
         <ul class="sidebar-nav">
+          <li><a href="keybindings.html" class="sidebar-link">Keyboard Shortcuts</a></li>
           <li><a href="faq.html" class="sidebar-link">FAQ</a></li>
           <li><a href="troubleshooting.html" class="sidebar-link">Troubleshooting</a></li>
         </ul>
@@ -80,91 +83,101 @@
     <main class="main-content">
       <h1>Claude Code</h1>
       <p class="lead">
-        A research-focused fork of Anthropic's Claude Code CLI with multi-provider routing, 
-        extensible plugin architecture, and enhanced AI capabilities.
+        A research fork of Anthropic's Claude Code CLI — a terminal-based AI coding assistant
+        with multi-provider routing, extensible plugin architecture, and a comprehensive
+        tool system for professional development workflows.
       </p>
 
       <div class="hero">
-        <h2>🚀 Get Started</h2>
-        <p>Start using Claude Code in minutes:</p>
+        <h2>Get Started</h2>
+        <p>Install and run Claude Code in minutes:</p>
         <div class="code-block">
-          <pre><code># Install dependencies
+          <pre><code># Clone the repository
+git clone https://github.com/JonusNattapong/ClaudeCode.git
+cd ClaudeCode
+
+# Install dependencies
 bun install
 
-# Build the project
+# Build and start a session
 bun run build
-
-# Start a session
 bun run src/main.tsx session</code></pre>
         </div>
       </div>
 
-      <h2>✨ What's New (2026)</h2>
+      <h2>Key Capabilities</h2>
       <ul>
-        <li><strong>11 AI Providers</strong> — Anthropic, OpenAI, Google Gemini, OpenRouter, Ollama, xAI, Mistral, and more</li>
-        <li><strong>90+ Commands</strong> — File ops, git, search, npm, agents, MCP, and more</li>
-        <li><strong>40+ Built-in Tools</strong> — Read, Edit, Write, Glob, Grep, Bash, WebSearch, Agent, and more</li>
-        <li><strong>Plugin System</strong> — Extend functionality with 12+ plugins and custom skills</li>
-        <li><strong>YOLO Modes</strong> — Three permission levels (YOLO Lite → YOLO ALLOW → YOLO MAX)</li>
-        <li><strong>Bridge Mode</strong> — Remote collaboration via session URLs</li>
-        <li><strong>Subagents</strong> — Background AI agents for parallel task execution</li>
+        <li><strong>14 AI Providers</strong> — Anthropic, OpenAI, Google Gemini, OpenRouter, Ollama, DeepSeek, xAI, Mistral, Groq, Copilot, and more</li>
+        <li><strong>104 Slash Commands</strong> — File operations, git, search, AI model management, MCP servers, plugins, and diagnostics</li>
+        <li><strong>54 Built-in Tools</strong> — Read, Edit, Write, Glob, Grep, Bash, PowerShell, WebFetch, WebSearch, Agent, Task, MCP, LSP, Git, CodeIndex, and more</li>
+        <li><strong>14 Plugins</strong> — Agent SDK, code review, commit commands, frontend design, feature development, security guidance, and more</li>
+        <li><strong>20 Bundled Skills</strong> — Debugging, web search, web scraping, commit, code review, scheduling, keybinding configuration</li>
+        <li><strong>Permission System</strong> — Four-tier automation mode: Default approval, YOLO Lite, YOLO ALLOW, and YOLO MAX</li>
+        <li><strong>Subagent Runtime</strong> — Background AI agents for parallel task execution with lease management and workspace isolation</li>
+        <li><strong>Bridge Mode</strong> — WebSocket-based remote collaboration with session sharing and team onboarding</li>
       </ul>
 
-      <h3>🔄 Recent Fixes (v2.1.136)</h3>
+      <h2>Recent Updates (v2.1.137)</h2>
       <ul>
-        <li><strong>MCP Stability</strong> — Per-call timeout isolation, 3× retry on transient errors, OAuth improvements</li>
-        <li><strong>Plugin Fixes</strong> — Windows path support, npm update detection, hook version locking</li>
-        <li><strong>Auth & OAuth</strong> — Default TTL 24h, client_secret_post, unhandled rejection fix, needs-auth visibility</li>
+        <li><strong>Subagent API Headers (G32)</strong> — Subagent API requests now carry <code>x-claude-code-agent-id</code> and <code>x-claude-code-parent-agent-id</code> headers for traceability</li>
+        <li><strong>API Key Override Gates (G33)</strong> — OAuth-dependent features are disabled when API key overrides are active, with clear messaging</li>
+        <li><strong>Compaction Preserves Instructions (G26)</strong> — Context compaction now preserves sensitive user instructions verbatim</li>
+        <li><strong>Symlinked Settings Hot-Reload (G8)</strong> — Settings watcher resolves realpath, enabling hot-reload for symlinked <code>settings.json</code></li>
+        <li><strong>Sandbox Auto-Allow Fix (G9)</strong> — Shell expansion commands (<code>$VAR</code>, <code>$(cmd)</code>) now respect auto-allow before prompting</li>
+        <li><strong>SIGTSTP Handler (E50)</strong> — Ctrl+Z no longer hangs in npx/bun wrapper environments</li>
+        <li><strong>Diff Truncation Fix (G41)</strong> — Corrected off-by-one in line count when truncation boundary falls on a newline</li>
+        <li><strong>Keybinding Modifier Fix (G19)</strong> — Cmd/Super/Win keybindings no longer incorrectly flagged as unparseable</li>
       </ul>
-      <p>See <a href="https://github.com/JonusNattapong/claude-code-mark1/blob/main/CHANGELOG.md">CHANGELOG</a> for details.</p>
+      <p>Full changelog available at <a href="https://github.com/JonusNattapong/ClaudeCode/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
 
       <div class="features-grid">
         <div class="feature-card">
-          <h3>🤖 11 AI Providers</h3>
-          <p>Switch between Anthropic, OpenAI, Google Gemini, OpenRouter, Ollama, xAI, Mistral, and more.</p>
-          <a href="providers.html" class="feature-link">Learn more →</a>
+          <h3>14 AI Providers</h3>
+          <p>Switch between Anthropic, OpenAI, Google, OpenRouter, Ollama, DeepSeek, xAI, Mistral, and more — all from one interface.</p>
+          <a href="providers.html" class="feature-link">Browse providers</a>
         </div>
         <div class="feature-card">
-          <h3>⚡️ 90+ Commands</h3>
-          <p>File operations, git, search, npm, agents, MCP, and more.</p>
-          <a href="commands.html" class="feature-link">Browse commands →</a>
+          <h3>104 Commands</h3>
+          <p>File operations, git, search, npm, agents, MCP, and more — all accessible via slash commands.</p>
+          <a href="commands.html" class="feature-link">View commands</a>
         </div>
         <div class="feature-card">
-          <h3>🔌 Plugin System</h3>
-          <p>Extend functionality with 12+ plugins and custom skills.</p>
-          <a href="plugins.html" class="feature-link">Explore plugins →</a>
+          <h3>Plugin System</h3>
+          <p>Extend the CLI with 14 plugins providing commands, agents, skills, hooks, and output styles.</p>
+          <a href="plugins.html" class="feature-link">Explore plugins</a>
         </div>
         <div class="feature-card">
-          <h3>🛡️ YOLO Modes</h3>
-          <p>Progressive permission bypass from read-only to full autonomy.</p>
-          <a href="permissions.html" class="feature-link">Configure →</a>
+          <h3>Permission Tiers</h3>
+          <p>Progressive automation modes from approval-based to full autonomy via YOLO Lite, ALLOW, and MAX.</p>
+          <a href="permissions.html" class="feature-link">Configure permissions</a>
         </div>
         <div class="feature-card">
-          <h3>🔧 40+ Tools</h3>
-          <p>Built-in tools for file ops, shell, web, development, and more.</p>
-          <a href="tools.html" class="feature-link">View tools →</a>
+          <h3>54 Built-in Tools</h3>
+          <p>File ops, shell execution, web search/fetch, MCP, subagents, LSP, notebooks, and structured diffs.</p>
+          <a href="tools.html" class="feature-link">View tools</a>
         </div>
         <div class="feature-card">
-          <h3>👥 Subagents</h3>
-          <p>Create background AI agents for parallel task execution.</p>
-          <a href="agents.html" class="feature-link">Learn more →</a>
+          <h3>Subagent System</h3>
+          <p>Background AI agents for parallel task execution with lease management and stale recovery.</p>
+          <a href="agents.html" class="feature-link">Learn more</a>
         </div>
       </div>
 
       <h2>Quick Links</h2>
       <ul class="quick-links">
-        <li><a href="installation.html">→ Installation Guide</a></li>
-        <li><a href="configuration.html">→ Configuration Options</a></li>
-        <li><a href="providers.html#api-keys">→ API Keys Setup</a></li>
-        <li><a href="commands.html">→ All Commands</a></li>
-        <li><a href="plugins.html">→ Plugin List</a></li>
-        <li><a href="faq.html">→ Frequently Asked Questions</a></li>
+        <li><a href="installation.html">Installation Guide</a></li>
+        <li><a href="quick-start.html">Quick Start</a></li>
+        <li><a href="configuration.html">Configuration Options</a></li>
+        <li><a href="providers.html#api-keys">API Key Setup</a></li>
+        <li><a href="commands.html">Complete Command Reference</a></li>
+        <li><a href="plugins.html">Plugin Catalog</a></li>
+        <li><a href="faq.html">Frequently Asked Questions</a></li>
       </ul>
     </main>
   </div>
 
   <footer class="footer">
-    <p>Claude Code Documentation • <a href="https://github.com/anomalyco/claude-code">GitHub</a></p>
+    <p>Claude Code Documentation — <a href="https://github.com/JonusNattapong/ClaudeCode">GitHub Repository</a></p>
   </footer>
 </body>
 </html>

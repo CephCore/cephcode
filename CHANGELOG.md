@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.139] - 2026-05-13
+
+### Added
+
+- **G32 — Subagent API headers**: API requests from subagents now carry `x-claude-code-agent-id` and `x-claude-code-parent-agent-id` headers. OTEL `llm_request` spans include `agent_id` / `parent_agent_id` attributes. Parent agent ID is captured at subagent creation time.
+- **G33 — API key override gates OAuth features**: When `ANTHROPIC_API_KEY` / `apiKeyHelper` / `ANTHROPIC_AUTH_TOKEN` is set, remote-control-dependent features are disabled with a clear message. claude.ai MCP connectors are gated by API key override check (removes the previous bypass that allowed dual-auth users).
+- **G26 — Compaction preserves sensitive instructions**: Compaction prompt now instructs the model to preserve sensitive user instructions verbatim during context compaction.
+- **E61 — Fallback thinking toggle**: Added Ctrl+Shift+T as fallback hotkey for toggling thinking mode on macOS when Option is not bound as Meta.
+
+### Fixed
+
+- **G19**: Keybindings with cmd/super/win modifier no longer flagged as unparseable — validator now allows `!parsed.super` keybindings without flagging them as parse errors.
+- **G8 — Symlinked settings hot-reload**: Settings file watcher now resolves realpath before watching, so edits to symlinked `~/.claude/settings.json` trigger hot-reload correctly.
+- **G9 — Sandbox auto-allow with shell expansions**: Sandbox auto-allow permission is now checked before returning "ask" for shell expansion commands (`$VAR`, `$(cmd)`) in the AST too-complex path.
+- **E50 — Ctrl+Z hang in npx/bun wrappers**: Added explicit SIGTSTP handler that exits alternate screen and sends SIGSTOP. Without this, wrapper processes (npx, bun run) swallow SIGTSTP and hang.
+- **G41 — Diff truncation line count off by one**: Fixed overcount when truncation boundary lands at a newline — `split('\n')` produces a trailing empty element that made `keptLines` one too many and `remainingLines` one too few.
+- **G44 — Regex metacharacters in skill argument names**: Special regex characters in skill argument names are now escaped before substitution, preventing corrupted prompt injection.
+
 ## [2.1.137] - 2026-05-12
 
 ### Added
@@ -202,6 +220,8 @@ All notable changes to this project will be documented in this file.
 
 - Initial release with core functionality.
 
+[2.1.139]: https://github.com/JonusNattapong/ClaudeCode/compare/v2.1.137...v2.1.139
+[2.1.137]: https://github.com/JonusNattapong/ClaudeCode/compare/v2.1.136...v2.1.137
 [2.1.136]: https://github.com/JonusNattapong/ClaudeCode/compare/v2.1.129...v2.1.136
 [2.1.129]: https://github.com/JonusNattapong/ClaudeCode/compare/v2.1.97...v2.1.129
 [2.1.97]: https://github.com/JonusNattapong/ClaudeCode/compare/v0.0.1...v2.1.97

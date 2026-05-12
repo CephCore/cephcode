@@ -1,212 +1,192 @@
 # Claude Code
 
-by Dek1milliontoken
+A research fork of Anthropic's Claude Code CLI — a terminal-based AI coding assistant with multi-provider routing, an extensible plugin architecture, and comprehensive tool system.
 
-Claude Code is an experimental, Bun-powered AI coding assistant CLI. This fork focuses on learning, research, and extension: multi-provider model routing, terminal UI, MCP integration, plugin workflows, permissions, subagents, and local developer automation.
+> This repository is an independent research and development project. It is not affiliated with or endorsed by Anthropic PBC.
 
-> This repository is not affiliated with Anthropic. It is an independent research and development fork.
+## Overview
 
-## What This Project Includes
+Claude Code extends the Claude Code CLI into a multi-provider AI platform. It preserves the original terminal interface and tool execution model while adding support for 14 AI providers, 54 built-in tools, 104 slash commands, 14 plugins, and 20 bundled skills.
 
-- A terminal-first AI coding interface built with React/Ink-style components.
-- Multi-provider AI support through `src/services/ai`.
-- Built-in tools for reading, editing, searching, shell execution, MCP, notebooks, planning, and agent workflows.
-- Slash commands for configuration, model/provider selection, permissions, plugins, MCP, sessions, git/worktree workflows, and diagnostics.
-- Plugin support for commands, agents, skills, hooks, MCP servers, and output styles.
-- Static HTML documentation in `docs/`.
-- Example configs, hooks, and MDM policy files in `examples/`.
+The project runs on [Bun](https://bun.sh) 1.3+ and targets Windows, macOS, and Linux (including WSL2).
+
+### Key Capabilities
+
+- **Multi-Provider AI** — Unified interface across Anthropic, OpenAI, Google Gemini, OpenRouter, Ollama, and more with seamless provider/model switching.
+- **Terminal UI** — React (Ink 6)-based terminal interface with syntax highlighting, scrollback, search, and keyboard navigation.
+- **Tool System** — 54 built-in tools covering file operations, shell execution, web search/fetch, git, MCP, subagents, Jupyter notebooks, LSP, structured diff editing, and more.
+- **Plugin Architecture** — Extensible plugin system supporting hooks, skills, commands, agents, MCP servers, and custom output styles.
+- **Permission Model** — Layered permission system from interactive approval through progressive automation modes (YOLO Lite, YOLO ALLOW, YOLO MAX).
+- **Subagent Runtime** — Background AI agents for parallel task execution with lease management, stale recovery, and workspace isolation.
+- **MCP Integration** — Model Context Protocol support with OAuth/SSE/stdio transports, tool registry, and channel notifications.
+- **Bridge Mode** — WebSocket-based remote collaboration with session sharing and team onboarding.
+- **Skill System** — 20 bundled skills (debug, web search, scrapling, commit, code review, and more) plus project-level custom skills.
 
 ## Requirements
 
-- Bun 1.3 or newer
-- Git
-- Windows, macOS, Linux, or WSL
-- At least one configured AI provider or compatible local provider
+| Dependency | Version |
+|-----------|---------|
+| [Bun](https://bun.sh) | 1.3 or newer |
+| Git | 2.x or newer |
+| OS | Windows, macOS, Linux, or WSL2 |
 
-## Install
+At least one configured AI provider API key is required for AI functionality.
 
-```bash
-bun install
-```
-
-If dependencies ever get into a stale state:
+## Quick Start
 
 ```bash
-rm -rf node_modules
+# Clone the repository
+git clone https://github.com/JonusNattapong/ClaudeCode.git
+cd ClaudeCode
+
+# Install dependencies
 bun install
+
+# Build the project
+bun run build
+
+# Start a session
+bun run src/main.tsx session
 ```
 
-On Windows PowerShell:
-
-```powershell
-Remove-Item -Recurse -Force node_modules
-bun install
-```
-
-## Run
-
-Development mode with watch:
+Development mode with hot reload:
 
 ```bash
 bun run dev
 ```
 
-Start once:
-
-```bash
-bun run start
-```
-
-Build:
-
-```bash
-bun run build
-```
-
-Test:
+Run the test suite:
 
 ```bash
 bun test
 ```
 
-The dev script runs:
+## AI Provider Configuration
+
+The following providers are implemented in `src/services/ai/providers/`:
+
+| Provider | Environment Variable |
+|----------|---------------------|
+| Anthropic (default) | `ANTHROPIC_API_KEY` |
+| OpenAI | `OPENAI_API_KEY` |
+| Google Gemini | `GOOGLE_GENERATIVE_API_KEY` |
+| OpenRouter | `OPENROUTER_API_KEY` |
+| DeepSeek | `DEEPSEEK_API_KEY` |
+| Ollama | `OLLAMA_HOST` |
+| xAI Grok | `XAI_API_KEY` |
+| Mistral | `MISTRAL_API_KEY` |
+| Groq | `GROQ_API_KEY` |
+| Copilot | GitHub token |
+| KiloCode | `KILOCODE_API_KEY` |
+| OpenCode | `OPENCODE_API_KEY` |
+| Cline API | `CLINE_API_KEY` |
+| ChatGPT Plus | Session token |
+
+Configure one or more providers via environment variables or `.env` file:
 
 ```bash
-bun --watch run src/main.tsx
-```
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for the full history. Key recent improvements:
-
-- **MCP Stability**: per-call timeout isolation, 3× retry on transient errors, OAuth `client_secret_post` support, `alwaysLoad` option, auth error recovery, and header expansion.
-- **Plugin fixes**: Windows path resolution for MCPB, npm update detection, hook version locking, and re-install dependency re-resolution.
-- **OAuth fixes**: default TTL 24h (was 1h), unhandled rejection fix, needs-auth visibility for headersHelper servers.
-
-## Provider Configuration
-
-The repo contains provider implementations for:
-
-- Anthropic
-- OpenAI
-- OpenAI Responses
-- Google Gemini
-- OpenRouter
-- Ollama
-- OpenAI-compatible endpoints
-- ChatGPT session/OAuth flows
-- Copilot
-- KiloCode
-
-Common environment variables:
-
-```bash
-# Anthropic
 export ANTHROPIC_API_KEY=sk-ant-...
-
-# OpenAI
 export OPENAI_API_KEY=sk-...
-
-# Google Gemini
 export GOOGLE_GENERATIVE_API_KEY=...
-
-# OpenRouter
-export OPENROUTER_API_KEY=sk-or-...
-
-# Ollama
-export OLLAMA_HOST=http://localhost:11434
 ```
 
-Inside the CLI, use:
+Within the CLI, switch providers and models interactively using `/provider` and `/model` commands.
 
-```text
-/provider
-/model
+Refer to [docs/providers.html](docs/providers.html) for detailed configuration instructions.
+
+## Commands, Tools, and Skills
+
+### Slash Commands (104)
+
+The command system covers file operations, git workflows, AI model management, plugin administration, MCP server management, session control, diagnostics, and more. Common commands include:
+
 ```
-
-See [docs/providers.html](docs/providers.html) and [docs/provider-pattern.html](docs/provider-pattern.html).
-
-## Important Commands
-
-Common interactive commands include:
-
-```text
-/help              Show command help
-/model             Select or inspect models
+/help              Command reference
+/model             Select or inspect AI models
 /provider          Switch AI provider
 /config            Edit configuration
-/permissions       Review permission settings
-/yolo              Open automation mode picker
+/permissions       Manage permission settings
 /mcp               Manage MCP servers
 /agents            Manage subagents
 /plugins           Manage plugins
-/reload-plugins    Reload plugin state
 /theme             Change terminal theme
-/doctor            Run diagnostics
-/compact           Compact context
+/doctor            Run system diagnostics
+/compact           Compact conversation context
 /resume            Resume a previous session
+/stats             View token usage statistics
 ```
 
-More command docs are in [docs/commands.html](docs/commands.html).
+See [docs/commands.html](docs/commands.html) for the full command reference.
 
-## Permissions And Automation
+### Built-in Tools (54)
 
-The project includes an ask-first permission model plus progressive automation modes. Keep the default permission behavior for normal development.
+Tools are organized by purpose in `src/tools/`:
 
-Automation modes such as `yolo-lite`, `yolo`, and `yolo-max` can allow broad tool execution. Use them only in trusted repositories or disposable sandboxes.
+- **File Operations**: Read, Edit, Write, Glob, Grep, NotebookEdit, FileEditTool
+- **Shell Execution**: BashTool, PowerShell
+- **Version Control**: Git
+- **Web**: WebFetch, WebSearch, ResearchTool
+- **AI & Agents**: Agent, Task, Skill, AskUserQuestion
+- **Protocol Integration**: MCPTool, MCPSearchTool, LSP
+- **Code Intelligence**: CodeIndex
+- **Media**: MediaUnderstanding
+- **Scheduling**: ScheduleCronTool
+- **Monitoring**: Monitor
+- **Persistence**: MemoryTool
 
-See:
+See [docs/tools.html](docs/tools.html) for detailed tool documentation.
 
-- [docs/permissions.html](docs/permissions.html)
-- [docs/permission-model.html](docs/permission-model.html)
+### Bundled Skills (20)
 
-## Plugins
+Skills in `src/skills/bundled/` provide specialized capabilities:
 
-Plugin examples live in `plugins/`. Current plugin folders include:
+`batch`, `claudeApi`, `claudeApiContent`, `claudeInChrome`, `commit`, `debug`, `index`, `keybindings`, `loop`, `loremIpsum`, `remember`, `scheduleRemoteAgents`, `scrapling`, `simplify`, `skillify`, `stuck`, `updateConfig`, `verify`, `verifyContent`, `webSearch`
 
-- `agent-sdk-dev`
-- `claude-opus-4-5-migration`
-- `code-review`
-- `commit-commands`
-- `explanatory-output-style`
-- `feature-dev`
-- `frontend-design`
-- `hookify`
-- `learning-output-style`
-- `plugin-dev`
-- `pr-review-toolkit`
-- `ralph-wiggum`
-- `security-guidance`
+See [docs/skills.html](docs/skills.html) for skill usage documentation.
 
-Plugins can contribute commands, agents, skills, hooks, MCP servers, and output styles depending on their manifest and file layout.
+## Plugin System
 
-See:
+The plugin system supports third-party and bundled extensions with the following capabilities:
 
-- [plugins/README.md](plugins/README.md)
-- [docs/plugins.html](docs/plugins.html)
-- [docs/plugin-system.html](docs/plugin-system.html)
+- Commands, agents, skills, and hooks
+- MCP server integration
+- Custom output styles
+- Marketplace installation via `clawdhub.com`
 
-## MCP
+### Included Plugins (14)
 
-MCP support is implemented under `src/services/mcp` and exposed through CLI commands and tool integration. The codebase includes MCP config loading, OAuth/auth flows, transport support, channel notifications, official registry helpers, and in-process transport utilities.
+`agent-sdk-dev`, `claude-opus-4-5-migration`, `code-review`, `commit-commands`, `dek-opus-4-5-migration`, `explanatory-output-style`, `feature-dev`, `frontend-design`, `hookify`, `learning-output-style`, `plugin-dev`, `pr-review-toolkit`, `ralph-wiggum`, `security-guidance`
 
-See [docs/mcp-integration.html](docs/mcp-integration.html).
+Plugin examples reside in `plugins/`. See [plugins/README.md](plugins/README.md) and [docs/plugins.html](docs/plugins.html) for development and usage documentation.
 
-## Project Layout
+## Permissions and Automation
 
-```text
+The permission system operates in tiers:
+
+| Mode | Behavior |
+|------|----------|
+| **Default** | Interactive approval for each tool execution |
+| **YOLO Lite** | Read-only operations auto-approved |
+| **YOLO ALLOW** | Most tools auto-approved; dangerous operations prompt |
+| **YOLO MAX** | Fully autonomous execution; bypass all confirmations |
+
+Use automation modes only in trusted repositories or disposable sandboxes. See [docs/permissions.html](docs/permissions.html) for configuration details.
+
+## Project Structure
+
+```
 src/
-  commands/          Slash commands and command UI
-  components/        Terminal UI components
-  context/           React contexts and shared app state
-  services/          AI providers, MCP, analytics, search, plugins, voice, VCR
-  skills/            Built-in skill loading and skill helpers
-  tools/             Built-in tool implementations
-  utils/             Config, permissions, telemetry, shell, plugins, filesystem
-  native-ts/         TypeScript ports/replacements for native helpers
+  commands/          Slash command implementations and UI (104 commands)
+  components/        Terminal UI components (React/Ink)
+  context/           React contexts and shared application state
+  services/          Core services (AI providers, MCP, analytics, search, plugins, voice, VCR)
+  skills/            Skill loading and bundled skill implementations
+  tools/             Built-in tool implementations (54 tools)
+  utils/             Shared utilities (config, permissions, telemetry, shell, plugins, filesystem)
+  native-ts/         TypeScript ports of native/cpp modules (color-diff, file-index, yoga-layout)
 
 docs/                Static HTML documentation site
-plugins/             Bundled/example plugin directories
+plugins/             Bundled and example plugin directories
 examples/            Example settings, hooks, and policy files
 scripts/             Utility and automation scripts
 assets/              Media assets
@@ -214,24 +194,38 @@ assets/              Media assets
 
 ## Documentation
 
-Open [docs/index.html](docs/index.html) in a browser.
-
-Useful pages:
+Open [docs/index.html](docs/index.html) in a browser for the full documentation site. Key pages:
 
 - [Installation](docs/installation.html)
 - [Quick Start](docs/quick-start.html)
 - [Configuration](docs/configuration.html)
-- [Providers](docs/providers.html)
-- [Commands](docs/commands.html)
-- [Tools](docs/tools.html)
-- [Agents](docs/agents.html)
-- [Plugins](docs/plugins.html)
+- [AI Providers](docs/providers.html)
+- [Commands Reference](docs/commands.html)
+- [Tools Reference](docs/tools.html)
+- [Agent System](docs/agents.html)
+- [Plugin Guide](docs/plugins.html)
 - [Architecture](docs/architecture.html)
 - [Troubleshooting](docs/troubleshooting.html)
+- [FAQ](docs/faq.html)
 
-## Notes For Windows
+### Architecture Deep Dives
 
-This repo is intended to run with Bun on Windows as well as Unix-like environments. If you see repeated module resolution errors after dependency changes, refresh `node_modules`:
+- [Provider Pattern](docs/provider-pattern.html)
+- [Command System](docs/command-system.html)
+- [Tool System](docs/tool-system.html)
+- [Permission Model](docs/permission-model.html)
+- [Memory System](docs/memory-system.html)
+- [Session System](docs/session-system.html)
+- [Context Compaction](docs/context-compaction.html)
+- [Plugin System](docs/plugin-system.html)
+- [Skill System](docs/skill-system.html)
+- [MCP Integration](docs/mcp-integration.html)
+- [Bridge Mode](docs/bridge-mode.html)
+- [Agent System](docs/agent-system.html)
+
+## Windows Notes
+
+This project is developed and tested with Bun on Windows. If you encounter module resolution errors after dependency changes:
 
 ```powershell
 Remove-Item -Recurse -Force node_modules
@@ -239,9 +233,9 @@ bun install
 bun run dev
 ```
 
-## Status
+## Changelog
 
-This is an active experimental fork. Some features are research-oriented, some are platform-specific, and some integrations may require private configuration, environment flags, or external services.
+See [CHANGELOG.md](CHANGELOG.md) for the complete version history. The current release is **v2.1.137**.
 
 ## License
 
