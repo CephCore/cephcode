@@ -45,6 +45,12 @@ function getClipboardCommands() {
 
   const screenshotPath = tempPaths[platform] || tempPaths.linux
 
+  // Detect WSL2: Linux kernel with Microsoft kernel build or WSL-specific env vars.
+  // On WSL2, xclip/wl-paste can't access the Windows clipboard, so fall back
+  // to powershell.exe via the Windows host (H34).
+  const isWSL = platform === 'linux' &&
+    (!!process.env.WSLENV || !!process.env.WSL_DISTRO_NAME || (process.env.OS?.startsWith('Windows')))
+
   // Platform-specific clipboard commands
   const commands: Record<
     SupportedPlatform,
@@ -63,10 +69,17 @@ function getClipboardCommands() {
     },
     linux: {
       checkImage:
-        'xclip -selection clipboard -t TARGETS -o 2>/dev/null | grep -E "image/(png|jpeg|jpg|gif|webp|bmp)" || wl-paste -l 2>/dev/null | grep -E "image/(png|jpeg|jpg|gif|webp|bmp)"',
-      saveImage: `xclip -selection clipboard -t image/png -o > "${screenshotPath}" 2>/dev/null || wl-paste --type image/png > "${screenshotPath}" 2>/dev/null || xclip -selection clipboard -t image/bmp -o > "${screenshotPath}" 2>/dev/null || wl-paste --type image/bmp > "${screenshotPath}"`,
+        `xclip -selection clipboard -t TARGETS -o 2>/dev/null | grep -E "image/(png|jpeg|jpg|gif|webp|bmp)" || ` +
+        `wl-paste -l 2>/dev/null | grep -E "image/(png|jpeg|jpg|gif|webp|bmp)"` +
+        (isWSL ? ` || powershell.exe -NoProfile -Command "(Get-Clipboard -Format Image) -ne ` + '$null"' : ''),
+      saveImage: `xclip -selection clipboard -t image/png -o > "${screenshotPath}" 2>/dev/null || ` +
+        `wl-paste --type image/png > "${screenshotPath}" 2>/dev/null || ` +
+        `xclip -selection clipboard -t image/bmp -o > "${screenshotPath}" 2>/dev/null || ` +
+        `wl-paste --type image/bmp > "${screenshotPath}"` +
+        (isWSL ? ` || powershell.exe -NoProfile -Command "$img = Get-Clipboard -Format Image; if ($img) { $img.Save('${screenshotPath.replace(/\\/g, '\\\\')}', [System.Drawing.Imaging.ImageFormat]::Png) }"` : ''),
       getPath:
-        'xclip -selection clipboard -t text/plain -o 2>/dev/null || wl-paste 2>/dev/null',
+        `xclip -selection clipboard -t text/plain -o 2>/dev/null || wl-paste 2>/dev/null` +
+        (isWSL ? ` || powershell.exe -NoProfile -Command "Get-Clipboard"` : ''),
       deleteFile: `rm -f "${screenshotPath}"`,
     },
     win32: {

@@ -10,13 +10,22 @@ import {
   getAttributionHeader,
   getCLISyspromptPrefix,
 } from '../constants/system.js'
+import { addToTotalSessionCost } from '../cost-tracker.js'
 import { logEvent } from '../services/analytics/index.js'
 import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../services/analytics/metadata.js'
+import {
+  classifyProviderError,
+  getProviderErrorInfo,
+} from '../services/api/errors.js'
 import { getAPIMetadata } from '../services/api/claude.js'
 import { getAnthropicClient } from '../services/api/client.js'
+import { ProviderManager } from '../services/ai/ProviderManager.js'
+import { fromGenericUsage } from '../services/ai/usageTypes.js'
 import { getModelBetas, modelSupportsStructuredOutputs } from './betas.js'
 import { computeFingerprint } from './fingerprint.js'
+import { logError } from './log.js'
 import { normalizeModelStringForAPI } from './model/model.js'
+import { getActiveProviderId, isAnthropicProvider } from './model/providers.js'
 
 type MessageParam = Anthropic.MessageParam
 type TextBlockParam = Anthropic.TextBlockParam
@@ -121,13 +130,92 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
     stop_sequences,
   } = opts
 
+  // ── Multi-provider routing ──────────────────────────────────────────────
+  // Non-Anthropic path: skip OAuth fingerprint/attribution headers (Anthropic-
+  // specific), use provider's chat API, and track costs via ProviderUsage.
+  const anthropic = isAnthropicProvider()
+  const normalizedModel = normalizeModelStringForAPI(model)
+  const start = Date.now()
+
+  if (!anthropic) {
+    const providerId = getActiveProviderId()
+    const systemText = systemBlocksText(system, skipSystemPromptPrefix)
+
+    try {
+      const providerClient = await ProviderManager.getInstance().createClient(providerId, {
+        model: normalizedModel,
+        maxRetries,
+        source: 'side_query',
+      }) as any
+      const messagesForProvider = [
+        ...(systemText ? [{ role: 'system' as const, content: systemText }] : []),
+        ...messages.map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: typeof m.content === 'string' ? m.content : m.content.map((c: any) => c.text || '').join(''),
+        })),
+      ]
+      const result = await (providerClient.chat?.completions?.create ?? providerClient.beta?.messages?.create)({
+        model: normalizedModel,
+        max_tokens: max_tokens,
+        messages: messagesForProvider,
+        ...(temperature !== undefined && { temperature }),
+        ...(stop_sequences && { stop: stop_sequences }),
+      })
+
+      const choice = result.choices?.[0] ?? result.content?.[0] ?? { text: '' }
+      const response: BetaMessage = {
+        id: result.id ?? 'side-query',
+        type: 'message' as any,
+        model: normalizedModel,
+        content: [{ type: 'text', text: choice.text ?? choice.message?.content ?? JSON.stringify(choice) }],
+        usage: {
+          input_tokens: result.usage?.prompt_tokens ?? result.usage?.input_tokens ?? 0,
+          output_tokens: result.usage?.completion_tokens ?? result.usage?.output_tokens ?? 0,
+        },
+      } as unknown as BetaMessage
+
+      // J2: Track side query costs for non-Anthropic providers
+      try {
+        addToTotalSessionCost(
+          normalizedModel,
+          fromGenericUsage(
+            response.usage.input_tokens,
+            response.usage.output_tokens,
+          ),
+          providerId,
+        )
+      } catch { /* cost tracking is best-effort */ }
+
+      // J1: Log with providerId for multi-provider debugging
+      const now = Date.now()
+      logEvent('tengu_api_success', {
+        querySource: opts.querySource as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        model: normalizedModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        providerId: providerId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        durationMsIncludingRetries: now - start,
+        timeSinceLastApiCallMs: getLastApiCompletionTimestamp() !== null ? now - getLastApiCompletionTimestamp()! : undefined,
+      })
+      setLastApiCompletionTimestamp(now)
+      return response
+    } catch (error) {
+      // J5: Classify error with provider info for better debugging
+      const classified = classifyProviderError(error)
+      logError(new Error(
+        `SideQuery [${providerId}/${normalizedModel}] ${classified.category}: ${error instanceof Error ? error.message : String(error)}`,
+      ))
+      throw error
+    }
+  }
+
+  // ── Anthropic path (unchanged logic, extracted for clarity) ────────────
   const client = await getAnthropicClient({
     maxRetries,
     model,
     source: 'side_query',
   })
   const betas = [...getModelBetas(model)]
-  // Add structured-outputs beta if using output_format and provider supports it
   if (
     output_format &&
     modelSupportsStructuredOutputs(model) &&
@@ -136,49 +224,25 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
     betas.push(STRUCTURED_OUTPUTS_BETA_HEADER)
   }
 
-  // Extract first user message text for fingerprint
   const messageText = extractFirstUserMessageText(messages)
-
-  // Compute fingerprint for OAuth attribution
   const fingerprint = computeFingerprint(messageText, MACRO.VERSION)
   const attributionHeader = getAttributionHeader(fingerprint)
 
-  // Build system as array to keep attribution header in its own block
-  // (prevents server-side parsing from including system content in cc_entrypoint)
   const systemBlocks: TextBlockParam[] = [
     attributionHeader ? { type: 'text', text: attributionHeader } : null,
-    // Skip CLI system prompt prefix for internal classifiers that provide their own prompt
     ...(skipSystemPromptPrefix
       ? []
-      : [
-          {
-            type: 'text' as const,
-            text: getCLISyspromptPrefix({
-              isNonInteractive: false,
-              hasAppendSystemPrompt: false,
-            }),
-          },
-        ]),
-    ...(Array.isArray(system)
-      ? system
-      : system
-        ? [{ type: 'text' as const, text: system }]
-        : []),
+      : [{ type: 'text' as const, text: getCLISyspromptPrefix({ isNonInteractive: false, hasAppendSystemPrompt: false }) }]),
+    ...(Array.isArray(system) ? system : system ? [{ type: 'text' as const, text: system }] : []),
   ].filter((block): block is TextBlockParam => block !== null)
 
   let thinkingConfig: BetaThinkingConfigParam | undefined
   if (thinking === false) {
     thinkingConfig = { type: 'disabled' }
   } else if (thinking !== undefined) {
-    thinkingConfig = {
-      type: 'enabled',
-      budget_tokens: Math.min(thinking, max_tokens - 1),
-    }
+    thinkingConfig = { type: 'enabled', budget_tokens: Math.min(thinking, max_tokens - 1) }
   }
 
-  const normalizedModel = normalizeModelStringForAPI(model)
-  const start = Date.now()
-  // biome-ignore lint/plugin: this IS the wrapper that handles OAuth attribution
   const response = await client.beta.messages.create(
     {
       model: normalizedModel,
@@ -197,26 +261,40 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
     { signal },
   )
 
-  const requestId =
-    (response as { _request_id?: string | null })._request_id ?? undefined
+  const requestId = (response as { _request_id?: string | null })._request_id ?? undefined
   const now = Date.now()
   const lastCompletion = getLastApiCompletionTimestamp()
   logEvent('tengu_api_success', {
-    requestId:
-      requestId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    querySource:
-      opts.querySource as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    model:
-      normalizedModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    requestId: requestId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    querySource: opts.querySource as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    model: normalizedModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
     cachedInputTokens: response.usage.cache_read_input_tokens ?? 0,
     uncachedInputTokens: response.usage.cache_creation_input_tokens ?? 0,
     durationMsIncludingRetries: now - start,
-    timeSinceLastApiCallMs:
-      lastCompletion !== null ? now - lastCompletion : undefined,
+    timeSinceLastApiCallMs: lastCompletion !== null ? now - lastCompletion : undefined,
   })
   setLastApiCompletionTimestamp(now)
 
   return response
+}
+
+/** Build system text from blocks for non-Anthropic providers. */
+function systemBlocksText(
+  system: string | TextBlockParam[] | undefined,
+  skipPrefix: boolean | undefined,
+): string {
+  const parts: string[] = []
+  if (!skipPrefix) {
+    parts.push(getCLISyspromptPrefix({ isNonInteractive: false, hasAppendSystemPrompt: false }))
+  }
+  if (typeof system === 'string') {
+    parts.push(system)
+  } else if (Array.isArray(system)) {
+    for (const block of system) {
+      if (block.type === 'text') parts.push(block.text)
+    }
+  }
+  return parts.join('\n')
 }

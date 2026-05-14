@@ -58,6 +58,7 @@ import { SLEEP_TOOL_NAME } from '../tools/SleepTool/prompt.js'
 import { TICK_TAG } from './xml.js'
 import { logForDebugging } from '../utils/debug.js'
 import { loadMemoryPrompt } from '../memdir/memdir.js'
+import { getSessionGoalSync } from '../utils/sessionGoalState.js'
 import { isUndercover } from '../utils/undercover.js'
 import { isMcpInstructionsDeltaEnabled } from '../utils/mcpInstructionsDelta.js'
 
@@ -487,6 +488,7 @@ export async function getSystemPrompt(
       getSessionSpecificGuidanceSection(enabledTools, skillToolCommands),
     ),
     systemPromptSection('memory', () => loadMemoryPrompt()),
+    systemPromptSection('session_goal', () => loadGoalPrompt()),
     systemPromptSection('ant_model_override', () =>
       getAntModelOverrideSection(),
     ),
@@ -931,4 +933,21 @@ Do not narrate each step, list every file you read, or explain routine actions. 
 The user context may include a \`terminalFocus\` field indicating whether the user's terminal is focused or unfocused. Use this to calibrate how autonomous you are:
 - **Unfocused**: The user is away. Lean heavily into autonomous action — make decisions, explore, commit, push. Only pause for genuinely irreversible or high-risk actions.
 - **Focused**: The user is watching. Be more collaborative — surface choices, ask before committing to large changes, and keep your output concise so it's easy to follow in real time.${BRIEF_PROACTIVE_SECTION && briefToolModule?.isBriefEnabled() ? `\n\n${BRIEF_PROACTIVE_SECTION}` : ''}`
+}
+
+export function loadGoalPrompt(): string | null {
+  const goal = getSessionGoalSync()
+  if (!goal) return null
+  return `<session-goal>
+The user has set the following goal for this session:
+
+"${goal}"
+
+This is your overarching task. Keep working toward it autonomously:
+- After each tool result, ask: "What is the next step toward the goal?"
+- If you detect drift, course-correct back to the goal immediately.
+- Do NOT stop at a natural step boundary — continue until the goal is achieved.
+- If you need clarification, ask — but prefer action over questions.
+- Report progress at the end of each turn.
+</session-goal>`
 }

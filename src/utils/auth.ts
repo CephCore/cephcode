@@ -95,6 +95,24 @@ function isManagedOAuthContext(): boolean {
   )
 }
 
+/**
+ * @[MULTI_PROVIDER] Check if the active provider is Anthropic-based.
+ * Non-Anthropic providers (OpenAI, Google, OpenRouter, Ollama, etc.) don't use
+ * Claude.ai OAuth or subscriber tiers — they use their own API keys.
+ * This gates all subscriber/auth checks that only make sense for Anthropic.
+ */
+export function isActiveProviderAnthropic(): boolean {
+  try {
+    const { ProviderManager } = require('../services/ai/ProviderManager.js') as typeof import('../services/ai/ProviderManager.js')
+    const config = ProviderManager.getInstance().getSelectedProviderConfig()
+    if (!config?.provider) return true // Default: Anthropic
+    const anthropicProviders = ['anthropic', 'bedrock', 'vertex', 'foundry', 'copilot']
+    return anthropicProviders.includes(config.provider)
+  } catch {
+    return true // If ProviderManager can't be loaded, assume Anthropic
+  }
+}
+
 /** Whether we are supporting direct 1P auth. */
 // this code is closely related to getAuthTokenSource
 export function isAnthropicAuthEnabled(): boolean {
@@ -145,21 +163,13 @@ export function isAnthropicAuthEnabled(): boolean {
     (hasExternalAuthToken && !isManagedOAuthContext()) ||
     (hasExternalApiKey && !isManagedOAuthContext())
 
-  // Even with ANTHROPIC_API_KEY set, keep auth enabled if the user
-  // has active OAuth login (from `claude auth login`). OAuth takes
-  // priority for features like remote control, /schedule, and
-  // claude.ai MCP connectors. The API key is still available for
-  // inference through getAnthropicApiKeyWithSource().
-  if (shouldDisableAuth && !is3P && !isManagedOAuthContext()) {
-    const oauthTokens = getClaudeAIOAuthTokens()
-    const hasOAuth =
-      oauthTokens?.accessToken &&
-      oauthTokens?.refreshToken &&
-      oauthTokens?.scopes?.includes('user:inference')
-    if (hasOAuth) {
-      return true
-    }
-  }
+  // Previously, auth was kept enabled when both API key and OAuth login existed,
+  // allowing OAuth-dependent features (Remote Control, /schedule, claude.ai MCP
+  // connectors, notification preferences) to work alongside the API key.
+  // This was changed upstream (2.1.139): when ANTHROPIC_API_KEY / apiKeyHelper /
+  // ANTHROPIC_AUTH_TOKEN is set, these OAuth features are now disabled because
+  // they require claude.ai login. Unset the API key to use them.
+  // https://code.claude.com/docs/en/changelog (G33/H2)
 
   return !shouldDisableAuth
 }
@@ -1587,8 +1597,16 @@ async function checkAndRefreshOAuthTokenIfNeededImpl(
   }
 }
 
+/**
+ * @[MULTI_PROVIDER] Claude.ai subscriber check — only meaningful for Anthropic providers.
+ * Non-Anthropic providers (OpenAI, Google, OpenRouter, etc.) use their own auth systems.
+ */
 export function isClaudeAISubscriber(): boolean {
   if (!isAnthropicAuthEnabled()) {
+    return false
+  }
+  // Non-Anthropic providers don't have Claude.ai subscriptions
+  if (!isActiveProviderAnthropic()) {
     return false
   }
 
@@ -1609,7 +1627,16 @@ export function hasProfileScope(): boolean {
   )
 }
 
+/**
+ * @[MULTI_PROVIDER] 1P API customer check — Anthropic-specific concept.
+ * Non-Anthropic providers (OpenAI, Google, etc.) are not Anthropic API customers.
+ */
 export function is1PApiCustomer(): boolean {
+  // Non-Anthropic providers use their own billing/API systems
+  if (!isActiveProviderAnthropic()) {
+    return false
+  }
+
   // 1P API customers are users who are NOT:
   // 1. Claude.ai subscribers (Max, Pro, Enterprise, Team)
   // 2. Vertex AI users
@@ -1737,7 +1764,26 @@ export function getRateLimitTier(): string | null {
   return oauthTokens.rateLimitTier ?? null
 }
 
+/**
+ * @[MULTI_PROVIDER] Returns the subscription/product name based on active provider.
+ * For non-Anthropic providers, returns the provider's display name.
+ */
 export function getSubscriptionName(): string {
+  if (!isActiveProviderAnthropic()) {
+    try {
+      const { ProviderManager } = require('../services/ai/ProviderManager.js') as typeof import('../services/ai/ProviderManager.js')
+      const config = ProviderManager.getInstance().getSelectedProviderConfig()
+      if (config?.provider) {
+        // Capitalize provider name for display
+        const name = config.provider.charAt(0).toUpperCase() + config.provider.slice(1)
+        return `${name} API`
+      }
+    } catch {
+      // Fall through to defaults
+    }
+    return 'External Provider'
+  }
+
   const subscriptionType = getSubscriptionType()
 
   switch (subscriptionType) {

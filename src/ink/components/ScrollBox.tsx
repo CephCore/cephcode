@@ -67,6 +67,12 @@ export type ScrollBoxProps = Except<Styles, 'textWrap' | 'overflow' | 'overflowX
    * grows. Unset manually via scrollTo/scrollBy to break the stickiness.
    */
   stickyScroll?: boolean;
+  /**
+   * When true, scrollToBottom jumps to the bottom without re-engaging sticky
+   * scroll. Used when autoScrollEnabled is false — the user can still scroll
+   * to see new content but auto-follow doesn't re-engage.
+   */
+  disableStickyScroll?: boolean;
 };
 
 /**
@@ -154,7 +160,12 @@ function ScrollBox({
       const el = domRef.current;
       if (!el) return;
       el.pendingScrollDelta = undefined;
-      el.stickyScroll = true;
+      if (el.attributes?.['disableStickyScroll']) {
+        // scroll to bottom without re-engaging sticky mode (autoScrollEnabled: false)
+        el.scrollTop = Math.max(0, (el.scrollHeight ?? 0) - (el.scrollViewportHeight ?? 0));
+      } else {
+        el.stickyScroll = true;
+      }
       markDirty(el);
       notify();
       forceRender(n => n + 1);
@@ -184,6 +195,10 @@ function ScrollBox({
     isSticky() {
       const el = domRef.current;
       if (!el) return false;
+      // When disableStickyScroll is set, sticky is always false regardless
+      // of the stickyScroll attribute. This prevents background sessions
+      // (WTerminal/VS Code) from re-engaging auto-follow after manual scroll.
+      if (el.attributes?.['disableStickyScroll']) return false;
       return el.stickyScroll ?? Boolean(el.attributes['stickyScroll']);
     },
     subscribe(listener: () => void) {
@@ -227,6 +242,8 @@ function ScrollBox({
     overflowY: 'scroll'
   }} {...stickyScroll ? {
     stickyScroll: true
+  } : {}}{...disableStickyScroll ? {
+    disableStickyScroll: true
   } : {}}>
       <Box flexDirection="column" flexGrow={1} flexShrink={0} width="100%">
         {children}

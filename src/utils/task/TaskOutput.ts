@@ -103,6 +103,17 @@ export class TaskOutput {
   }
 
   /**
+   * Stop all active polling and clear the interval.
+   */
+  static stopAllPolling(): void {
+    TaskOutput.#activePolling.clear()
+    if (TaskOutput.#pollInterval) {
+      clearInterval(TaskOutput.#pollInterval)
+      TaskOutput.#pollInterval = null
+    }
+  }
+
+  /**
    * Shared tick: reads the file tail for every actively-polled task.
    * Non-async body (.then) to avoid stacking if I/O is slow.
    */
@@ -386,5 +397,8 @@ export class TaskOutput {
     this.#disk?.cancel()
     TaskOutput.stopPolling(this.taskId)
     TaskOutput.#registry.delete(this.taskId)
+    if (TaskOutput.#registry.size === 0) {
+      TaskOutput.stopAllPolling()
+    }
   }
 }

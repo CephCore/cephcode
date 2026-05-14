@@ -34,8 +34,10 @@ import { clearAllPlanSlugs } from '../../utils/plans.js'
 import { setCwd } from '../../utils/Shell.js'
 import { processSessionStartHooks } from '../../utils/sessionStart.js'
 import {
+  cacheSessionTitle,
   clearSessionMetadata,
   getAgentTranscriptPath,
+  getCurrentSessionTitle,
   resetSessionFilePointer,
   saveWorktreeState,
 } from '../../utils/sessionStorage.js'
@@ -74,6 +76,10 @@ export async function clearConversation({
     signal: AbortSignal.timeout(sessionEndTimeoutMs),
     timeoutMs: sessionEndTimeoutMs,
   })
+
+  // Capture current session title and standalone agent context to preserve across clear
+  const previousTitle = getCurrentSessionTitle(getSessionId())
+  const preservedStandaloneContext = getAppState?.().standaloneAgentContext
 
   // Signal to inference that this conversation's cache can be evicted.
   const lastRequestId = getLastMainRequestId()
@@ -175,9 +181,10 @@ export async function clearConversation({
         ...prev,
         tasks: nextTasks,
         attribution: createEmptyAttributionState(),
-        // Clear standalone agent context (name/color set by /rename, /color)
-        // so the new session doesn't display the old session's identity badge
-        standaloneAgentContext: undefined,
+        // Preserve standalone agent context (name/color set by /rename, /color)
+        // if it exists, so the new session inherits the custom identity.
+        // E63: Preserve custom session name from /rename across /clear.
+        standaloneAgentContext: preservedStandaloneContext,
         fileHistory: {
           snapshots: [],
           trackedFiles: new Set(),
@@ -208,6 +215,11 @@ export async function clearConversation({
   // so the new session doesn't inherit the previous session's identity
   clearSessionMetadata()
 
+  // Restore the session title if it was custom-set (via /rename or --name)
+  if (previousTitle) {
+    cacheSessionTitle(previousTitle)
+  }
+
   // Generate new session ID to provide fresh state
   // Set the old session as parent for analytics lineage tracking
   regenerateSessionId({ setCurrentAsParent: true })
@@ -237,15 +249,13 @@ export async function clearConversation({
   // knows what the new post-clear session was in. clearSessionMetadata
   // wiped both from the cache, but the process is still in the same mode
   // and (if applicable) the same worktree directory.
-  if (feature('COORDINATOR_MODE')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
-    const { saveMode } = require('../../utils/sessionStorage.js')
-    const {
-      isCoordinatorMode,
-    } = require('../../coordinator/coordinatorMode.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
-    saveMode(isCoordinatorMode() ? 'coordinator' : 'normal')
-  }
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const { saveMode } = require('../../utils/sessionStorage.js')
+  const {
+    isCoordinatorMode,
+  } = require('../../coordinator/coordinatorMode.js')
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  saveMode(isCoordinatorMode() ? 'coordinator' : 'normal')
   const worktreeSession = getCurrentWorktreeSession()
   if (worktreeSession) {
     saveWorktreeState(worktreeSession)

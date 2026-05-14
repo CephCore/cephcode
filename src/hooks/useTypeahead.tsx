@@ -16,6 +16,8 @@ import { useKeybindings } from '../keybindings/useKeybinding.js';
 import { useShortcutDisplay } from '../keybindings/useShortcutDisplay.js';
 import { useAppState, useAppStateStore } from '../state/AppState.js';
 import type { AgentDefinition } from '../tools/AgentTool/loadAgentsDir.js';
+import type { ServerResource } from '../services/mcp/types.js';
+import type { MCPServerConnection } from '../services/mcp/types.js';
 import type { InlineGhostText, PromptInputMode } from '../types/textInputTypes.js';
 import { isAgentSwarmsEnabled } from '../utils/agentSwarmsEnabled.js';
 import { generateProgressiveArgumentHint, parseArguments } from '../utils/argumentSubstitution.js';
@@ -384,7 +386,14 @@ export function useTypeahead({
     return maxLen + 6; // +1 for "/" prefix, +5 for padding
   }, [commands]);
   const [maxColumnWidth, setMaxColumnWidth] = useState<number | undefined>(undefined);
-  const mcpResources = useAppState(s => s.mcp.resources);
+  const mcpResources = useAppState(s => s.mcp.resources) as Record<string, ServerResource[]>;
+  const mcpClients = useAppState(s => s.mcp.clients) as MCPServerConnection[];
+  // Derive set of connected server names to filter out stale resources
+  // from disconnected servers in @server: autocomplete (G3).
+  const connectedServers = useMemo(
+    () => new Set((mcpClients as any[]).filter((c: any) => c.type === 'connected').map((c: any) => c.name)),
+    [mcpClients],
+  );
   const store = useAppStateStore();
   const promptSuggestion = useAppState(s => s.promptSuggestion);
   // PromptInput hides suggestion ghost text in teammate view — mirror that
@@ -452,7 +461,7 @@ export function useTypeahead({
   // Expensive async operation to fetch file/resource suggestions
   const fetchFileSuggestions = useCallback(async (searchToken: string, isAtSymbol = false): Promise<void> => {
     latestSearchTokenRef.current = searchToken;
-    const combinedItems = await generateUnifiedSuggestions(searchToken, mcpResources, agents, isAtSymbol);
+    const combinedItems = await generateUnifiedSuggestions(searchToken, mcpResources, agents, isAtSymbol, connectedServers);
     // Discard stale results if a newer query was initiated while waiting
     if (latestSearchTokenRef.current !== searchToken) {
       return;
@@ -546,16 +555,15 @@ export function useTypeahead({
     if (mode === 'prompt') {
       const midInputCommand = findMidInputSlashCommand(value, effectiveCursorOffset);
       if (midInputCommand) {
-        const match = getBestCommandMatch(midInputCommand.partialCommand, commands);
-        if (match) {
-          // Clear dropdown suggestions when showing ghost text
-          setSuggestionsState(() => ({
+        const commandItems = generateCommandSuggestions(midInputCommand.token, commands);
+        if (commandItems.length > 0) {
+          setSuggestionsState(prev => ({
             commandArgumentHint: undefined,
-            suggestions: [],
-            selectedSuggestion: -1
+            suggestions: commandItems,
+            selectedSuggestion: getPreservedSelection(prev.suggestions, prev.selectedSuggestion, commandItems)
           }));
-          setSuggestionType('none');
-          setMaxColumnWidth(undefined);
+          setSuggestionType('command');
+          setMaxColumnWidth(allCommandsMaxWidth);
           return;
         }
       }
@@ -909,8 +917,8 @@ export function useTypeahead({
 
   // Handle tab key press - complete suggestions or trigger file suggestions
   const handleTab = useCallback(async () => {
-    // If we have inline ghost text, apply it
-    if (effectiveGhostText) {
+    // If we have inline ghost text, apply it (only if no dropdown suggestions)
+    if (effectiveGhostText && suggestions.length === 0) {
       // Check for bash mode history completion first
       if (mode === 'bash') {
         // Replace the input with the full command from history
@@ -945,7 +953,7 @@ export function useTypeahead({
         if (suggestion) {
           applyCommandSuggestion(suggestion, false,
           // don't execute on tab
-          commands, onInputChange, setCursorOffset, onSubmit);
+          commands, onInputChange, setCursorOffset, onSubmit, input, cursorOffset);
           clearSuggestions();
         }
       } else if (suggestionType === 'custom-title' && suggestions.length > 0) {
@@ -1115,7 +1123,7 @@ export function useTypeahead({
           // If token starts with @, search without the @ prefix
           const isAtSymbol = completionInfo.token.startsWith('@');
           const searchToken = isAtSymbol ? completionInfo.token.substring(1) : completionInfo.token;
-          suggestionItems = await generateUnifiedSuggestions(searchToken, mcpResources, agents, isAtSymbol);
+          suggestionItems = await generateUnifiedSuggestions(searchToken, mcpResources, agents, isAtSymbol, connectedServers);
         } else {
           suggestionItems = [];
         }
@@ -1141,7 +1149,7 @@ export function useTypeahead({
       if (suggestion) {
         applyCommandSuggestion(suggestion, true,
         // execute on return
-        commands, onInputChange, setCursorOffset, onSubmit);
+        commands, onInputChange, setCursorOffset, onSubmit, input, cursorOffset);
         debouncedFetchFileSuggestions.cancel();
         clearSuggestions();
       }

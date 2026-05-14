@@ -39,6 +39,14 @@ function buildHookSchemas() {
       .describe(
         "Shell interpreter. 'bash' uses your $SHELL (bash/zsh/sh); 'powershell' uses pwsh. Defaults to bash.",
       ),
+    args: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Arguments to pass to the command (exec form). When set, spawns the command directly ' +
+        'without a shell, so path placeholders never need quoting.',
+      ),
+
     timeout: z
       .number()
       .positive()
@@ -61,6 +69,13 @@ function buildHookSchemas() {
       .optional()
       .describe(
         'If true, hook runs in background and wakes the model on exit code 2 (blocking error). Implies async.',
+      ),
+    continueOnBlock: z
+      .boolean()
+      .optional()
+      .describe(
+        'If true, a PostToolUse hook that returns exit code 2 (blocking) feeds the rejection ' +
+        'reason back to Claude and continues the turn instead of stopping.',
       ),
   })
 

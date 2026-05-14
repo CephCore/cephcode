@@ -51,7 +51,7 @@ import { type Command, type CommandResultDisplay, type ResumeEntrypoint, getComm
 import type { PromptInputMode, QueuedCommand, VimMode } from '../types/textInputTypes.js';
 import { MessageSelector, selectableUserMessagesFilter, messagesAfterAreOnlySynthetic } from '../components/MessageSelector.js';
 import { useIdeLogging } from '../hooks/useIdeLogging.js';
-import { PermissionRequest, type ToolUseConfirm } from '../components/permissions/PermissionRequest.js';
+import { PermissionRequest } from '../components/permissions/PermissionRequest.js';
 import { ElicitationDialog } from '../components/mcp/ElicitationDialog.js';
 import { PromptDialog } from '../components/hooks/PromptDialog.js';
 import type { PromptRequest, PromptResponse } from '../types/hooks.js';
@@ -117,10 +117,10 @@ const getCoordinatorUserContext: (mcpClients: ReadonlyArray<{
   name: string;
 }>, scratchpadDir?: string) => {
   [k: string]: string;
-} = feature('COORDINATOR_MODE') ? require('../coordinator/coordinatorMode.js').getCoordinatorUserContext : () => ({});
+} = require('../coordinator/coordinatorMode.js').getCoordinatorUserContext;
 /* eslint-enable custom-rules/no-process-env-top-level, @typescript-eslint/no-require-imports */
 import useCanUseTool from '../hooks/useCanUseTool.js';
-import type { ToolPermissionContext, Tool } from '../Tool.js';
+import type { ToolPermissionContext, Tool, ToolUseConfirm } from '../Tool.js';
 import { applyPermissionUpdate, applyPermissionUpdates, persistPermissionUpdate } from '../utils/permissions/PermissionUpdate.js';
 import { buildPermissionUpdates } from '../components/permissions/ExitPlanModePermissionRequest/ExitPlanModePermissionRequest.js';
 import { stripDangerousPermissionsForAutoMode } from '../utils/permissions/permissionSetup.js';
@@ -1104,7 +1104,13 @@ export function REPL({
     }
     setToolJSXInternal(args);
   }, []);
-  const [toolUseConfirmQueue, setToolUseConfirmQueue] = useState<ToolUseConfirm[]>([]);
+  const toolUseConfirmQueue = useAppState(s => s.toolUseConfirmQueue);
+  const setToolUseConfirmQueue = useCallback((action: React.SetStateAction<ToolUseConfirm[]>) => {
+    setAppState(prev => ({
+      ...prev,
+      toolUseConfirmQueue: typeof action === 'function' ? action(prev.toolUseConfirmQueue) : action
+    }));
+  }, [setAppState]);
   // Sticky footer JSX registered by permission request components (currently
   // only ExitPlanModePermissionRequest). Renders in FullscreenLayout's `bottom`
   // slot so response options stay visible while the user scrolls a long plan.
@@ -1745,32 +1751,30 @@ export function REPL({
       const messages = deserializeMessages(log.messages);
 
       // Match coordinator/normal mode to the resumed session
-      if (feature('COORDINATOR_MODE')) {
+      /* eslint-disable @typescript-eslint/no-require-imports */
+      const coordinatorModule = require('../coordinator/coordinatorMode.js') as typeof import('../coordinator/coordinatorMode.js');
+      /* eslint-enable @typescript-eslint/no-require-imports */
+      const warning = coordinatorModule.matchSessionMode(log.mode);
+      if (warning) {
+        // Re-derive agent definitions after mode switch so built-in agents
+        // reflect the new coordinator/normal mode
         /* eslint-disable @typescript-eslint/no-require-imports */
-        const coordinatorModule = require('../coordinator/coordinatorMode.js') as typeof import('../coordinator/coordinatorMode.js');
+        const {
+          getAgentDefinitionsWithOverrides,
+          getActiveAgentsFromList
+        } = require('../tools/AgentTool/loadAgentsDir.js') as typeof import('../tools/AgentTool/loadAgentsDir.js');
         /* eslint-enable @typescript-eslint/no-require-imports */
-        const warning = coordinatorModule.matchSessionMode(log.mode);
-        if (warning) {
-          // Re-derive agent definitions after mode switch so built-in agents
-          // reflect the new coordinator/normal mode
-          /* eslint-disable @typescript-eslint/no-require-imports */
-          const {
-            getAgentDefinitionsWithOverrides,
-            getActiveAgentsFromList
-          } = require('../tools/AgentTool/loadAgentsDir.js') as typeof import('../tools/AgentTool/loadAgentsDir.js');
-          /* eslint-enable @typescript-eslint/no-require-imports */
-          getAgentDefinitionsWithOverrides.cache.clear?.();
-          const freshAgentDefs = await getAgentDefinitionsWithOverrides(getOriginalCwd());
-          setAppState(prev => ({
-            ...prev,
-            agentDefinitions: {
-              ...freshAgentDefs,
-              allAgents: freshAgentDefs.allAgents,
-              activeAgents: getActiveAgentsFromList(freshAgentDefs.allAgents)
-            }
-          }));
-          messages.push(createSystemMessage(warning, 'warning'));
-        }
+        getAgentDefinitionsWithOverrides.cache.clear?.();
+        const freshAgentDefs = await getAgentDefinitionsWithOverrides(getOriginalCwd());
+        setAppState(prev => ({
+          ...prev,
+          agentDefinitions: {
+            ...freshAgentDefs,
+            allAgents: freshAgentDefs.allAgents,
+            activeAgents: getActiveAgentsFromList(freshAgentDefs.allAgents)
+          }
+        }));
+        messages.push(createSystemMessage(warning, 'warning'));
       }
 
       // Fire SessionEnd hooks for the current session before starting the
@@ -1897,17 +1901,15 @@ export function REPL({
       }
 
       // Persist the current mode so future resumes know what mode this session was in
-      if (feature('COORDINATOR_MODE')) {
-        /* eslint-disable @typescript-eslint/no-require-imports */
-        const {
-          saveMode
-        } = require('../utils/sessionStorage.js');
-        const {
-          isCoordinatorMode
-        } = require('../coordinator/coordinatorMode.js') as typeof import('../coordinator/coordinatorMode.js');
-        /* eslint-enable @typescript-eslint/no-require-imports */
-        saveMode(isCoordinatorMode() ? 'coordinator' : 'normal');
-      }
+      /* eslint-disable @typescript-eslint/no-require-imports */
+      const {
+        saveMode
+      } = require('../utils/sessionStorage.js');
+      const {
+        isCoordinatorMode
+      } = require('../coordinator/coordinatorMode.js') as typeof import('../coordinator/coordinatorMode.js');
+      /* eslint-enable @typescript-eslint/no-require-imports */
+      saveMode(isCoordinatorMode() ? 'coordinator' : 'normal');
 
       // Restore target session's costs from the data we read earlier
       if (targetSessionCosts) {
@@ -2584,7 +2586,8 @@ export function REPL({
     setIsLoading: setIsExternalLoading,
     resetLoadingState,
     setAbortController,
-    onBackgroundQuery: handleBackgroundQuery
+    onBackgroundQuery: handleBackgroundQuery,
+    onForegrounded: repinScroll
   });
   const onQueryEvent = useCallback((event: Parameters<typeof handleMessageFromStream>[0]) => {
     handleMessageFromStream(event, newMessage => {
@@ -3173,6 +3176,11 @@ export function REPL({
       // Find matching command - treat as immediate if:
       // 1. Command has `immediate: true`, OR
       // 2. Command was triggered via keybinding (fromKeybinding option)
+      // /bg and /background — background current session and open agent view
+      if (commandName === 'bg' || commandName === 'background') {
+        void onSubmit('/agents')
+        return
+      }
       const matchingCommand = commands.find(cmd => isCommandEnabled(cmd) && (cmd.name === commandName || cmd.aliases?.includes(commandName) || getCommandName(cmd) === commandName));
       if (matchingCommand?.name === 'clear' && idleHintShownRef.current) {
         logEvent('tengu_idle_return_action', {
@@ -4204,6 +4212,32 @@ export function REPL({
     setFrozenTranscriptState(null);
   }, []);
 
+  // Show transcript keyboard shortcuts help
+  const handleShowTranscriptHelp = useCallback(() => {
+    setAppState(prev => ({
+      ...prev,
+      showTranscriptShortcuts: !prev.showTranscriptShortcuts,
+    }));
+    const { logEvent: log } = require('../services/analytics/index.js') as typeof import('../services/analytics/index.js');
+    log('transcript_show_help', {});
+  }, [setAppState]);
+
+  // Jump to the previous user prompt in transcript view
+  const handleJumpPrevPrompt = useCallback(() => {
+    const jr = jumpRef.current;
+    if (!jr || !jr.jumpToIndex) return;
+    // jumpToIndex(-1) means "previous prompt" — VirtualMessageList
+    // handles the index calculation internally.
+    jr.jumpToIndex(-1);
+  }, []);
+
+  // Jump to the next user prompt in transcript view
+  const handleJumpNextPrompt = useCallback(() => {
+    const jr = jumpRef.current;
+    if (!jr || !jr.jumpToIndex) return;
+    jr.jumpToIndex(1);
+  }, []);
+
   // Props for GlobalKeybindingHandlers component (rendered inside KeybindingSetup)
   const virtualScrollActive = isFullscreenEnvEnabled() && !disableVirtualScroll;
 
@@ -4385,7 +4419,10 @@ export function REPL({
     // doesn't stopPropagation, so without this gate transcript:exit
     // would fire on the same Esc that cancels the bar (child registers
     // first, fires first, bubbles).
-    searchBarOpen: searchOpen
+    searchBarOpen: searchOpen,
+    onShowTranscriptHelp: handleShowTranscriptHelp,
+    onJumpPrevPrompt: handleJumpPrevPrompt,
+    onJumpNextPrompt: handleJumpNextPrompt,
   };
 
   // Use frozen lengths to slice arrays, avoiding memory overhead of cloning

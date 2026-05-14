@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'url'
 import { randomUUID } from 'crypto'
 import { LRUCache } from 'lru-cache'
 import { logForDebugging } from '../../utils/debug.js'
@@ -370,11 +371,37 @@ export function resetAllLSPDiagnosticState(): void {
  * @param fileUri - URI of the file that was edited
  */
 export function clearDeliveredDiagnosticsForFile(fileUri: string): void {
-  if (deliveredDiagnostics.has(fileUri)) {
+  // Normalize fileUri if it's a file:// URL to match the format used in registerPendingLSPDiagnostic
+  let normalizedUri = fileUri
+  if (fileUri.startsWith('file://')) {
+    try {
+      normalizedUri = fileURLToPath(fileUri)
+    } catch {
+      // Fallback to original if fileURLToPath fails
+    }
+  }
+
+  // 1. Clear cross-turn deduplication cache (delivered diagnostics)
+  if (deliveredDiagnostics.has(normalizedUri)) {
     logForDebugging(
-      `LSP Diagnostics: Clearing delivered diagnostics for ${fileUri}`,
+      `LSP Diagnostics: Clearing delivered diagnostics for ${normalizedUri}`,
     )
-    deliveredDiagnostics.delete(fileUri)
+    deliveredDiagnostics.delete(normalizedUri)
+  }
+
+  // 2. Clear pending diagnostics for this file (those not yet delivered as attachments)
+  // This prevents stale diagnostics from being sent after the file has been edited.
+  for (const [id, pending] of pendingDiagnostics.entries()) {
+    const originalFileCount = pending.files.length
+    pending.files = pending.files.filter(f => f.uri !== normalizedUri)
+
+    if (pending.files.length === 0) {
+      pendingDiagnostics.delete(id)
+    } else if (pending.files.length < originalFileCount) {
+      logForDebugging(
+        `LSP Diagnostics: Filtered out edited file ${normalizedUri} from pending diagnostic ${id}`,
+      )
+    }
   }
 }
 

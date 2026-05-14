@@ -115,11 +115,6 @@ export function findMidInputSlashCommand(
   input: string,
   cursorOffset: number,
 ): MidInputSlashCommand | null {
-  // If input starts with "/", this is start-of-input case (handled elsewhere)
-  if (input.startsWith('/')) {
-    return null
-  }
-
   // Look backwards from cursor to find a "/" preceded by whitespace
   const beforeCursor = input.slice(0, cursorOffset)
 
@@ -507,6 +502,8 @@ export function applyCommandSuggestion(
   onInputChange: (value: string) => void,
   setCursorOffset: (offset: number) => void,
   onSubmit: (value: string, isSubmittingSlashCommand?: boolean) => void,
+  input?: string,
+  cursorOffset?: number,
 ): void {
   // Extract command name and object from string or SuggestionItem metadata
   let commandName: string
@@ -522,7 +519,33 @@ export function applyCommandSuggestion(
     commandObj = suggestion.metadata
   }
 
-  // Format the command input with trailing space
+  // Handle mid-input replacement if input and cursorOffset are provided
+  if (input !== undefined && cursorOffset !== undefined) {
+    const midInputCommand = findMidInputSlashCommand(input, cursorOffset)
+    if (midInputCommand) {
+      const before = input.slice(0, midInputCommand.startPos)
+      const after = input.slice(
+        midInputCommand.startPos + midInputCommand.token.length,
+      )
+      const replacement = '/' + commandName + ' '
+      const newInput = before + replacement + after
+      onInputChange(newInput)
+      setCursorOffset(before.length + replacement.length)
+
+      // Execute command if requested and it takes no arguments
+      if (shouldExecute && commandObj) {
+        if (
+          commandObj.type !== 'prompt' ||
+          (commandObj.argNames ?? []).length === 0
+        ) {
+          onSubmit(newInput, /* isSubmittingSlashCommand */ true)
+        }
+      }
+      return
+    }
+  }
+
+  // Default behavior: Format the command input with trailing space (start-of-input case)
   const newInput = formatCommand(commandName)
   onInputChange(newInput)
   setCursorOffset(newInput.length)

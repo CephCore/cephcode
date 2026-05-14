@@ -39,6 +39,10 @@ export const NON_REBINDABLE: ReservedShortcut[] = [
  * Note: ctrl+s (XOFF) and ctrl+q (XON) are NOT included here because:
  * - Most modern terminals disable flow control by default
  * - We use ctrl+s for the stash feature
+ * - On Linux/X11 terminals where flow control IS enabled, ctrl+s hangs
+ *   the terminal (H36). `/usage` and clipboard copy now auto-disable
+ *   flow control via `stty -ixon` — run `stty -ixon` manually if other
+ *   Ctrl+S bindings are affected.
  */
 export const TERMINAL_RESERVED: ReservedShortcut[] = [
   {

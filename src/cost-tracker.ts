@@ -1,4 +1,5 @@
 import type { BetaUsage as Usage } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
+import { type ProviderUsage, fromAnthropicUsage } from './services/ai/usageTypes.js'
 import chalk from 'chalk'
 import {
   addToTotalCostState,
@@ -248,9 +249,27 @@ function round(number: number, precision: number): number {
   return Math.round(number * precision) / precision
 }
 
+/**
+ * @[MULTI_PROVIDER] Track model usage from an Anthropic Usage object.
+ * For non-Anthropic providers, use the ProviderUsage overload.
+ */
 function addToTotalModelUsage(
   cost: number,
   usage: Usage,
+  model: string,
+  provider?: string,
+): ModelUsage;
+
+function addToTotalModelUsage(
+  cost: number,
+  usage: ProviderUsage,
+  model: string,
+  provider?: string,
+): ModelUsage;
+
+function addToTotalModelUsage(
+  cost: number,
+  usage: Usage | ProviderUsage,
   model: string,
   provider?: string,
 ): ModelUsage {
@@ -272,62 +291,97 @@ function addToTotalModelUsage(
     modelUsage.provider = provider || ProviderManager.getInstance().getActiveProviderName()
   }
 
-  modelUsage.inputTokens += usage.input_tokens
-  modelUsage.outputTokens += usage.output_tokens
-  modelUsage.cacheReadInputTokens += usage.cache_read_input_tokens ?? 0
-  modelUsage.cacheCreationInputTokens += usage.cache_creation_input_tokens ?? 0
-  modelUsage.webSearchRequests +=
-    usage.server_tool_use?.web_search_requests ?? 0
+  // Normalize usage data — handle both Anthropic Usage (snake_case) and ProviderUsage (camelCase)
+  const isAnthropicUsage = 'input_tokens' in usage
+  const inputTokens = isAnthropicUsage ? (usage as Usage).input_tokens : (usage as ProviderUsage).inputTokens
+  const outputTokens = isAnthropicUsage ? (usage as Usage).output_tokens : (usage as ProviderUsage).outputTokens
+  const cacheReadTokens = isAnthropicUsage
+    ? (usage as Usage).cache_read_input_tokens ?? 0
+    : (usage as ProviderUsage).cacheReadInputTokens ?? 0
+  const cacheCreateTokens = isAnthropicUsage
+    ? (usage as Usage).cache_creation_input_tokens ?? 0
+    : (usage as ProviderUsage).cacheCreationInputTokens ?? 0
+  const webSearchRequests = isAnthropicUsage
+    ? (usage as Usage).server_tool_use?.web_search_requests ?? 0
+    : (usage as ProviderUsage).webSearchRequests ?? 0
+
+  modelUsage.inputTokens += inputTokens
+  modelUsage.outputTokens += outputTokens
+  modelUsage.cacheReadInputTokens += cacheReadTokens
+  modelUsage.cacheCreationInputTokens += cacheCreateTokens
+  modelUsage.webSearchRequests += webSearchRequests
   modelUsage.costUSD += cost
   modelUsage.contextWindow = getContextWindowForModel(model, getSdkBetas())
   modelUsage.maxOutputTokens = getModelMaxOutputTokens(model).default
   return modelUsage
 }
 
+/**
+ * @[MULTI_PROVIDER] Track session cost from Anthropic Usage object.
+ * For non-Anthropic providers, use the ProviderUsage overload.
+ */
 export function addToTotalSessionCost(
   cost: number,
   usage: Usage,
-    model: string,
-    provider?: string,
+  model: string,
+  provider?: string,
+): number;
+
+export function addToTotalSessionCost(
+  cost: number,
+  usage: ProviderUsage,
+  model: string,
+  provider?: string,
+): number;
+
+export function addToTotalSessionCost(
+  cost: number,
+  usage: Usage | ProviderUsage,
+  model: string,
+  provider?: string,
 ): number {
   const modelUsage = addToTotalModelUsage(cost, usage, model, provider)
   addToTotalCostState(cost, modelUsage, model)
 
+  const isAnthropicUsage = 'input_tokens' in usage
+  const inputTokens = isAnthropicUsage ? (usage as Usage).input_tokens : (usage as ProviderUsage).inputTokens
+  const outputTokens = isAnthropicUsage ? (usage as Usage).output_tokens : (usage as ProviderUsage).outputTokens
+  const cacheReadTokens = isAnthropicUsage ? (usage as Usage).cache_read_input_tokens ?? 0 : (usage as ProviderUsage).cacheReadInputTokens ?? 0
+  const cacheCreateTokens = isAnthropicUsage ? (usage as Usage).cache_creation_input_tokens ?? 0 : (usage as ProviderUsage).cacheCreationInputTokens ?? 0
+  const speed = isAnthropicUsage ? (usage as Usage).speed : undefined
+
   const attrs =
-    isFastModeEnabled() && usage.speed === 'fast'
+    isFastModeEnabled() && speed === 'fast'
       ? { model, speed: 'fast' }
       : { model }
 
   getCostCounter()?.add(cost, attrs)
-  getTokenCounter()?.add(usage.input_tokens, { ...attrs, type: 'input' })
-  getTokenCounter()?.add(usage.output_tokens, { ...attrs, type: 'output' })
-  getTokenCounter()?.add(usage.cache_read_input_tokens ?? 0, {
-    ...attrs,
-    type: 'cacheRead',
-  })
-  getTokenCounter()?.add(usage.cache_creation_input_tokens ?? 0, {
-    ...attrs,
-    type: 'cacheCreation',
-  })
+  getTokenCounter()?.add(inputTokens, { ...attrs, type: 'input' })
+  getTokenCounter()?.add(outputTokens, { ...attrs, type: 'output' })
+  getTokenCounter()?.add(cacheReadTokens, { ...attrs, type: 'cacheRead' })
+  getTokenCounter()?.add(cacheCreateTokens, { ...attrs, type: 'cacheCreation' })
 
+  // Advisor usage is always in Anthropic Usage format — only track when called with Usage
   let totalCost = cost
-  for (const advisorUsage of getAdvisorUsage(usage)) {
-    const advisorCost = calculateUSDCost(advisorUsage.model, advisorUsage)
-    logEvent('tengu_advisor_tool_token_usage', {
-      advisor_model:
-        advisorUsage.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      input_tokens: advisorUsage.input_tokens,
-      output_tokens: advisorUsage.output_tokens,
-      cache_read_input_tokens: advisorUsage.cache_read_input_tokens ?? 0,
-      cache_creation_input_tokens:
-        advisorUsage.cache_creation_input_tokens ?? 0,
-      cost_usd_micros: Math.round(advisorCost * 1_000_000),
-    })
-    totalCost += addToTotalSessionCost(
-      advisorCost,
-      advisorUsage,
-      advisorUsage.model,
-    )
+  if (isAnthropicUsage) {
+    for (const advisorUsage of getAdvisorUsage(usage as Usage)) {
+      const advisorCost = calculateUSDCost(advisorUsage.model, advisorUsage)
+      logEvent('tengu_advisor_tool_token_usage', {
+        advisor_model:
+          advisorUsage.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        input_tokens: advisorUsage.input_tokens,
+        output_tokens: advisorUsage.output_tokens,
+        cache_read_input_tokens: advisorUsage.cache_read_input_tokens ?? 0,
+        cache_creation_input_tokens:
+          advisorUsage.cache_creation_input_tokens ?? 0,
+        cost_usd_micros: Math.round(advisorCost * 1_000_000),
+      })
+      totalCost += addToTotalSessionCost(
+        advisorCost,
+        advisorUsage,
+        advisorUsage.model,
+      )
+    }
   }
   return totalCost
 }

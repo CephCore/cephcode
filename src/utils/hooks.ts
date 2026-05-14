@@ -1016,16 +1016,43 @@ async function execCommandHook(
       windowsHide: true,
     }) as ChildProcessWithoutNullStreams
   } else {
-    // On Windows, use Git Bash explicitly (cmd.exe can't run bash syntax).
-    // On other platforms, shell: true uses /bin/sh.
-    const shell = isWindows ? findGitBashPath() : true
-    child = spawn(finalCommand, [], {
-      env: envVars,
-      cwd: safeCwd,
-      shell,
-      // Prevent visible console window on Windows (no-op on other platforms)
-      windowsHide: true,
-    }) as ChildProcessWithoutNullStreams
+    // Exec form: when hook.args is set, spawn the command directly without a
+    // shell — the command is the executable path and args is the argv array.
+    // This avoids shell-quoting issues with path placeholders. Each arg
+    // undergoes ${} substitution just like the command string.
+    if (hook.args && hook.args.length > 0) {
+      const execPath = finalCommand
+      const execArgs = hook.args.map((a: string) =>
+        a.replace(
+          /\$\{([^}]+)\}/g,
+          (match, key: string) =>
+            ({
+              CLAUDE_PROJECT_DIR: projectDir,
+              CLAUDE_SESSION_ID: sessionId,
+              CLAUDE_ORIGINAL_CWD: originalCwd,
+              'user_config.session_id': sessionId,
+            })[key] ?? match,
+        ),
+      )
+      child = spawn(execPath, execArgs, {
+        env: envVars,
+        cwd: safeCwd,
+        // No shell option — direct exec. The caller is responsible for
+        // resolving the executable path via PATH.
+        windowsHide: true,
+      }) as ChildProcessWithoutNullStreams
+    } else {
+      // On Windows, use Git Bash explicitly (cmd.exe can't run bash syntax).
+      // On other platforms, shell: true uses /bin/sh.
+      const shell = isWindows ? findGitBashPath() : true
+      child = spawn(finalCommand, [], {
+        env: envVars,
+        cwd: safeCwd,
+        shell,
+        // Prevent visible console window on Windows (no-op on other platforms)
+        windowsHide: true,
+      }) as ChildProcessWithoutNullStreams
+    }
   }
 
   // Hooks use pipe mode — stdout must be streamed into JS so we can parse
@@ -2643,7 +2670,36 @@ async function* executeHooks({
         // SECURITY: Hooks that emit valid JSON to stdout AND exit with code 2
         // must still block the tool call. The exit code 2 is the canonical
         // "block" signal in the hook protocol.
+        // EXCEPTION: PostToolUse hooks with continueOnBlock: true feed the
+        // rejection reason back to Claude and continue the turn.
         if (result.status === 2) {
+          if (
+            hook.continueOnBlock &&
+            (hookEvent === 'PostToolUse' || hookEvent === 'PostToolUseFailure')
+          ) {
+            const rejectionText =
+              processed.hookPermissionDecisionReason ||
+              result.stderr.trim() ||
+              result.stdout.trim() ||
+              `Hook ${hookName} rejected the tool result`
+            emitHookResponse({
+              hookId,
+              hookName,
+              hookEvent,
+              output: result.output,
+              stdout: result.stdout,
+              stderr: result.stderr,
+              exitCode: result.status,
+              outcome: 'success',
+            })
+            yield {
+              ...processed,
+              outcome: 'success' as const,
+              additionalContext: rejectionText,
+              hook,
+            }
+            return
+          }
           emitHookResponse({
             hookId,
             hookName,

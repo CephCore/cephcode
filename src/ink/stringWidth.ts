@@ -75,13 +75,13 @@ function stringWidthJavaScript(str: string): number {
     }
 
     // Calculate width for non-emoji graphemes
-    // For grapheme clusters (like Devanagari conjuncts with virama+ZWJ), only count
-    // the first non-zero-width character's width since the cluster renders as one glyph
+    // For complex-script graphemes (like Devanagari conjuncts), sum the widths
+    // of all non-zero-width characters in the cluster. This matches terminal
+    // behavior where each base consonant occupies a cell even when ligated.
     for (const char of grapheme) {
       const codePoint = char.codePointAt(0)!
       if (!isZeroWidth(codePoint)) {
         width += eastAsianWidth(codePoint, { ambiguousAsWide: false })
-        break
       }
     }
   }
@@ -99,6 +99,9 @@ function needsSegmentation(str: string): boolean {
     // Variation selectors, ZWJ
     if (cp >= 0xfe00 && cp <= 0xfe0f) return true
     if (cp === 0x200d) return true
+    // Indic, Thai, Lao ranges (scripts with combining marks/conjuncts)
+    if (cp >= 0x0900 && cp <= 0x0d7f) return true
+    if (cp >= 0x0e00 && cp <= 0x0eff) return true
   }
   return false
 }
@@ -162,14 +165,34 @@ function isZeroWidth(codePoint: number): boolean {
     return true
   }
 
-  // Indic script combining marks (covers Devanagari through Malayalam)
-  if (codePoint >= 0x0900 && codePoint <= 0x0d4f) {
+  // Indic script combining marks (covers Devanagari through Malayalam, plus others)
+  if (codePoint >= 0x0900 && codePoint <= 0x0dff) {
     // Signs and vowel marks at start of each script block
     const offset = codePoint & 0x7f
-    if (offset <= 0x03) return true // Signs at block start
-    if (offset >= 0x3a && offset <= 0x4f) return true // Vowel signs, virama
-    if (offset >= 0x51 && offset <= 0x57) return true // Stress signs
+    if (offset <= 0x03) return true // Combining signs (Candrabindu, Anusvara, Visarga)
+    if (offset === 0x3c) return true // Nukta
+    if (offset >= 0x3e && offset <= 0x4d) return true // Vowel signs + Virama / Halant
+    if (offset >= 0x51 && offset <= 0x57) return true // Stress signs / accents
     if (offset >= 0x62 && offset <= 0x63) return true // Vowel signs
+    if (offset >= 0x70 && offset <= 0x71) return true // Signs
+  }
+
+  // Khmer combining marks
+  if (codePoint >= 0x17b4 && codePoint <= 0x17d3) return true
+
+  // Myanmar combining marks
+  if (
+    (codePoint >= 0x102b && codePoint <= 0x103e) ||
+    (codePoint >= 0x1056 && codePoint <= 0x1059) ||
+    (codePoint >= 0x105e && codePoint <= 0x1060) ||
+    (codePoint >= 0x1062 && codePoint <= 0x1064) ||
+    (codePoint >= 0x1067 && codePoint <= 0x106d) ||
+    (codePoint >= 0x1071 && codePoint <= 0x1074) ||
+    (codePoint >= 0x1082 && codePoint <= 0x108d) ||
+    codePoint === 0x108f ||
+    (codePoint >= 0x109a && codePoint <= 0x109d)
+  ) {
+    return true
   }
 
   // Thai/Lao combining marks
@@ -217,6 +240,20 @@ const bunStringWidth =
 
 const BUN_STRING_WIDTH_OPTS = { ambiguousIsNarrow: true } as const
 
+function needsJavaScriptWidth(str: string): boolean {
+  for (const char of str) {
+    const cp = char.codePointAt(0)!
+    // Bun's native width path can drift from terminal behavior for scripts
+    // with marks that attach to neighboring glyphs. Use our tuned fallback for
+    // these ranges so cursor math stays aligned while typing Thai/Lao/Indic.
+    if (cp >= 0x0900 && cp <= 0x0eff) return true
+  }
+  return false
+}
+
 export const stringWidth: (str: string) => number = bunStringWidth
-  ? str => bunStringWidth(str, BUN_STRING_WIDTH_OPTS)
+  ? str =>
+      needsJavaScriptWidth(str)
+        ? stringWidthJavaScript(str)
+        : bunStringWidth(str, BUN_STRING_WIDTH_OPTS)
   : stringWidthJavaScript

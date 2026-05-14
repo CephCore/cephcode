@@ -1,0 +1,651 @@
+/**
+ * Supervisor Daemon — Background process that manages independent session processes.
+ *
+ * Architecture:
+ * - One supervisor per user, auto-started on first background session
+ * - Communicates via Windows named pipe or Unix socket
+ * - Each background session is a child Bun process
+ * - Roster persisted to ~/.claude/daemon/roster.json
+ * - Auto-exits when all sessions finished and no terminal connected for ~1h
+ *
+ * IPC Protocol (JSON, newline-delimited over pipe/socket):
+ *   Request:  {"type":"<command>","sessionId?":"...","cwd?":"...","prompt?":"..."}
+ *   Response: {"ok":true,"data":{...}} or {"ok":false,"error":"..."}
+ *
+ * Commands: spawn, attach, stop, respawn, rm, list, logs, shutdown, ping
+ */
+
+import { createServer, type Socket } from 'net'
+import { spawn, type ChildProcess } from 'child_process'
+import { join } from 'path'
+import { readFile, writeFile, mkdir, unlink, access } from 'fs/promises'
+import { randomBytes } from 'crypto'
+import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
+import { jsonParse } from '../../utils/slowOperations.js'
+
+// ─── Constants ────────────────────────────────────────────────
+
+const DAEMON_DIR = join(getClaudeConfigHomeDir(), 'daemon')
+const ROSTER_PATH = join(DAEMON_DIR, 'roster.json')
+const LOG_PATH = join(getClaudeConfigHomeDir(), 'daemon.log')
+
+// Named pipe path (Windows) or Unix socket path
+const PIPE_NAME = process.platform === 'win32'
+  ? `\\\\.\\pipe\\claude-supervisor-${process.env.USER ?? 'default'}`
+  : `/tmp/claude-supervisor-${process.env.USER ?? 'default'}.sock`
+
+// How long to wait before auto-exiting after last session finishes
+const IDLE_EXIT_MS = 60 * 60 * 1000 // 1 hour
+
+// ─── Types ────────────────────────────────────────────────────
+
+interface SessionEntry {
+  id: string
+  pid: number
+  cwd: string
+  startedAt: number
+  updatedAt: number
+  status: 'running' | 'completed' | 'failed' | 'stopped'
+  name?: string
+  agentType?: string
+  prompt?: string
+  worktreePath?: string
+  logPath?: string
+  model?: string
+}
+
+interface RosterFile {
+  version: 1
+  updatedAt: number
+  sessions: Record<string, SessionEntry>
+}
+
+interface IPCRequest {
+  type: 'spawn' | 'attach' | 'stop' | 'respawn' | 'rm' | 'list' | 'logs' | 'shutdown' | 'ping'
+  sessionId?: string
+  cwd?: string
+  prompt?: string
+  agent?: string
+  model?: string
+  permissionMode?: string
+}
+
+interface IPCResponse {
+  ok: boolean
+  data?: unknown
+  error?: string
+}
+
+// ─── State ────────────────────────────────────────────────────
+
+let roster: RosterFile = { version: 1, updatedAt: Date.now(), sessions: {} }
+const childProcesses = new Map<string, ChildProcess>()
+let idleTimer: ReturnType<typeof setTimeout> | null = null
+let connectedClients = 0
+let shuttingDown = false
+
+// ─── Persistence ──────────────────────────────────────────────
+
+async function loadRoster(): Promise<void> {
+  try {
+    const raw = await readFile(ROSTER_PATH, 'utf-8')
+    const parsed = jsonParse(raw) as RosterFile
+    if (parsed.version === 1 && parsed.sessions) {
+      roster = parsed
+      log('Loaded roster:', Object.keys(roster.sessions).length, 'sessions')
+    }
+  } catch {
+    log('No existing roster, starting fresh')
+  }
+}
+
+async function saveRoster(): Promise<void> {
+  roster.updatedAt = Date.now()
+  await mkdir(DAEMON_DIR, { recursive: true })
+  await writeFile(ROSTER_PATH, JSON.stringify(roster, null, 2), 'utf-8')
+}
+
+function log(...args: unknown[]): void {
+  const ts = new Date().toISOString()
+  const line = `[${ts}] ${args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')}\n`
+  // Write to log file (best-effort)
+  mkdir(DAEMON_DIR, { recursive: true }).then(() => {
+    import('fs').then(fs => {
+      fs.appendFileSync(LOG_PATH, line)
+    }).catch(() => {})
+  }).catch(() => {})
+}
+
+// ─── Session Process Management ───────────────────────────────
+
+function getSessionLogPath(sessionId: string): string {
+  return join(DAEMON_DIR, 'jobs', sessionId, 'output.log')
+}
+
+function spawnSessionProcess(entry: SessionEntry): ChildProcess {
+  const shortId = entry.id.slice(0, 8)
+  log(`Spawning session ${shortId} in ${entry.cwd}`)
+
+  const args: string[] = []
+
+  // Use the same entrypoint as the CLI
+  const mainScript = join(import.meta.dirname ?? process.cwd(), '..', '..', 'main.tsx')
+
+  args.push('run', mainScript, 'session')
+
+  if (entry.prompt) {
+    args.push(entry.prompt)
+  }
+  if (entry.agentType) {
+    args.push('--agent', entry.agentType)
+  }
+  if (entry.model) {
+    args.push('--model', entry.model)
+  }
+  args.push('--resume', entry.id)
+
+  // Ensure log directory exists
+  const logDir = join(DAEMON_DIR, 'jobs', entry.id)
+  mkdir(logDir, { recursive: true }).catch(() => {})
+
+  const child = spawn(process.execPath, args, {
+    cwd: entry.cwd,
+    env: {
+      ...process.env,
+      CLAUDE_CODE_DAEMON_SESSION_ID: entry.id,
+      CLAUDE_CODE_DAEMON_MODE: '1',
+    },
+    detached: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+
+  child.unref()
+
+  // Capture output to log
+  if (child.stdout) {
+    import('fs').then(fs => {
+      const logStream = fs.createWriteStream(entry.logPath!, { flags: 'a' })
+      child.stdout!.pipe(logStream)
+    }).catch(() => {})
+  }
+  if (child.stderr) {
+    import('fs').then(fs => {
+      const logStream = fs.createWriteStream(entry.logPath!, { flags: 'a' })
+      child.stderr!.pipe(logStream)
+    }).catch(() => {})
+  }
+
+  child.on('exit', (code) => {
+    log(`Session ${shortId} process exited with code ${code}`)
+    const session = roster.sessions[entry.id]
+    if (session) {
+      session.status = code === 0 ? 'completed' : 'failed'
+      session.updatedAt = Date.now()
+      saveRoster()
+    }
+    childProcesses.delete(entry.id)
+    checkIdleExit()
+  })
+
+  child.on('error', (err) => {
+    log(`Session ${shortId} process error:`, err.message)
+    const session = roster.sessions[entry.id]
+    if (session) {
+      session.status = 'failed'
+      session.updatedAt = Date.now()
+      saveRoster()
+    }
+    childProcesses.delete(entry.id)
+    checkIdleExit()
+  })
+
+  return child
+}
+
+// ─── IPC Command Handlers ─────────────────────────────────────
+
+function handleSpawn(req: IPCRequest): IPCResponse {
+  if (!req.sessionId) return { ok: false, error: 'Missing sessionId' }
+  if (!req.cwd) return { ok: false, error: 'Missing cwd' }
+
+  const shortId = randomBytes(4).toString('hex')
+  const sessionId = req.sessionId || shortId
+  const entry: SessionEntry = {
+    id: sessionId,
+    pid: 0,
+    cwd: req.cwd,
+    startedAt: Date.now(),
+    updatedAt: Date.now(),
+    status: 'running',
+    name: req.prompt?.slice(0, 40),
+    agentType: req.agent,
+    prompt: req.prompt,
+    model: req.model,
+    logPath: getSessionLogPath(sessionId),
+  }
+
+  roster.sessions[sessionId] = entry
+  saveRoster()
+
+  const child = spawnSessionProcess(entry)
+  entry.pid = child.pid ?? 0
+  childProcesses.set(sessionId, child)
+  saveRoster()
+
+  // Reset idle timer
+  resetIdleTimer()
+
+  log(`Spawned session ${sessionId.slice(0, 8)} (pid ${entry.pid})`)
+  return { ok: true, data: { sessionId, pid: entry.pid } }
+}
+
+function handleAttach(req: IPCRequest): IPCResponse {
+  if (!req.sessionId) return { ok: false, error: 'Missing sessionId' }
+
+  const entry = roster.sessions[req.sessionId]
+  if (!entry) return { ok: false, error: `Session not found: ${req.sessionId}` }
+
+  const child = childProcesses.get(req.sessionId)
+  const isRunning = child && !child.killed && child.exitCode === null
+
+  return {
+    ok: true,
+    data: {
+      sessionId: entry.id,
+      pid: entry.pid,
+      cwd: entry.cwd,
+      status: entry.status,
+      isRunning,
+      name: entry.name,
+      agentType: entry.agentType,
+      prompt: entry.prompt,
+      logPath: entry.logPath,
+      startedAt: entry.startedAt,
+    },
+  }
+}
+
+function handleStop(req: IPCRequest): IPCResponse {
+  if (!req.sessionId) return { ok: false, error: 'Missing sessionId' }
+
+  const child = childProcesses.get(req.sessionId)
+  if (child && !child.killed) {
+    child.kill('SIGTERM')
+    log(`Sent SIGTERM to session ${req.sessionId.slice(0, 8)}`)
+  }
+
+  const entry = roster.sessions[req.sessionId]
+  if (entry) {
+    entry.status = 'stopped'
+    entry.updatedAt = Date.now()
+  }
+  saveRoster()
+  checkIdleExit()
+
+  return { ok: true, data: { sessionId: req.sessionId, status: 'stopped' } }
+}
+
+function handleRespawn(req: IPCRequest): IPCResponse {
+  if (req.type === 'respawn' && !req.sessionId) {
+    // respawn --all: restart all stopped sessions
+    const respawned: string[] = []
+    for (const [id, entry] of Object.entries(roster.sessions)) {
+      if (entry.status === 'stopped' || entry.status === 'failed') {
+        entry.status = 'running'
+        entry.updatedAt = Date.now()
+        const child = spawnSessionProcess(entry)
+        entry.pid = child.pid ?? 0
+        childProcesses.set(id, child)
+        respawned.push(id)
+      }
+    }
+    saveRoster()
+    if (respawned.length > 0) resetIdleTimer()
+    return { ok: true, data: { respawned: respawned.length, sessions: respawned } }
+  }
+
+  if (!req.sessionId) return { ok: false, error: 'Missing sessionId' }
+
+  const entry = roster.sessions[req.sessionId]
+  if (!entry) return { ok: false, error: `Session not found: ${req.sessionId}` }
+
+  // Kill existing if running
+  const existing = childProcesses.get(req.sessionId)
+  if (existing && !existing.killed) {
+    existing.kill('SIGTERM')
+  }
+
+  entry.status = 'running'
+  entry.updatedAt = Date.now()
+  const child = spawnSessionProcess(entry)
+  entry.pid = child.pid ?? 0
+  childProcesses.set(req.sessionId, child)
+  saveRoster()
+  resetIdleTimer()
+
+  return { ok: true, data: { sessionId: entry.id, pid: entry.pid } }
+}
+
+function handleRm(req: IPCRequest): IPCResponse {
+  if (!req.sessionId) return { ok: false, error: 'Missing sessionId' }
+
+  // Stop process first
+  const child = childProcesses.get(req.sessionId)
+  if (child && !child.killed) {
+    child.kill('SIGTERM')
+    childProcesses.delete(req.sessionId)
+  }
+
+  const entry = roster.sessions[req.sessionId]
+  delete roster.sessions[req.sessionId]
+  saveRoster()
+
+  // Clean up log directory
+  if (entry?.logPath) {
+    const logDir = join(DAEMON_DIR, 'jobs', req.sessionId)
+    import('fs/promises').then(fs => {
+      fs.rm(logDir, { recursive: true, force: true }).catch(() => {})
+    }).catch(() => {})
+  }
+
+  log(`Removed session ${req.sessionId.slice(0, 8)}`)
+  checkIdleExit()
+  return { ok: true, data: { removed: req.sessionId } }
+}
+
+function handleList(): IPCResponse {
+  const sessions = Object.entries(roster.sessions).map(([id, entry]) => {
+    const child = childProcesses.get(id)
+    const isRunning = child && !child.killed && child.exitCode === null
+    return {
+      id,
+      shortId: id.slice(0, 8),
+      pid: entry.pid,
+      cwd: entry.cwd,
+      status: isRunning ? 'running' as const : entry.status,
+      name: entry.name,
+      agentType: entry.agentType,
+      startedAt: entry.startedAt,
+      updatedAt: entry.updatedAt,
+    }
+  })
+
+  return {
+    ok: true,
+    data: {
+      sessions,
+      total: sessions.length,
+      running: sessions.filter(s => s.status === 'running').length,
+    },
+  }
+}
+
+async function handleLogs(req: IPCRequest): Promise<IPCResponse> {
+  if (!req.sessionId) return { ok: false, error: 'Missing sessionId' }
+
+  const entry = roster.sessions[req.sessionId]
+  if (!entry) return { ok: false, error: `Session not found: ${req.sessionId}` }
+
+  // Read recent log output synchronously (fs.readFileSync is available in Bun)
+  let logContent = ''
+  if (entry.logPath) {
+    try {
+      const fs = await import('fs')
+      logContent = fs.readFileSync(entry.logPath, 'utf-8').slice(-10000) // last 10KB
+    } catch {
+      logContent = '(log not available)'
+    }
+  }
+
+  const child = childProcesses.get(req.sessionId)
+  const isRunning = child && !child.killed && child.exitCode === null
+
+  return {
+    ok: true,
+    data: {
+      sessionId: entry.id,
+      status: entry.status,
+      isRunning,
+      pid: entry.pid,
+      logContent: logContent || '(no output yet)',
+    },
+  }
+}
+
+function handleShutdown(): IPCResponse {
+  log('Shutting down supervisor...')
+  shuttingDown = true
+
+  // Kill all child processes
+  for (const [id, child] of childProcesses) {
+    if (!child.killed) {
+      child.kill('SIGTERM')
+    }
+    childProcesses.delete(id)
+  }
+
+  saveRoster()
+
+  // Schedule exit
+  setTimeout(() => {
+    process.exit(0)
+  }, 500)
+
+  return { ok: true, data: { message: 'Supervisor shutting down' } }
+}
+
+// ─── Idle Exit ────────────────────────────────────────────────
+
+function resetIdleTimer(): void {
+  if (idleTimer) clearTimeout(idleTimer)
+
+  idleTimer = setTimeout(() => {
+    const runningSessions = Object.values(roster.sessions).filter(
+      s => s.status === 'running'
+    )
+    if (runningSessions.length === 0) {
+      log('No running sessions and idle for 1h. Exiting.')
+      server.close()
+      process.exit(0)
+    }
+  }, IDLE_EXIT_MS)
+}
+
+function checkIdleExit(): void {
+  const runningSessions = Object.values(roster.sessions).filter(
+    s => s.status === 'running'
+  )
+  if (runningSessions.length === 0 && connectedClients === 0) {
+    // Still wait for idle timeout before exiting
+    if (!idleTimer) resetIdleTimer()
+  } else {
+    resetIdleTimer()
+  }
+}
+
+// ─── IPC Server ───────────────────────────────────────────────
+
+function sendResponse(socket: Socket, response: IPCResponse): void {
+  socket.write(JSON.stringify(response) + '\n')
+}
+
+function handleRequest(socket: Socket, request: IPCRequest): void {
+  log('IPC request:', request.type, request.sessionId?.slice(0, 8) ?? '')
+
+  const respond = (response: IPCResponse) => sendResponse(socket, response)
+
+  switch (request.type) {
+    case 'ping':
+      respond({ ok: true, data: { sessions: Object.keys(roster.sessions).length } })
+      break
+    case 'spawn':
+      respond(handleSpawn(request))
+      break
+    case 'attach':
+      respond(handleAttach(request))
+      break
+    case 'stop':
+      respond(handleStop(request))
+      break
+    case 'respawn':
+      respond(handleRespawn(request))
+      break
+    case 'rm':
+      respond(handleRm(request))
+      break
+    case 'list':
+      respond(handleList())
+      break
+    case 'logs':
+      // handleLogs is async (reads from disk)
+      handleLogs(request).then(respond).catch(err => respond({ ok: false, error: err.message }))
+      return // Don't respond synchronously
+    case 'shutdown':
+      respond(handleShutdown())
+      break
+    default:
+      respond({ ok: false, error: `Unknown command: ${(request as any).type}` })
+  }
+}
+
+function onClientConnect(socket: Socket): void {
+  connectedClients++
+  log(`Client connected (${connectedClients} connected)`)
+  resetIdleTimer()
+
+  let buffer = ''
+
+  socket.on('data', (data: Buffer) => {
+    buffer += data.toString()
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+
+    for (const line of lines) {
+      if (!line.trim()) continue
+      try {
+        const request = jsonParse(line) as IPCRequest
+        handleRequest(socket, request)
+      } catch (e) {
+        sendResponse(socket, { ok: false, error: `Invalid JSON: ${(e as Error).message}` })
+      }
+    }
+  })
+
+  socket.on('close', () => {
+    connectedClients--
+    log(`Client disconnected (${connectedClients} connected)`)
+    checkIdleExit()
+  })
+
+  socket.on('error', (err) => {
+    log('Socket error:', err.message)
+  })
+}
+
+// Clean up stale pipe file on startup
+async function cleanupPipeFile(): Promise<void> {
+  if (process.platform !== 'win32') {
+    try {
+      await unlink(PIPE_NAME)
+    } catch {
+      // Pipe file doesn't exist, that's fine
+    }
+  }
+}
+
+// ─── Server ───────────────────────────────────────────────────
+
+let server: ReturnType<typeof createServer>
+
+// ─── Startup ──────────────────────────────────────────────────
+
+async function start(): Promise<void> {
+  log('=== Supervisor starting ===')
+  log('PID:', process.pid)
+  log('Config dir:', getClaudeConfigHomeDir())
+  log('Pipe:', PIPE_NAME)
+
+  await loadRoster()
+  await cleanupPipeFile()
+
+  // Check if we can resume any existing sessions (recover after upgrade)
+  for (const [id, entry] of Object.entries(roster.sessions)) {
+    if (entry.status === 'running') {
+      // Mark as stopped since this is a fresh supervisor
+      entry.status = 'stopped'
+      entry.updatedAt = Date.now()
+    }
+  }
+  await saveRoster()
+
+  server = createServer(onClientConnect)
+    .on('error', (err: Error) => {
+      log('Server error:', err.message)
+      process.exit(1)
+    })
+
+  server.listen(PIPE_NAME, () => {
+    log('=== Supervisor ready ===')
+    // Write PID file for discovery
+    mkdir(DAEMON_DIR, { recursive: true }).then(() => {
+      writeFile(join(DAEMON_DIR, 'supervisor.pid'), String(process.pid), 'utf-8').catch(() => {})
+    }).catch(() => {})
+  })
+
+  // Start idle timer
+  checkIdleExit()
+
+  // Handle process signals
+  process.on('SIGTERM', () => {
+    log('Received SIGTERM, shutting down...')
+    shuttingDown = true
+    for (const [id, child] of childProcesses) {
+      if (!child.killed) {
+        child.kill('SIGTERM')
+      }
+    }
+    saveRoster().then(() => {
+      server.close()
+      process.exit(0)
+    })
+  })
+
+  process.on('SIGINT', () => {
+    // Supervisor ignores Ctrl+C; only sessions should handle it
+    log('Ignoring SIGINT (Ctrl+C) at supervisor level')
+  })
+}
+
+// ─── Entry Point ──────────────────────────────────────────────
+
+// Check if we're already running
+async function isAlreadyRunning(): Promise<boolean> {
+  try {
+    const pidPath = join(DAEMON_DIR, 'supervisor.pid')
+    const pidStr = await readFile(pidPath, 'utf-8')
+    const pid = parseInt(pidStr.trim(), 10)
+    if (isNaN(pid)) return false
+
+    // Check if process is still running
+    try {
+      process.kill(pid, 0) // Signal 0 = check existence
+      return true
+    } catch {
+      return false
+    }
+  } catch {
+    return false
+  }
+}
+
+// Only start if run as main
+const isMainModule = process.argv[1]?.includes('supervisor')
+
+if (isMainModule) {
+  start().catch((err) => {
+    log('Fatal error:', err.message)
+    process.exit(1)
+  })
+}
+
+export { start, isAlreadyRunning, PIPE_NAME, DAEMON_DIR }

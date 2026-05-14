@@ -175,9 +175,15 @@ export async function handlePromptSubmit(
   const mode = params.mode ?? 'prompt'
   const rawPastedContents = params.pastedContents ?? {}
 
+  // Expand pasted text references BEFORE any input processing, so that
+  // auto-truncation (if any) applies to the expanded text, not the
+  // placeholder. This prevents [Pasted text #N] references from being
+  // silently dropped when the prompt is shortened.
+  const preExpandedInput = expandPastedTextRefs(input, rawPastedContents)
+
   // Images are only sent if their [Image #N] placeholder is still in the text.
   // Deleting the inline pill drops the image; orphaned entries are filtered here.
-  const referencedIds = new Set(parseReferences(input).map(r => r.id))
+  const referencedIds = new Set(parseReferences(preExpandedInput).map(r => r.id))
   const pastedContents = Object.fromEntries(
     Object.entries(rawPastedContents).filter(
       ([, c]) => c.type !== 'image' || referencedIds.has(c.id),
@@ -210,10 +216,9 @@ export async function handlePromptSubmit(
     return
   }
 
-  // Parse references and replace with actual content early, before queueing
-  // or immediate-command dispatch, so queued commands and immediate commands
-  // both receive the expanded text from when it was submitted.
-  const finalInput = expandPastedTextRefs(input, pastedContents)
+  // Use the pre-expanded input (expanded before empty/exit checks above)
+  // so pasted text content is preserved even if truncation happened upstream.
+  const finalInput = preExpandedInput
   const pastedTextRefs = parseReferences(input).filter(
     r => pastedContents[r.id]?.type === 'text',
   )

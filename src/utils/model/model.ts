@@ -38,8 +38,28 @@ export type ModelShortName = string
 export type ModelName = string
 export type ModelSetting = ModelName | ModelAlias | null
 
+/**
+ * @[MULTI_PROVIDER] Returns the small/fast model for the active provider.
+ * For Anthropic: ANTHROPIC_SMALL_FAST_MODEL env or Haiku.
+ * For non-Anthropic: checks provider registry for a small model, falls back to default.
+ */
 export function getSmallFastModel(): ModelName {
-  return process.env.ANTHROPIC_SMALL_FAST_MODEL || getDefaultHaikuModel()
+  // Anthropic-specific env var
+  if (process.env.ANTHROPIC_SMALL_FAST_MODEL) {
+    return process.env.ANTHROPIC_SMALL_FAST_MODEL
+  }
+  // Check provider registry for non-Anthropic small model
+  const activeProvider = ProviderManager.getInstance().getActiveProviderName()
+  if (activeProvider && activeProvider !== 'anthropic') {
+    const registryEntry = (PROVIDER_REGISTRY as any)[activeProvider]
+    if (registryEntry?.smallFastModel) {
+      return registryEntry.smallFastModel
+    }
+    if (registryEntry?.defaultModel) {
+      return registryEntry.defaultModel
+    }
+  }
+  return getDefaultHaikuModel()
 }
 
 export function isNonCustomOpusModel(model: ModelName): boolean {
@@ -153,7 +173,18 @@ export function getMainLoopModel(): ModelName {
   return getUnifiedModel()
 }
 
+/**
+ * @[MULTI_PROVIDER] Returns the best available model for the active provider.
+ * For Anthropic: Opus (largest model).
+ * For non-Anthropic: checks provider registry for best model, falls back to default.
+ */
 export function getBestModel(): ModelName {
+  const activeProvider = ProviderManager.getInstance().getActiveProviderName()
+  if (activeProvider && activeProvider !== 'anthropic') {
+    const registryEntry = (PROVIDER_REGISTRY as any)[activeProvider]
+    if (registryEntry?.bestModel) return registryEntry.bestModel
+    if (registryEntry?.defaultModel) return registryEntry.defaultModel
+  }
   return getDefaultOpusModel()
 }
 
@@ -223,15 +254,25 @@ export function getRuntimeMainLoopModel(params: {
 }
 
 /**
- * Get the default main loop model setting.
+ * @[MULTI_PROVIDER] Get the default main loop model setting.
  *
- * This handles the built-in default:
+ * Non-Anthropic providers: uses the provider registry's defaultModel.
+ * Anthropic provider defaults:
  * - Opus for Max and Team Premium users
  * - Sonnet 4.6 for all other users (including Team Standard, Pro, Enterprise)
  *
  * @returns The default model setting to use
  */
 export function getDefaultMainLoopModelSetting(): ModelName | ModelAlias {
+  // Non-Anthropic providers: use registry default
+  const activeProvider = ProviderManager.getInstance().getActiveProviderName()
+  if (activeProvider && activeProvider !== 'anthropic') {
+    const registryEntry = (PROVIDER_REGISTRY as any)[activeProvider]
+    if (registryEntry?.defaultModel) {
+      return registryEntry.defaultModel
+    }
+  }
+
   // Ants default to defaultModel from flag config, or Opus 1M if not configured
   if (process.env.USER_TYPE === 'ant') {
     return (
@@ -655,8 +696,17 @@ export function isLegacyModelRemapEnabled(): boolean {
   return !isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_LEGACY_MODEL_REMAP)
 }
 
+/**
+ * @[MULTI_PROVIDER] Returns a human-readable display string for the model setting.
+ * For non-Anthropic providers, shows the provider name + model.
+ */
 export function modelDisplayString(model: ModelSetting): string {
   if (model === null) {
+    const activeProvider = ProviderManager.getInstance().getActiveProviderName()
+    if (activeProvider && activeProvider !== 'anthropic') {
+      const providerLabel = activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)
+      return `Default for ${providerLabel} (${getDefaultMainLoopModel()})`
+    }
     if (process.env.USER_TYPE === 'ant') {
       return `Default for Ants (${renderDefaultModelSetting(getDefaultMainLoopModelSetting())})`
     } else if (isClaudeAISubscriber()) {

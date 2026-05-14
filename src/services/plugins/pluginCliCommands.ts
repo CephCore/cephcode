@@ -11,6 +11,7 @@ import { errorMessage } from '../../utils/errors.js'
 import { gracefulShutdown } from '../../utils/gracefulShutdown.js'
 import { logError } from '../../utils/log.js'
 import { getManagedPluginNames } from '../../utils/plugins/managedPlugins.js'
+import { clearMarketplacesCache } from '../../utils/plugins/marketplaceManager.js'
 import { parsePluginIdentifier } from '../../utils/plugins/pluginIdentifier.js'
 import type { PluginScope } from '../../utils/plugins/schemas.js'
 import { writeToStdout } from '../../utils/process.js'
@@ -116,6 +117,11 @@ export async function installPlugin(
 
     // biome-ignore lint/suspicious/noConsole:: intentional console output
     console.log(`${figures.tick} ${result.message}`)
+
+    // Clear marketplace caches so that the marketplace list auto-refreshes
+    // to reflect the newly installed plugin. Without this, the marketplace
+    // browse list would remain stale until a manual cache clear or restart.
+    clearMarketplacesCache()
 
     // _PROTO_* routes to PII-tagged plugin_name/marketplace_name BQ columns.
     // Unredacted plugin_id was previously logged to general-access

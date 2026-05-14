@@ -535,6 +535,7 @@ function extractToolStats(log: LogOption): {
       const content = msg.message.content
       if (Array.isArray(content)) {
         for (const block of content) {
+          if (!block || typeof block !== 'object') continue
           if (block.type === 'tool_use' && 'name' in block) {
             const toolName = block.name as string
             toolCounts[toolName] = (toolCounts[toolName] || 0) + 1
@@ -551,7 +552,9 @@ function extractToolStats(log: LogOption): {
 
             const input = (block as { input?: Record<string, unknown> }).input
 
-            if (input) {
+            // H25: Malformed tool call inputs may have input as a string,
+            // array, or other non-object type. Only process object inputs.
+            if (input && typeof input === 'object' && !Array.isArray(input)) {
               const filePath = (input.file_path as string) || ''
               if (filePath) {
                 const lang = getLanguageFromPath(filePath)
@@ -614,10 +617,20 @@ function extractToolStats(log: LogOption): {
         if (msgTimestamp) {
           try {
             const msgDate = new Date(msgTimestamp)
-            const hour = msgDate.getHours() // Local hour 0-23
-            messageHours.push(hour)
-            // Collect timestamp for multi-clauding detection (matching Python)
-            userMessageTimestamps.push(msgTimestamp)
+            // new Date("invalid") does NOT throw — it creates an Invalid Date.
+            // Check getTime() to detect unparseable timestamps that would
+            // skew the time-of-day chart with NaN or negative hours.
+            // G18: Also reject timestamps before 2024 (epoch/bogus parses)
+            // and timestamps more than 1 day in the future (clock skew).
+            const time = msgDate.getTime()
+            const JAN_1_2024 = 1704067200000
+            const oneDayFromNow = Date.now() + 86_400_000
+            if (!Number.isNaN(time) && time > JAN_1_2024 && time < oneDayFromNow) {
+              const hour = msgDate.getHours() // Local hour 0-23
+              messageHours.push(hour)
+              // Collect timestamp for multi-clauding detection (matching Python)
+              userMessageTimestamps.push(msgTimestamp)
+            }
           } catch {
             // Skip invalid timestamps
           }
@@ -2878,11 +2891,19 @@ export async function generateUsageReport(options?: {
     for (const logs of batchResults) {
       for (const log of logs) {
         if (isMetaSession(log) || !hasValidDates(log)) continue
-        const meta = logToSessionMeta(log)
-        allMetas.push(meta)
-        metasToSave.push(meta)
-        // Keep the log around for potential facet extraction
-        logsForFacets.set(meta.session_id, log)
+        // H25: Wrap logToSessionMeta in try/catch to handle sessions with
+        // malformed tool call inputs that would crash the entire insights run.
+        try {
+          const meta = logToSessionMeta(log)
+          allMetas.push(meta)
+          metasToSave.push(meta)
+          // Keep the log around for potential facet extraction
+          logsForFacets.set(meta.session_id, log)
+        } catch {
+          // Skip sessions with malformed data — individual session
+          // metadata loss is acceptable vs crashing the entire report.
+          continue
+        }
       }
     }
     await Promise.all(metasToSave.map(meta => saveSessionMeta(meta)))

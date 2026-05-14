@@ -5,6 +5,9 @@
  * - Calling onBackgroundQuery to spawn a background task for the current query
  * - Re-backgrounding foregrounded tasks
  * - Syncing foregrounded task messages/state to main view
+ * - ← (left arrow) on empty prompt to background and open agent view
+ * - Ctrl+Z to force detach from agent view
+ * - /bg slash command support
  */
 
 import { useCallback, useEffect, useRef } from 'react'
@@ -17,6 +20,9 @@ type UseSessionBackgroundingProps = {
   resetLoadingState: () => void
   setAbortController: (controller: AbortController | null) => void
   onBackgroundQuery: () => void
+  /** G47: Called when a background task is foregrounded — used by REPL to
+   *  repin scroll position so the user sees the latest messages. */
+  onForegrounded?: () => void
 }
 
 type UseSessionBackgroundingResult = {
@@ -24,12 +30,15 @@ type UseSessionBackgroundingResult = {
   handleBackgroundSession: () => void
 }
 
+import { setForegroundedSessionActive } from './foregroundedSessionFlag.js'
+
 export function useSessionBackgrounding({
   setMessages,
   setIsLoading,
   resetLoadingState,
   setAbortController,
   onBackgroundQuery,
+  onForegrounded,
 }: UseSessionBackgroundingProps): UseSessionBackgroundingResult {
   const foregroundedTaskId = useAppState(s => s.foregroundedTaskId)
   const foregroundedTask = useAppState(s =>
@@ -37,6 +46,8 @@ export function useSessionBackgrounding({
   )
   const setAppState = useSetAppState()
   const lastSyncedMessagesLengthRef = useRef<number>(0)
+  // G47: Track foregrounding transitions to trigger scroll repin on re-attach
+  const prevForegroundedTaskIdRef = useRef<string | undefined>(undefined)
 
   const handleBackgroundSession = useCallback(() => {
     if (foregroundedTaskId) {
@@ -75,6 +86,9 @@ export function useSessionBackgrounding({
 
   // Sync foregrounded task's messages and loading state to the main view
   useEffect(() => {
+    // Update global flag for Ctrl+Z force-detach detection
+    setForegroundedSessionActive(!!foregroundedTaskId)
+
     if (!foregroundedTaskId) {
       // Reset when no foregrounded task
       lastSyncedMessagesLengthRef.current = 0
@@ -94,7 +108,15 @@ export function useSessionBackgrounding({
     if (taskMessages.length !== lastSyncedMessagesLengthRef.current) {
       lastSyncedMessagesLengthRef.current = taskMessages.length
       setMessages([...taskMessages])
+      // G47: Notify REPL to repin scroll on first sync after foreground
+      if (
+        prevForegroundedTaskIdRef.current === undefined &&
+        foregroundedTaskId !== undefined
+      ) {
+        onForegrounded?.()
+      }
     }
+    prevForegroundedTaskIdRef.current = foregroundedTaskId
 
     if (foregroundedTask.status === 'running') {
       // Check if the task was aborted (user pressed Escape)
@@ -150,6 +172,7 @@ export function useSessionBackgrounding({
     setIsLoading,
     resetLoadingState,
     setAbortController,
+    onForegrounded,
   ])
 
   return {

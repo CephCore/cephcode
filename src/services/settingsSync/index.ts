@@ -202,7 +202,10 @@ async function doDownloadUserSettings(
 }
 
 /**
- * Check if user is authenticated with first-party OAuth.
+ * @[MULTI_PROVIDER] Check if user is authenticated with first-party Anthropic OAuth.
+ * Settings sync is Anthropic-only — non-Anthropic providers (OpenAI, Google, etc.)
+ * don't use Claude.ai OAuth and don't participate in settings sync.
+ *
  * Required for settings sync in both CLI (upload) and CCR (download) modes.
  *
  * Only checks user:inference (not user:profile) — CCR's file-descriptor token

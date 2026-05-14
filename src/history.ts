@@ -16,7 +16,7 @@ import {
 import { sleep } from './utils/sleep.js'
 import { jsonParse, jsonStringify } from './utils/slowOperations.js'
 
-const MAX_HISTORY_ITEMS = 100
+const MAX_HISTORY_ITEMS = 1000
 const MAX_PASTED_CONTENT_LENGTH = 1024
 
 /**
@@ -69,7 +69,7 @@ export function parseReferences(
     .map(match => ({
       id: parseInt(match[2] || '0'),
       match: match[0],
-      index: match.index,
+      index: match.index ?? 0,
     }))
     .filter(match => match.id > 0)
 }

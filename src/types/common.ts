@@ -48,6 +48,19 @@ export interface Usage {
   iterations?: number
 }
 
+/**
+ * @[MULTI_PROVIDER] Provider-agnostic content block type.
+ * Used as an intermediate representation between provider-specific formats.
+ * Adapters convert their native types <-> ProviderContentBlock.
+ */
+export type ProviderContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; id: string; name: string; input: unknown }
+  | { type: 'tool_result'; tool_use_id: string; content: unknown; is_error?: boolean }
+  | { type: 'thinking'; thinking: string; signature?: string }
+  | { type: 'image'; source: unknown; media_type?: string }
+  | { type: 'refusal'; refusal: string }
+
 export interface MessageParam {
   role: 'user' | 'assistant' | 'system'
   content: string | Array<ContentBlockParam>

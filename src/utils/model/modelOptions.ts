@@ -19,6 +19,7 @@ import { isModelAllowed } from './modelAllowlist.js'
 import {
   getCanonicalName,
   getClaudeAiUserDefaultModelDescription,
+  getDefaultMainLoopModel,
   getDefaultSonnetModel,
   getDefaultOpusModel,
   getDefaultHaikuModel,
@@ -27,6 +28,7 @@ import {
   getUserSpecifiedModelSetting,
   isOpus1mMergeEnabled,
   getOpus46PricingSuffix,
+  parseUserSpecifiedModel,
   renderDefaultModelSetting,
   type ModelSetting,
 } from './model.js'
@@ -43,13 +45,21 @@ export type ModelOption = {
 }
 
 export function getDefaultOptionForUser(fastMode = false): ModelOption {
+  // Check for env var overrides to show in the Default label
+  const customOpusModel = process.env.ANTHROPIC_DEFAULT_OPUS_MODEL
+  const customSonnetModel = process.env.ANTHROPIC_DEFAULT_SONNET_MODEL
+  const customDefaultModel = customOpusModel || customSonnetModel
+  const defaultLabel = customDefaultModel
+    ? `Default (${customDefaultModel})`
+    : 'Default (recommended)'
+
   if (process.env.USER_TYPE === 'ant') {
     const currentModel = renderDefaultModelSetting(
       getDefaultMainLoopModelSetting(),
     )
     return {
       value: null,
-      label: 'Default (recommended)',
+      label: defaultLabel,
       description: `Use the default model for Ants (currently ${currentModel})`,
       descriptionForModel: `Default model (currently ${currentModel})`,
     }
@@ -59,7 +69,7 @@ export function getDefaultOptionForUser(fastMode = false): ModelOption {
   if (isClaudeAISubscriber()) {
     return {
       value: null,
-      label: 'Default (recommended)',
+      label: defaultLabel,
       description: getClaudeAiUserDefaultModelDescription(fastMode),
     }
   }
@@ -68,7 +78,7 @@ export function getDefaultOptionForUser(fastMode = false): ModelOption {
   const is3P = getAPIProvider() !== 'firstParty'
   return {
     value: null,
-    label: 'Default (recommended)',
+    label: defaultLabel,
     description: `Use the default model (currently ${renderDefaultModelSetting(getDefaultMainLoopModelSetting())})${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
   }
 }
@@ -359,8 +369,12 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
   if (customOpus !== undefined) {
     payg3pOptions.push(customOpus)
   } else {
-    // Add Opus 4.1, Opus 4.6 and Opus 4.6 1M
-    payg3pOptions.push(getOpus41Option()) // This is the default opus
+    // For PAYG 3P, skip legacy Opus 4.1 if it resolves to the same model
+    // as the default entry to avoid duplicate rows
+    const is3PProvider = getAPIProvider() !== 'firstParty'
+    if (!is3PProvider || parseUserSpecifiedModel('opus') !== getDefaultMainLoopModel()) {
+      payg3pOptions.push(getOpus41Option()) // This is the default opus
+    }
     payg3pOptions.push(getOpus46Option(fastMode))
     if (checkOpus1mAccess()) {
       payg3pOptions.push(getOpus46_1MOption(fastMode))

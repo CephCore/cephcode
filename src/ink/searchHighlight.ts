@@ -66,8 +66,19 @@ export function applySearchHighlight(
       }
       const lc = cell.char.toLowerCase()
       const cellIdx = colOf.length
-      for (let i = 0; i < lc.length; i++) {
+      // Iterate by Unicode code point (not UTF-16 code unit) to prevent
+      // splitting emoji and astral-plane surrogate pairs mid-character.
+      // Each code point maps to the same cell, but we add one entry per
+      // code unit so text.indexOf() positions stay aligned.
+      const codePoints = Array.from(lc)
+      for (const cp of codePoints) {
         codeUnitToCell.push(cellIdx)
+        // For surrogate pairs, add an extra entry for the low surrogate
+        // so the codeUnitToCell array stays synchronized with text.length
+        // (which uses UTF-16 code units via indexOf).
+        if (cp.length > 1) {
+          codeUnitToCell.push(cellIdx)
+        }
       }
       text += lc
       colOf.push(col)

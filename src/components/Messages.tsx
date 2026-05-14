@@ -587,7 +587,15 @@ const MessagesImpl = ({
     }
     if (msg_6.type !== 'user') return false;
     const b_0 = msg_6.message.content[0];
-    if (b_0?.type !== 'tool_result' || b_0.is_error || !msg_6.toolUseResult) return false;
+    if (b_0?.type !== 'tool_result' || !msg_6.toolUseResult) return false;
+    // H24: Allow click-to-expand for errored tool results when output is
+    // truncated — users need to see the full error message.
+    if (b_0.is_error) {
+      const tool = msg_6.toolUseResult
+        ? findToolByName(tools, lookupsRef.current.toolUseByToolUseID.get(b_0.tool_use_id)?.name ?? '')
+        : undefined;
+      return tool?.isResultTruncated?.(msg_6.toolUseResult as never) ?? false;
+    }
     const name = lookupsRef.current.toolUseByToolUseID.get(b_0.tool_use_id)?.name;
     const tool = name ? findToolByName(tools, name) : undefined;
     return tool?.isResultTruncated?.(msg_6.toolUseResult as never) ?? false;
@@ -610,7 +618,7 @@ const MessagesImpl = ({
   useEffect(() => {
     return () => progress(null);
   }, [progress]);
-  const messageKey = useCallback((msg_7: RenderableMessage) => `${msg_7.uuid}-${conversationId}`, [conversationId]);
+  const messageKey = useCallback((msg_7: RenderableMessage) => `${msg_7.uuid}-${msg_7.type}-${conversationId}`, [conversationId]);
   const renderMessageRow = (msg_8: RenderableMessage, index: number) => {
     const prevType = index > 0 ? renderableMessages[index - 1]?.type : undefined;
     const isUserContinuation = msg_8.type === 'user' && prevType === 'user';

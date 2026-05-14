@@ -28,10 +28,11 @@ export function ProgressBar(t0) {
   const $ = _c(13);
   const {
     ratio: inputRatio,
-    width,
+    width: inputWidth,
     fillColor,
     emptyColor
   } = t0;
+  const width = Math.floor(inputWidth);
   const ratio = Math.min(1, Math.max(0, inputRatio));
   const whole = Math.floor(ratio * width);
   let t1;
@@ -47,7 +48,12 @@ export function ProgressBar(t0) {
     segments = [t1];
     if (whole < width) {
       const remainder = ratio * width - whole;
-      const middle = Math.floor(remainder * BLOCKS.length);
+      const rawMiddle = remainder * BLOCKS.length;
+      // Clamp to [0, BLOCKS.length-2] so an almost-full fraction doesn't
+      // render a full block ('█') — the full block case is already handled
+      // by the `whole` variable. A near-full fraction should show the
+      // penultimate partial block instead of duplicating the full block.
+      const middle = Math.max(0, Math.min(Math.floor(rawMiddle), BLOCKS.length - 2));
       segments.push(BLOCKS[middle]);
       const empty = width - whole - 1;
       if (empty > 0) {

@@ -7,6 +7,12 @@ const sessionTranscriptModule = feature('KAIROS')
   ? (require('../sessionTranscript/sessionTranscript.js') as typeof import('../sessionTranscript/sessionTranscript.js'))
   : null
 
+/**
+ * @[MULTI_PROVIDER] APIUserAbortError is from Anthropic SDK — used for abort
+ * signaling during compact retry loops. This is a thin Error subclass; for
+ * non-Anthropic providers, it still works as a generic abort signal since it
+ * only extends Error with no Anthropic-specific behavior.
+ */
 import { APIUserAbortError } from '@anthropic-ai/sdk'
 import { markPostCompaction } from 'src/bootstrap/state.js'
 import { getInvokedSkillsForAgent } from '../../bootstrap/state.js'

@@ -56,11 +56,9 @@ export function buildEffectiveSystemPrompt({
   if (overrideSystemPrompt) {
     return asSystemPrompt([overrideSystemPrompt])
   }
-  // Coordinator mode: use coordinator prompt instead of default
-  // Use inline env check instead of coordinatorModule to avoid circular
-  // dependency issues during test module loading.
+  // Coordinator mode: use coordinator prompt instead of default.
+  // Check env var at runtime (no compile-time feature gate).
   if (
-    feature('COORDINATOR_MODE') &&
     isEnvTruthy(process.env.CLAUDE_CODE_COORDINATOR_MODE) &&
     !mainThreadAgentDefinition
   ) {

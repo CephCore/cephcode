@@ -58,12 +58,12 @@ export function useTerminalViewport(): [
     // Without this, an element inside a ScrollBox whose yoga position exceeds
     // terminalRows would be considered offscreen even when scrolled into view
     // (e.g., the spinner in fullscreen mode after enough messages accumulate).
-    let absoluteTop = element.yogaNode.getComputedTop()
+    let absoluteTop = element.yogaNode.getComputedTop() ?? 0
     let parent: DOMElement | undefined = element.parentNode
     let root = element.yogaNode
     while (parent) {
       if (parent.yogaNode) {
-        absoluteTop += parent.yogaNode.getComputedTop()
+        absoluteTop += parent.yogaNode.getComputedTop() ?? 0
         root = parent.yogaNode
       }
       // scrollTop is only ever set on scroll containers (by ScrollBox + renderer).
@@ -73,7 +73,7 @@ export function useTerminalViewport(): [
     }
 
     // Only the root's height matters
-    const screenHeight = root.getComputedHeight()
+    const screenHeight = root.getComputedHeight() ?? 0
 
     const bottom = absoluteTop + height
     // When content overflows the viewport (screenHeight > rows), the
@@ -85,7 +85,10 @@ export function useTerminalViewport(): [
     const cursorRestoreScroll = screenHeight > rows ? 1 : 0
     const viewportY = Math.max(0, screenHeight - rows) + cursorRestoreScroll
     const viewportBottom = viewportY + rows
-    const visible = bottom > viewportY && absoluteTop < viewportBottom
+
+    // Handle NaN defensively to avoid infinite re-renders or crashes
+    const isInvalid = isNaN(absoluteTop) || isNaN(bottom) || isNaN(viewportY) || isNaN(viewportBottom)
+    const visible = isInvalid ? true : (bottom > viewportY && absoluteTop < viewportBottom)
 
     if (visible !== entryRef.current.isVisible) {
       entryRef.current = { isVisible: visible }

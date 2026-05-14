@@ -183,7 +183,8 @@ import {
 import { returnValue } from 'src/utils/generators.js'
 import { headlessProfilerCheckpoint } from 'src/utils/headlessProfiler.js'
 import { isMcpInstructionsDeltaEnabled } from 'src/utils/mcpInstructionsDelta.js'
-import { calculateUSDCost } from 'src/utils/modelCost.js'
+import { calculateUSDCost, calculateUSDCostFromProviderUsage } from 'src/utils/modelCost.js'
+import { fromOpenAIUsage } from 'src/services/ai/usageTypes.js'
 import { endQueryProfile, queryCheckpoint } from 'src/utils/queryProfiler.js'
 import {
   modelSupportsAdaptiveThinking,
@@ -287,6 +288,46 @@ function isOpenAICompatibleProvider(
   return provider !== 'anthropic' && provider !== 'google'
 }
 
+/**
+ * Returns true when the active provider speaks the native Anthropic
+ * Messages API (including Bedrock/Vertex which are Anthropic-compatible).
+ */
+function isAnthropicApiProvider(provider: ProviderId): boolean {
+  return provider === 'anthropic'
+}
+
+/**
+ * Strip Anthropic-specific request params that non-Anthropic providers
+ * will reject or ignore.  Keeps the params builder clean (all-Anthropic
+ * by default) and filters at the edge.
+ */
+function filterParamsForProvider(
+  params: Record<string, unknown>,
+  provider: ProviderId,
+): Record<string, unknown> {
+  if (isAnthropicApiProvider(provider)) return params
+
+  const filtered = { ...params }
+  // Anthropic-specific: betas, thinking, output_config, speed, context_management
+  delete filtered.betas
+  delete filtered.thinking
+  delete filtered.speed
+  delete filtered.context_management
+  // extraBodyParams carries anthropic_beta — strip for non-Anthropic
+  if ((filtered as any).anthropic_beta) {
+    delete (filtered as any).anthropic_beta
+  }
+  // Remove anthropic_internal which is ant-only
+  if ((filtered as any).anthropic_internal) {
+    delete (filtered as any).anthropic_internal
+  }
+  // Strip output_config for non-OpenAI providers (OpenAI uses it for reasoning_effort)
+  if (filtered.output_config && !isOpenAICompatibleProvider(provider)) {
+    delete filtered.output_config
+  }
+  return filtered
+}
+
 function getOpenAICompatibleChatCompletionsUrl(baseUrl: string): string {
   const normalized = baseUrl.replace(/\/$/, '')
   return normalized.endsWith('/chat/completions')
@@ -357,7 +398,7 @@ async function callOpenAICompatibleProvider({
     const assistantMessage = createAssistantMessageFromOpenAIResponse(response, tools, resolvedModel, provider)
     const openAIUsage = extractOpenAIUsage(response)
     if (openAIUsage) {
-      const costUSD = calculateUSDCost(resolvedModel, openAIUsage)
+      const costUSD = calculateUSDCostFromProviderUsage(resolvedModel, fromOpenAIUsage(openAIUsage))
       addToTotalSessionCost(costUSD, openAIUsage, resolvedModel, provider)
     }
     return assistantMessage
@@ -377,7 +418,7 @@ async function callOpenAICompatibleProvider({
     const assistantMessage = createAssistantMessageFromOpenAIResponse(response, tools, resolvedModel, provider)
     const openAIUsage = extractOpenAIUsage(response)
     if (openAIUsage) {
-      const costUSD = calculateUSDCost(resolvedModel, openAIUsage)
+      const costUSD = calculateUSDCostFromProviderUsage(resolvedModel, fromOpenAIUsage(openAIUsage))
       addToTotalSessionCost(costUSD, openAIUsage, resolvedModel, provider)
     }
     return assistantMessage
@@ -991,9 +1032,14 @@ export async function* executeNonStreamingRequest(
           clientOptions.agentId,
           clientOptions.parentAgentId,
         )
+        // Filter Anthropic-specific params for non-Anthropic providers
+        const nsFilteredParams = filterParamsForProvider(
+          adjustedParams as Record<string, unknown>,
+          ProviderManager.getInstance().getActiveProviderName(),
+        )
         return await anthropic.beta.messages.create(
           {
-            ...adjustedParams,
+            ...nsFilteredParams,
             model: normalizeModelStringForAPI(adjustedParams.model),
           },
           {
@@ -2485,6 +2531,13 @@ async function* queryModel(
         const params = paramsFromContext(context)
         captureAPIRequest(params, options.querySource) // Capture for bug reports
 
+        // Strip Anthropic-specific params when the active provider
+        // doesn't speak the native Messages API.
+        const filteredParams = filterParamsForProvider(
+          params as Record<string, unknown>,
+          providerId,
+        )
+
         maxOutputTokens = params.max_tokens
 
         // Fire immediately before the fetch is dispatched. .withResponse() below
@@ -2517,7 +2570,7 @@ async function* queryModel(
         }
         const result = await anthropic.beta.messages
           .create(
-            { ...params, stream: true },
+            { ...filteredParams, stream: true },
             {
               signal,
               ...(clientRequestId || Object.keys(agentHeaders).length > 0

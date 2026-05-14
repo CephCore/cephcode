@@ -30,6 +30,8 @@ import { LINK_END, link as oscLink } from './termio/osc.js'
 
 type State = {
   previousOutput: string
+  lastRenderedHeight: number
+  lastRenderedWidth: number
 }
 
 type Options = {
@@ -46,6 +48,8 @@ export class LogUpdate {
   constructor(private readonly options: Options) {
     this.state = {
       previousOutput: '',
+      lastRenderedHeight: 0,
+      lastRenderedWidth: 0,
     }
   }
 
@@ -60,6 +64,8 @@ export class LogUpdate {
   // Called when process resumes from suspension (SIGCONT) to prevent clobbering terminal content
   reset(): void {
     this.state.previousOutput = ''
+    this.state.lastRenderedHeight = 0
+    this.state.lastRenderedWidth = 0
   }
 
   private renderFullFrame(frame: Frame): Diff {
@@ -139,10 +145,31 @@ export class LogUpdate {
     // not reset here but that would involve predicting the current layout
     // _after_ the viewport change which means calcuating text wrapping.
     // Resizing is a rare enough event that it's not practically a big issue.
+    // When the terminal is resized, the existing output on the screen is
+    // re-wrapped by the terminal itself. To avoid "ghost" lines from the
+    // previous render being left behind (scrollback duplication), we need to
+    // clear the previous output's visual footprint at the NEW width.
     if (
-      next.viewport.height < prev.viewport.height ||
-      (prev.viewport.width !== 0 && next.viewport.width !== prev.viewport.width)
+      (prev.viewport.width !== 0 && next.viewport.width !== prev.viewport.width) ||
+      next.viewport.height < prev.viewport.height
     ) {
+      const prevHeightAtNewWidth = calculateWrappedHeight(
+        prev.screen,
+        next.viewport.width,
+      )
+      this.state.lastRenderedHeight = prevHeightAtNewWidth
+      this.state.lastRenderedWidth = next.viewport.width
+
+      // If the estimated height is within the viewport, we can clear it
+      // precisely using eraseLines. If it's too tall, we fall back to a full
+      // terminal clear to ensure no stale content remains.
+      if (prevHeightAtNewWidth <= next.viewport.height) {
+        return [
+          { type: 'clear', count: prevHeightAtNewWidth },
+          ...this.renderFullFrame(next),
+        ]
+      }
+
       return fullResetSequence_CAUSES_FLICKER(next, 'resize', stylePool)
     }
 
@@ -315,10 +342,16 @@ export class LogUpdate {
       // advance 2 columns when we write the wide character itself.
       // SpacerTail: Second cell of a wide character
       // SpacerHead: Marks line-end position where wide char wraps to next line
+      // H28: Only skip when the REMOVED cell was also a spacer or empty.
+      // When a non-spacer (e.g., overlay background) was at this position,
+      // the SpacerTail must be explicitly written to clear color artifacts.
       if (
         added &&
         (added.width === CellWidth.SpacerTail ||
-          added.width === CellWidth.SpacerHead)
+          added.width === CellWidth.SpacerHead) &&
+        (!removed ||
+          removed.width === CellWidth.SpacerTail ||
+          removed.width === CellWidth.SpacerHead)
       ) {
         return
       }
@@ -461,10 +494,55 @@ export class LogUpdate {
       )
     }
 
+    this.state.lastRenderedHeight = next.screen.height
+    this.state.lastRenderedWidth = next.viewport.width
+
     return scrollPatch.length > 0
       ? [...scrollPatch, ...screen.diff]
       : screen.diff
   }
+}
+
+/**
+ * Estimate the visual height of a screen buffer if it were re-wrapped to a
+ * different width. Uses the screen's soft-wrap markers to reconstruct original
+ * logical lines before re-wrapping.
+ */
+function calculateWrappedHeight(screen: Screen, newWidth: number): number {
+  if (newWidth <= 0 || screen.height === 0) return 0
+
+  let totalHeight = 0
+  let currentLogicalLineWidth = 0
+
+  for (let y = 0; y < screen.height; y++) {
+    // If this row is NOT a continuation of the previous one, it's a new
+    // logical line. Process the previous one's wrapped height.
+    const continuationColumn = screen.softWrap[y]
+    if (continuationColumn === 0 && y > 0) {
+      totalHeight += Math.max(1, Math.ceil(currentLogicalLineWidth / newWidth))
+      currentLogicalLineWidth = 0
+    }
+
+    // Measure the printable content of this row
+    let rowWidth = 0
+    for (let x = screen.width - 1; x >= 0; x--) {
+      if (!isEmptyCellAt(screen, x, y)) {
+        rowWidth = x + 1
+        break
+      }
+    }
+
+    // If this row is a continuation, we only add the content AFTER the
+    // soft-wrap point of the previous row.
+    // However, for a simple estimate, summing the total cells used
+    // in all rows of the logical line is sufficient.
+    currentLogicalLineWidth += rowWidth
+  }
+
+  // Handle the last logical line
+  totalHeight += Math.max(1, Math.ceil(currentLogicalLineWidth / newWidth))
+
+  return totalHeight
 }
 
 function transitionHyperlink(

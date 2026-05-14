@@ -47,7 +47,7 @@ import { BackgroundHint } from '../BashTool/UI.js';
 import { FILE_READ_TOOL_NAME } from '../FileReadTool/prompt.js';
 import { spawnTeammate } from '../shared/spawnMultiAgent.js';
 import { setAgentColor } from './agentColorManager.js';
-import { agentToolResultSchema, classifyHandoffIfNeeded, emitTaskProgress, extractPartialResult, finalizeAgentTool, getLastToolUseName, runAsyncAgentLifecycle } from './agentToolUtils.js';
+import { agentToolResultSchema, classifyHandoffIfNeeded, emitTaskProgress, extractPartialResult, finalizeAgentTool, getLastToolUseName, normalizeAgentType, runAsyncAgentLifecycle } from './agentToolUtils.js';
 import { GENERAL_PURPOSE_AGENT } from './built-in/generalPurposeAgent.js';
 import { AGENT_TOOL_NAME, LEGACY_AGENT_TOOL_NAME, ONE_SHOT_BUILTIN_AGENT_TYPES } from './constants.js';
 import { buildForkedMessages, buildWorktreeNotice, FORK_AGENT, isForkSubagentEnabled, isInForkChild } from './forkSubagent.js';
@@ -223,7 +223,7 @@ export const AgentTool = buildTool({
 
     // Use inline env check instead of coordinatorModule to avoid circular
     // dependency issues during test module loading.
-    const isCoordinator = feature('COORDINATOR_MODE') ? isEnvTruthy(process.env.CLAUDE_CODE_COORDINATOR_MODE) : false;
+    const isCoordinator = isEnvTruthy(process.env.CLAUDE_CODE_COORDINATOR_MODE);
     return await getPrompt(filteredAgents, isCoordinator, allowedAgentTypes);
   },
   name: AGENT_TOOL_NAME,
@@ -286,7 +286,7 @@ export const AgentTool = buildTool({
     // Spawn is triggered when team_name is set (from param or context) and name is provided
     if (teamName && name) {
       // Set agent definition color for grouped UI display before spawning
-      const agentDef = subagent_type ? toolUseContext.options.agentDefinitions.activeAgents.find(a => a.agentType === subagent_type) : undefined;
+      const agentDef = subagent_type ? toolUseContext.options.agentDefinitions.activeAgents.find(a => normalizeAgentType(a.agentType) === normalizeAgentType(subagent_type)) : undefined;
       if (agentDef?.color) {
         setAgentColor(subagent_type!, agentDef.color);
       }
@@ -344,11 +344,11 @@ export const AgentTool = buildTool({
       } = toolUseContext.options.agentDefinitions;
       const agents = filterDeniedAgents(
       // When allowedAgentTypes is set (from Agent(x,y) tool spec), restrict to those types
-      allowedAgentTypes ? allAgents.filter(a => allowedAgentTypes.includes(a.agentType)) : allAgents, appState.toolPermissionContext, AGENT_TOOL_NAME);
-      const found = agents.find(agent => agent.agentType === effectiveType);
+      allowedAgentTypes ? allAgents.filter(a => allowedAgentTypes.some(t => normalizeAgentType(t) === normalizeAgentType(a.agentType))) : allAgents, appState.toolPermissionContext, AGENT_TOOL_NAME);
+      const found = agents.find(agent => normalizeAgentType(agent.agentType) === normalizeAgentType(effectiveType));
       if (!found) {
         // Check if the agent exists but is denied by permission rules
-        const agentExistsButDenied = allAgents.find(agent => agent.agentType === effectiveType);
+        const agentExistsButDenied = allAgents.find(agent => normalizeAgentType(agent.agentType) === normalizeAgentType(effectiveType));
         if (agentExistsButDenied) {
           const denyRule = getDenyRuleForAgent(appState.toolPermissionContext, AGENT_TOOL_NAME, effectiveType);
           throw new Error(`Agent type '${effectiveType}' has been denied by permission rule '${AGENT_TOOL_NAME}(${effectiveType})' from ${denyRule?.source ?? 'settings'}.`);
@@ -553,7 +553,7 @@ export const AgentTool = buildTool({
 
     // Use inline env check instead of coordinatorModule to avoid circular
     // dependency issues during test module loading.
-    const isCoordinator = feature('COORDINATOR_MODE') ? isEnvTruthy(process.env.CLAUDE_CODE_COORDINATOR_MODE) : false;
+    const isCoordinator = isEnvTruthy(process.env.CLAUDE_CODE_COORDINATOR_MODE);
 
     // Fork subagent experiment: force ALL spawns async for a unified
     // <task-notification> interaction model (not just fork spawns — all of them).

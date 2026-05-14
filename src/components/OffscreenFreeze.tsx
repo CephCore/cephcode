@@ -32,6 +32,16 @@ export function OffscreenFreeze({
     isVisible
   }] = useTerminalViewport();
   const cached = useRef(children);
+  // H26: When children type changes mid-session (e.g., tool result reclassified
+  // as collapsed group), update cache immediately regardless of visibility to
+  // prevent React reconciliation crash from stale element type refs.
+  if (cached.current !== children) {
+    const oldType = typeof cached.current === 'object' && cached.current !== null ? (cached.current as any)?.type : undefined;
+    const newType = typeof children === 'object' && children !== null ? (children as any)?.type : undefined;
+    if (oldType !== newType) {
+      cached.current = children;
+    }
+  }
   // Virtual list has no terminal scrollback — the ScrollBox clips inside the
   // viewport, so there's nothing to freeze. Freezing there also blocks
   // click-to-expand since useTerminalViewport's visibility calc can disagree

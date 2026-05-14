@@ -20,6 +20,7 @@ import type { SystemMessage, SystemStopHookSummaryMessage, SystemBridgeStatusMes
 import { SystemAPIErrorMessage } from './SystemAPIErrorMessage.js';
 import { formatDuration, formatNumber, formatSecondsShort } from '../../utils/format.js';
 import { getGlobalConfig } from '../../utils/config.js';
+import { decodeHtmlEntities } from '../../utils/htmlEntities.js';
 import Link from '../../ink/components/Link.js';
 import ThemedText from '../design-system/ThemedText.js';
 import { CtrlOToExpand } from '../CtrlOToExpand.js';
@@ -453,7 +454,7 @@ function SystemTextMessageInner(t0) {
   const t3 = columns - 10;
   let t4;
   if ($[4] !== content) {
-    t4 = content.trim();
+    t4 = decodeHtmlEntities(content.trim());
     $[4] = content;
     $[5] = t4;
   } else {

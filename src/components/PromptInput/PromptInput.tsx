@@ -875,6 +875,19 @@ function PromptInput({
     }
   }, [addNotification, ultrareviewTriggers.length]);
 
+  // Show "Pasting…" hint while image/rich content is being pasted (H39)
+  useEffect(() => {
+    if (isPasting) {
+      addNotification({
+        key: 'pasting',
+        text: 'Pasting…',
+        priority: 'immediate',
+      });
+    } else {
+      removeNotification('pasting');
+    }
+  }, [isPasting, addNotification, removeNotification]);
+
   // Track input length for stash hint
   const prevInputLengthRef = useRef(input.length);
   const peakInputLengthRef = useRef(input.length);
@@ -2011,7 +2024,15 @@ function PromptInput({
         priority: 'immediate',
         timeoutMs: 5000
       });
-      // Don't return - let the character be typed so user sees the issue
+      // Also fire the mapped action so the shortcut works even without
+      // "Option as Meta" — prevents inserting the literal character.
+      const action = shortcut === 'alt+t' ? 'chat:thinkingToggle'
+        : shortcut === 'alt+p' ? 'chat:modelPicker'
+        : shortcut === 'alt+o' ? 'chat:fastMode'
+        : null;
+      if (action) {
+        return { key: action };
+      }
     }
 
     // Footer navigation is handled via useKeybindings above (Footer context)
@@ -2084,6 +2105,11 @@ function PromptInput({
         doublePressEscFromEmpty();
       }
     }
+    if (key.leftArrow && cursorOffset === 0 && input === '' && !isLoading) {
+      void onSubmit('/agents');
+      return;
+    }
+
     if (key.return && helpOpen) {
       setHelpOpen(false);
     }

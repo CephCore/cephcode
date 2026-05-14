@@ -762,8 +762,12 @@ function renderNodeToOutput(
         // spacer) making scrollTop >= prevMaxScroll true by artifact, not
         // because the user was at bottom.
         const grew = scrollHeight >= prevScrollHeight
+        // H17: When disableStickyScroll is set (autoScrollEnabled: false),
+        // only re-engage follow on explicit sticky=true (scrollToBottom button),
+        // not on positional bottom — manual scroll-to-bottom must not re-engage.
+        const disableSticky = Boolean(node.attributes?.['disableStickyScroll'])
         const atBottom =
-          sticky || (grew && scrollTopBeforeFollow >= prevMaxScroll)
+          sticky || (!disableSticky && grew && scrollTopBeforeFollow >= prevMaxScroll)
         if (atBottom && (node.pendingScrollDelta ?? 0) >= 0) {
           node.scrollTop = maxScroll
           node.pendingScrollDelta = undefined

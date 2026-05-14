@@ -306,12 +306,12 @@ function AskUserQuestionPermissionRequestBody(t0) {
         return result;
       }).join("\n");
       const feedback = `The user wants to clarify these questions.
-    This means they may have additional information, context or questions for you.
-    Take their response into account and then reformulate the questions if appropriate.
-    Start by asking them what they would like to clarify.
+This means they may have additional information, context or questions for you.
+Take their response into account and then reformulate the questions if appropriate.
+Start by asking them what they would like to clarify.
 
-    Questions asked:\n${questionsWithAnswers}`;
-      if (metadataSource) {
+Questions asked:\n${questionsWithAnswers}`;
+  if (metadataSource) {
         logEvent("tengu_ask_user_question_respond_to_claude", {
           source: metadataSource as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           questionCount: questions.length,
@@ -320,8 +320,10 @@ function AskUserQuestionPermissionRequestBody(t0) {
         });
       }
       const imageBlocks = await convertImagesToBlocks(allImageAttachments);
-      onDone();
+      // H11: onReject before onDone so question context is fully processed
+      // by the tool system before the dialog is dismissed.
       toolUseConfirm.onReject(feedback, imageBlocks && imageBlocks.length > 0 ? imageBlocks : undefined);
+      onDone();
     };
     $[32] = allImageAttachments;
     $[33] = answers;
@@ -366,8 +368,9 @@ Questions asked and answers provided:\n${questionsWithAnswers_0}`;
         });
       }
       const imageBlocks_0 = await convertImagesToBlocks(allImageAttachments);
-      onDone();
+      // H11: onReject before onDone so question context is fully processed
       toolUseConfirm.onReject(feedback_0, imageBlocks_0 && imageBlocks_0.length > 0 ? imageBlocks_0 : undefined);
+      onDone();
     };
     $[41] = allImageAttachments;
     $[42] = answers;

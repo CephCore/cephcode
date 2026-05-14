@@ -1422,6 +1422,11 @@ export default class Ink {
       if (stdinWithRaw.setRawMode) {
         stdinWithRaw.setRawMode(true);
       }
+      // H22: On Windows, stdin can enter a paused state when re-opening
+      // a background session. Resume the stream to re-enable reading.
+      if (process.platform === 'win32' && stdin.isTTY && (stdin as NodeJS.ReadStream).readableFlowing === false) {
+        stdin.resume();
+      }
       this.wasRawMode = false;
     }
   }

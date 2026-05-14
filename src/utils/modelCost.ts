@@ -22,16 +22,15 @@ import {
   getDefaultMainLoopModelSetting,
   type ModelShortName,
 } from './model/model.js'
+import {
+  type ProviderUsage,
+  type ModelCostRates,
+  calculateUsageCost,
+  fromAnthropicUsage,
+} from '../services/ai/usageTypes.js'
 
 // @see https://platform.claude.com/docs/en/about-claude/pricing
-export type ModelCosts = {
-  inputTokens: number
-  outputTokens: number
-  promptCacheWriteTokens: number
-  promptCacheReadTokens: number
-  webSearchRequests: number
-  isFree?: boolean
-}
+export type ModelCosts = ModelCostRates
 
 // Free provider marker
 
@@ -401,7 +400,8 @@ export const MODEL_COSTS: Record<ModelShortName, ModelCosts> = {
 }
 
 /**
- * Calculates the USD cost based on token usage and model cost configuration
+ * Calculates the USD cost based on token usage and model cost configuration.
+ * Accepts Anthropic's native `BetaUsage` (backward-compatible).
  */
 function tokensToUSDCost(modelCosts: ModelCosts, usage: Usage): number {
   return (
@@ -416,14 +416,19 @@ function tokensToUSDCost(modelCosts: ModelCosts, usage: Usage): number {
   )
 }
 
-export function getModelCosts(model: string, usage: Usage): ModelCosts {
+/**
+ * @[MULTI_PROVIDER] Get the cost rates for a model.
+ * Uses PROVIDER_PRICING table for non-Anthropic models.
+ * Speed info is only needed for Opus 4.6 fast-mode pricing.
+ */
+export function getModelCosts(model: string, speedInfo?: { speed?: string }): ModelCosts {
   const shortName = getCanonicalName(model)
 
   // Check if this is an Opus 4.6 model with fast mode active.
   if (
     shortName === firstPartyNameToCanonical(CLAUDE_OPUS_4_7_CONFIG.firstParty)
   ) {
-    const isFastMode = usage.speed === 'fast'
+    const isFastMode = speedInfo?.speed === 'fast'
     return getOpus46CostTier(isFastMode)
   }
 
@@ -509,11 +514,51 @@ function trackUnknownModelCost(model: string, shortName: ModelShortName): void {
   setHasUnknownModelCost()
 }
 
-// Calculate the cost of a query in US dollars.
-// If the model's costs are not found, use the default model's costs.
+/**
+ * @[MULTI_PROVIDER] Calculate the cost of a query in US dollars from a `Usage` object.
+ * @deprecated Use `calculateUSDCostFromProviderUsage()` with `fromAnthropicUsage()` instead.
+ */
 export function calculateUSDCost(resolvedModel: string, usage: Usage): number {
-  const modelCosts = getModelCosts(resolvedModel, usage)
+  const modelCosts = getModelCosts(resolvedModel, { speed: usage.speed })
   return tokensToUSDCost(modelCosts, usage)
+}
+
+/**
+ * Calculate USD cost from a provider-agnostic `ProviderUsage` object.
+ * Preferred for non-Anthropic providers; still works for Anthropic.
+ *
+ * @example
+ *   import { fromOpenAIUsage } from '../services/ai/usageTypes.js'
+ *   const usage = fromOpenAIUsage(response.usage)
+ *   const cost = calculateUSDCostFromProviderUsage(model, usage)
+ */
+export function calculateUSDCostFromProviderUsage(
+  resolvedModel: string,
+  usage: ProviderUsage,
+): number {
+  const modelCosts = getModelCosts(resolvedModel)
+  return calculateUsageCost(usage, modelCosts)
+}
+
+/**
+ * Like `calculateUSDCost` but takes raw token counts directly.
+ * Provider-agnostic — no BetaUsage dependency.
+ */
+export function calculateCostFromTokensProviderAgnostic(
+  model: string,
+  tokens: {
+    inputTokens: number
+    outputTokens: number
+    cacheReadInputTokens?: number
+    cacheCreationInputTokens?: number
+  },
+): number {
+  return calculateUSDCostFromProviderUsage(model, {
+    inputTokens: tokens.inputTokens,
+    outputTokens: tokens.outputTokens,
+    cacheReadInputTokens: tokens.cacheReadInputTokens,
+    cacheCreationInputTokens: tokens.cacheCreationInputTokens,
+  })
 }
 
 /**

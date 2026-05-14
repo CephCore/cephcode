@@ -1,6 +1,6 @@
 import { c as _c } from "react/compiler-runtime";
 import figures from 'figures';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import type { CommandResultDisplay } from '../../commands.js';
 import { Box, color, Link, Text, useTheme } from '../../ink.js';
 import { useKeybindings } from '../../keybindings/useKeybinding.js';
@@ -462,7 +462,7 @@ export function MCPListPanel(t0) {
   }
   let t30;
   if ($[71] !== handleCancel || $[72] !== t21 || $[73] !== t29) {
-    t30 = <Dialog title="Manage MCP servers" subtitle={t21} onCancel={handleCancel} hideInputGuide={true}>{t29}</Dialog>;
+    t30 = <Dialog title="Manage MCP servers" subtitle={t21} onCancel={handleCancel} hideInputGuide={true} scrollable={true}>{t29}</Dialog>;
     $[71] = handleCancel;
     $[72] = t21;
     $[73] = t29;

@@ -5,6 +5,7 @@ import type { ScrollBoxHandle } from '../ink/components/ScrollBox.js';
 import { useSelection } from '../ink/hooks/use-selection.js';
 import type { FocusMove, SelectionState } from '../ink/selection.js';
 import { isXtermJs } from '../ink/terminal.js';
+import { isSupportedJetBrainsTerminal } from '../utils/ide.js';
 import { getClipboardPath } from '../ink/termio/osc.js';
 // eslint-disable-next-line custom-rules/prefer-use-keybindings -- Esc needs conditional propagation based on selection state
 import { type Key, useInput } from '../ink.js';
@@ -332,9 +333,13 @@ export function initWheelAccel(xtermJs = false, base = 1): WheelAccelState {
 // The renderer also calls isXtermJsHost() (in render-node-to-output) to
 // select the drain algorithm — no state to pass through.
 function initAndLogWheelAccel(): WheelAccelState {
-  const xtermJs = isXtermJs();
+  // H37: JetBrains IDE 2025.2 terminals use xterm.js-based wheel events
+  // (browser-style, no encoder bounce). Route to the decay curve path to
+  // avoid runaway acceleration, spurious arrow keys, and wrong-direction
+  // events from the JetBrains terminal emulator.
+  const xtermJs = isXtermJs() || isSupportedJetBrainsTerminal();
   const base = readScrollSpeedBase();
-  logForDebugging(`wheel accel: ${xtermJs ? 'decay (xterm.js)' : 'window (native)'} · base=${base} · TERM_PROGRAM=${process.env.TERM_PROGRAM ?? 'unset'}`);
+  logForDebugging(`wheel accel: ${xtermJs ? 'decay (xterm.js' + (isSupportedJetBrainsTerminal() ? ', jetbrains' : '') + ')' : 'window (native)'} · base=${base} · TERM_PROGRAM=${process.env.TERM_PROGRAM ?? 'unset'}`);
   return initWheelAccel(xtermJs, base);
 }
 
@@ -473,6 +478,7 @@ export function ScrollKeybindingHandler({
       // inside the centered Modal, where the paginated slice always fits).
       if (!s_2 || s_2.getScrollHeight() <= s_2.getViewportHeight()) return false;
       wheelAccel.current ??= initAndLogWheelAccel();
+      wheelAccel.current.base = readScrollSpeedBase();
       scrollUp(s_2, computeWheelStep(wheelAccel.current, -1, performance.now()));
       onScroll?.(false, s_2);
     },
@@ -481,6 +487,7 @@ export function ScrollKeybindingHandler({
       const s_3 = scrollRef.current;
       if (!s_3 || s_3.getScrollHeight() <= s_3.getViewportHeight()) return false;
       wheelAccel.current ??= initAndLogWheelAccel();
+      wheelAccel.current.base = readScrollSpeedBase();
       const step = computeWheelStep(wheelAccel.current, 1, performance.now());
       const reachedBottom = scrollDown(s_3, step);
       onScroll?.(reachedBottom, s_3);

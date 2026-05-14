@@ -29,7 +29,10 @@ const BONUS_FIRST_CHAR = 8
 const PENALTY_GAP_START = 3
 const PENALTY_GAP_EXTENSION = 1
 
-const TOP_LEVEL_CACHE_LIMIT = 100
+// H33: Increased from 100 to 500 so @-mention file picker finds files in
+// directories with >100 entries. The original limit caused files beyond the
+// first 100 in any directory to be invisible to the picker.
+const TOP_LEVEL_CACHE_LIMIT = 500
 const MAX_QUERY_LEN = 64
 // Yield to event loop after this many ms of sync work. Chunk sizes are
 // time-based (not count-based) so slow machines get smaller chunks and
@@ -182,11 +185,14 @@ export class FileIndex {
     // Smart case: lowercase query → case-insensitive; any uppercase → case-sensitive
     const caseSensitive = query !== query.toLowerCase()
     const needle = caseSensitive ? query : query.toLowerCase()
-    const nLen = Math.min(needle.length, MAX_QUERY_LEN)
+    // Use spread to properly handle astral-plane characters (emoji, etc.)
+    // that span multiple UTF-16 code units (G14).
+    const needleCodePoints = [...needle]
+    const nLen = Math.min(needleCodePoints.length, MAX_QUERY_LEN)
     const needleChars: string[] = new Array(nLen)
     let needleBitmap = 0
     for (let j = 0; j < nLen; j++) {
-      const ch = needle.charAt(j)
+      const ch = needleCodePoints[j]!
       needleChars[j] = ch
       const cc = ch.charCodeAt(0)
       if (cc >= 97 && cc <= 122) needleBitmap |= 1 << (cc - 97)

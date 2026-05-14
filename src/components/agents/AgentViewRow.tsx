@@ -1,0 +1,229 @@
+/**
+ * AgentViewRow — Single session row in the agent view dashboard.
+ * Extracted from AgentViewDashboard for maintainability.
+ */
+
+import * as React from 'react'
+import figures from 'figures'
+import { Box, Text } from '../../ink.js'
+import type { LocalAgentTaskState } from '../../tasks/LocalAgentTask/LocalAgentTask.js'
+import { isWaitingForInput as checkWaitingForInput } from './utils.js'
+
+export type TaskCategory = 'needs-input' | 'working' | 'completed' | 'failed' | 'stopped'
+
+export function isWaitingForInput(task: { status: string; progress?: { lastActivity?: { toolName?: string } } | null }): boolean {
+  return checkWaitingForInput(task as any)
+}
+
+export function getTaskCategory(task: { status: string; progress?: { lastActivity?: { toolName?: string } } | null }): TaskCategory {
+  if (task.status === 'failed') return 'failed'
+  if (task.status === 'killed') return 'stopped'
+  if (isWaitingForInput(task)) return 'needs-input'
+  if (task.status === 'running' || task.status === 'pending') return 'working'
+  return 'completed'
+}
+
+export function formatTimeAgo(timestamp: number): string {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h`
+  return `${Math.floor(hours / 24)}d`
+}
+
+/**
+ * Shape-based icons matching official Claude Code agent view:
+ * ✻ (alive process, active), ✽ (alive process, animated),
+ * ∙ (process exited), ✢ (loop/sleep session)
+ */
+const SHAPE_ICONS = {
+  alive: figures.circleDotted,      // ✽ — animated while working
+  exited: figures.bullet,           // ∙ — process has exited
+  loop: figures.lozenge,            // ◊ — loop/sleep session
+} as const
+
+const STATE_COLORS: Record<TaskCategory, string> = {
+  'needs-input': 'yellow',
+  'working': 'blue',
+  'completed': 'green',
+  'failed': 'red',
+  'stopped': 'grey',
+} as const
+
+const STATE_ICONS: Record<TaskCategory, string> = {
+  'needs-input': '?',
+  'working': figures.circleDotted,
+  'completed': figures.tick,
+  'failed': figures.cross,
+  'stopped': figures.circle,
+} as const
+
+/**
+ * PR status colors matching official Claude Code spec:
+ * - Yellow: waiting on checks/review, or checks failed
+ * - Green: checks passed, no review blocking
+ * - Purple: merged
+ * - Grey: draft or closed
+ */
+export type PRStatus = 'pending_checks' | 'checks_failed' | 'checks_passed' | 'merged' | 'draft' | 'closed'
+
+const PR_STATUS_ICONS: Record<PRStatus, { char: string; color: string }> = {
+  pending_checks:  { char: '●', color: 'yellow' },
+  checks_failed:   { char: '●', color: 'yellow' },
+  checks_passed:   { char: '●', color: 'green' },
+  merged:          { char: '●', color: 'magenta' },
+  draft:           { char: '●', color: 'grey' },
+  closed:          { char: '●', color: 'grey' },
+}
+
+export function getPRStatusIcon(status: PRStatus): { char: string; color: string } {
+  return PR_STATUS_ICONS[status] ?? { char: '●', color: 'grey' }
+}
+
+export function getStatusIcon(task: {
+  status: string;
+  progress?: { lastActivity?: { toolName?: string } } | null;
+  processRunning?: boolean;
+  isLoopSession?: boolean;
+}): { icon: string; color: string; isAnimated: boolean } {
+  const cat = getTaskCategory(task)
+  const baseColor = STATE_COLORS[cat]
+
+  // Shape distinction
+  if (task.isLoopSession) {
+    return { icon: SHAPE_ICONS.loop, color: baseColor, isAnimated: false }
+  }
+  if (task.processRunning === false) {
+    // Process has exited but task state is preserved
+    return { icon: SHAPE_ICONS.exited, color: baseColor, isAnimated: false }
+  }
+  if (task.status === 'running' && task.processRunning !== false) {
+    // Animated spinner for actively working sessions
+    return { icon: figures.circleDotted, color: baseColor, isAnimated: true }
+  }
+  // Default: use state-specific icon
+  return { icon: STATE_ICONS[cat] ?? figures.circle, color: baseColor, isAnimated: false }
+}
+
+export function getActivityPreview(task: LocalAgentTaskState): string {
+  // Prefer AI-generated row summary
+  if ((task as any).rowSummary) return (task as any).rowSummary
+
+  const last = task.progress?.lastActivity
+  if (last?.activityDescription) return last.activityDescription
+  if (last?.toolName) return `Running ${last.toolName}`
+  if (task.status === 'completed') return 'Task completed'
+  if (task.status === 'failed') return task.error ?? 'Failed'
+  if (task.status === 'killed') return 'Stopped'
+  return task.prompt?.slice(0, 60) ?? 'Working...'
+}
+
+type Props = {
+  task: LocalAgentTaskState
+  index: number
+  isSelected: boolean
+  prCount?: number
+  prStatus?: PRStatus | null
+  prUrl?: string | null
+}
+
+export function AgentViewRow({ task, index, isSelected, prCount, prStatus, prUrl }: Props) {
+  const cat = getTaskCategory(task)
+  const statusStyle = getStatusIcon(task)
+  const previewText = getActivityPreview(task)
+
+  // Selected row gets suggestion color
+  const highlightColor = isSelected ? 'suggestion' : (
+    cat === 'needs-input' ? 'yellow' :
+    cat === 'failed' ? 'red' :
+    cat === 'stopped' ? 'grey' : 'dim'
+  )
+
+  // PR status dot
+  const prDot = prStatus ? getPRStatusIcon(prStatus) : null
+  const showPRCount = prCount && prCount > 1
+
+  return (
+    <Box
+      key={task.id}
+      flexDirection="row"
+      paddingX={1}
+      gap={0}
+      borderStyle={isSelected ? 'bold' : 'single'}
+      borderColor={highlightColor}
+      height={1}
+    >
+      {/* Icon column (2 chars wide) */}
+      <Box width={3} flexShrink={0}>
+        <Text color={statusStyle.color as any}>
+          {statusStyle.isAnimated ? figures.circleDotted : statusStyle.icon}
+        </Text>
+      </Box>
+
+      {/* Session name / agent type (20 chars) */}
+      <Box width={18} flexShrink={0}>
+        <Text bold={isSelected} wrap="truncate-end">
+          {(task as any).customName ?? task.agentType ?? 'Agent'}
+        </Text>
+      </Box>
+
+      {/* Activity preview (flexible) */}
+      <Box flexGrow={1}>
+        <Text wrap="truncate-end" dimColor={!isSelected}>
+          {previewText}
+        </Text>
+      </Box>
+
+      {/* PR status */}
+      {prDot && (
+        <Box width={showPRCount ? 4 : 2} flexShrink={0}>
+          {showPRCount && (
+            <Text dimColor>{prCount}</Text>
+          )}
+          <Text color={prDot.color as any}>{prDot.char}</Text>
+        </Box>
+      )}
+
+      {/* Time ago (8 chars) */}
+      <Box width={8} flexShrink={0}>
+        <Text dimColor>
+          {task.startTime ? formatTimeAgo(task.startTime) : ''}
+        </Text>
+      </Box>
+    </Box>
+  )
+}
+
+export function AgentViewGroupHeader({
+  label,
+  count,
+  color,
+  isCollapsed,
+  onToggle,
+  isSelected,
+}: {
+  label: string
+  count: number
+  color: string
+  isCollapsed: boolean
+  onToggle: () => void
+  isSelected: boolean
+}) {
+  return (
+    <Box
+      flexDirection="row"
+      paddingX={1}
+      gap={1}
+      borderStyle={isSelected ? 'bold' : 'single'}
+      borderColor={isSelected ? 'suggestion' : 'dim'}
+      height={1}
+    >
+      <Text color={color as any} bold>
+        {isCollapsed ? figures.arrowRight : figures.arrowDown} {label} ({count})
+      </Text>
+      <Text dimColor>{figures.ellipsis}</Text>
+    </Box>
+  )
+}

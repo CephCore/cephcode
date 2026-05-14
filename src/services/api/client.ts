@@ -1,7 +1,39 @@
+/**
+ * Provider client factory.
+ *
+ * Returns the right SDK client (Anthropic, OpenAI, Google, …) and wraps
+ * non-Anthropic clients in `AnthropicAdapter` so the rest of the codebase
+ * can use the unified `client.beta.messages.*` interface.
+ */
+
 import type { ClientOptions } from '@anthropic-ai/sdk'
 import type { ProviderId } from '../ai/providers/ProviderInterface.js'
 import { ProviderManager } from '../ai/ProviderManager.js'
 import { createAnthropicClient } from './anthropicClient.js'
+import { AnthropicAdapter } from '../ai/adapter/AnthropicAdapter.js'
+import '../ai/adapter/GoogleAdapter.js' // side-effect: registers Google adapter
+
+// ── Unified client interface ─────────────────────────────────────────────────
+
+/**
+ * The unified client shape that every provider exposes.
+ *
+ * - Anthropic SDK clients already satisfy this natively.
+ * - Non-Anthropic clients are wrapped in `AnthropicAdapter` which provides
+ *   the same `beta.messages.create()` shape.
+ */
+export interface UnifiedAIProviderClient {
+  beta: {
+    messages: {
+      create(
+        params: any,
+        options?: any,
+      ): Promise<any> & { withResponse?: () => Promise<any> }
+    }
+  }
+}
+
+// ── Factory functions ────────────────────────────────────────────────────────
 
 export async function getAnthropicClient({
   apiKey,
@@ -19,8 +51,13 @@ export async function getAnthropicClient({
   return createAnthropicClient({ apiKey, maxRetries, model, fetchOverride, source })
 }
 
-import { AnthropicAdapter } from '../ai/adapter/AnthropicAdapter.js'
-
+/**
+ * Returns a unified provider client for any registered provider.
+ *
+ * - For `anthropic`: returns the native Anthropic SDK client directly.
+ * - For all others: creates the provider-specific SDK client and wraps it
+ *   in `AnthropicAdapter` (which uses the adapter registry under the hood).
+ */
 export async function getAIProviderClient({
   provider,
   apiKey,
@@ -35,25 +72,25 @@ export async function getAIProviderClient({
   model?: string
   fetchOverride?: ClientOptions['fetch']
   source?: string
-}): Promise<any> {
+}): Promise<UnifiedAIProviderClient> {
   const providerManager = ProviderManager.getInstance()
   const effectiveProvider = provider ?? providerManager.getActiveProviderName()
 
+  // Anthropic: return native client directly (no adapter needed)
   if (effectiveProvider === 'anthropic') {
     return getAnthropicClient({ apiKey, maxRetries, model, fetchOverride, source })
   }
 
-  // Use ProviderManager for other providers
-  const client = await providerManager.createClient(effectiveProvider, {
+  // Other providers: create SDK client and wrap with adapter
+  const rawClient = await providerManager.createClient(effectiveProvider, {
     apiKey,
     model,
     fetchOverride,
     source,
-    maxRetries
+    maxRetries,
   })
 
-  // Wrap in AnthropicAdapter to maintain compatibility with existing code
-  return new AnthropicAdapter(client, effectiveProvider)
+  return new AnthropicAdapter(rawClient, effectiveProvider) as unknown as UnifiedAIProviderClient
 }
 
 export const CLIENT_REQUEST_ID_HEADER = 'x-client-request-id'

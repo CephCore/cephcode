@@ -208,7 +208,11 @@ export function verifyAndDemote(plugins: readonly LoadedPlugin[]): {
           : enabled.has(dep)
         if (!satisfied) {
           enabled.delete(p.source)
-          const count = enabledByName.get(p.name) ?? 0
+          // Use the parsed source name (from p.source), not p.name (manifest
+          // name), since enabledByName is keyed by source identifier name and
+          // the two can differ (e.g. GitHub-style "repo-name" vs display "Repo Name").
+          const parsedSourceName = parsePluginIdentifier(p.source).name
+          const count = enabledByName.get(parsedSourceName) ?? 0
           if (count <= 1) enabledByName.delete(p.name)
           else enabledByName.set(p.name, count - 1)
           errors.push({

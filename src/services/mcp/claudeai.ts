@@ -5,7 +5,7 @@ import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
 } from 'src/services/analytics/index.js'
-import { getClaudeAIOAuthTokens, getConfiguredApiKeyHelper } from 'src/utils/auth.js'
+import { getClaudeAIOAuthTokens, getConfiguredApiKeyHelper, isActiveProviderAnthropic } from 'src/utils/auth.js'
 import { getGlobalConfig, saveGlobalConfig } from 'src/utils/config.js'
 import { logForDebugging } from 'src/utils/debug.js'
 import { isEnvDefinedFalsy } from 'src/utils/envUtils.js'
@@ -31,14 +31,20 @@ const FETCH_TIMEOUT_MS = 5000
 const MCP_SERVERS_BETA_HEADER = 'mcp-servers-2025-12-04'
 
 /**
- * Fetches MCP server configurations from Claude.ai org configs.
+ * @[MULTI_PROVIDER] Fetches MCP server configurations from Claude.ai org configs.
  * These servers are managed by the organization via Claude.ai.
+ * Non-Anthropic providers (OpenAI, Google, etc.) don't use Claude.ai — returns {}.
  *
  * Results are memoized for the session lifetime (fetch once per CLI session).
  */
 export const fetchClaudeAIMcpConfigsIfEligible = memoize(
   async (): Promise<Record<string, ScopedMcpServerConfig>> => {
     try {
+      // Non-Anthropic providers don't have Claude.ai MCP configs
+      if (!isActiveProviderAnthropic()) {
+        return {}
+      }
+
       if (isEnvDefinedFalsy(process.env.ENABLE_CLAUDEAI_MCP_SERVERS)) {
         logForDebugging('[claudeai-mcp] Disabled via env var')
         logEvent('tengu_claudeai_mcp_eligibility', {

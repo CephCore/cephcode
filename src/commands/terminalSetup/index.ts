@@ -15,7 +15,9 @@ const terminalSetup = {
   description:
     env.terminal === 'Apple_Terminal'
       ? 'Enable Option+Enter key binding for newlines and visual bell'
-      : 'Install Shift+Enter key binding for newlines',
+      : process.env.WT_SESSION
+        ? 'Shift+Enter is natively supported in Windows Terminal'
+        : 'Install Shift+Enter key binding for newlines',
   isHidden: env.terminal !== null && env.terminal in NATIVE_CSIU_TERMINALS,
   load: () => import('./terminalSetup.js'),
 } satisfies Command

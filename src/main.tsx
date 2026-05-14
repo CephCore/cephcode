@@ -83,6 +83,7 @@ import { createSyntheticOutputTool, isSyntheticOutputToolEnabled } from './tools
 import { getTools } from './tools.js';
 import { canUserConfigureAdvisor, getInitialAdvisorSetting, isAdvisorEnabled, isValidAdvisorModel, modelSupportsAdvisor } from './utils/advisor.js';
 import { isAgentSwarmsEnabled } from './utils/agentSwarmsEnabled.js';
+import { isCoordinatorMode } from './coordinator/coordinatorMode.js';
 import { count, uniq } from './utils/array.js';
 import { installAsciicastRecorder } from './utils/asciicast.js';
 import { getSubscriptionType, isClaudeAISubscriber, prefetchAwsCredentialsAndBedRockInfoIfSafe, prefetchGcpCredentialsIfSafe, validateForceLoginOrg } from './utils/auth.js';
@@ -108,9 +109,9 @@ const getTeammateUtils = () => require('./utils/teammate.js') as typeof import('
 const getTeammatePromptAddendum = () => require('./utils/swarm/teammatePromptAddendum.js') as typeof import('./utils/swarm/teammatePromptAddendum.js');
 const getTeammateModeSnapshot = () => require('./utils/swarm/backends/teammateModeSnapshot.js') as typeof import('./utils/swarm/backends/teammateModeSnapshot.js');
 /* eslint-enable @typescript-eslint/no-require-imports */
-// Dead code elimination: conditional import for COORDINATOR_MODE
+// Lazy require for coordinator mode — always included via static import above.
 /* eslint-disable @typescript-eslint/no-require-imports */
-const coordinatorModeModule = feature('COORDINATOR_MODE') ? require('./coordinator/coordinatorMode.js') as typeof import('./coordinator/coordinatorMode.js') : null;
+const coordinatorModeModule = require('./coordinator/coordinatorMode.js') as typeof import('./coordinator/coordinatorMode.js');
 /* eslint-enable @typescript-eslint/no-require-imports */
 // Dead code elimination: conditional import for KAIROS (assistant mode)
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -403,9 +404,18 @@ function isBeingDebugged() {
 
 // Exit if we detect node debugging or inspection
 if ("external" !== 'ant' && isBeingDebugged()) {
-  // Use process.exit directly here since we're in the top-level code before imports
-  // and gracefulShutdown is not yet available
-  // eslint-disable-next-line custom-rules/no-top-level-side-effects
+  process.stderr.write(chalk.red('Error: Node debugging is enabled. Please disable it to run Claude Code.\n'));
+  process.exit(1);
+}
+
+function isNode18OrHigher(): boolean {
+  const nodeVersion = process.version;
+  const major = parseInt(nodeVersion.replace('v', '').split('.')[0], 10);
+  return !isNaN(major) && major >= 18;
+}
+
+if (!isNode18OrHigher()) {
+  process.stderr.write(chalk.red('Error: Claude Code requires Node.js 18 or higher.\n'));
   process.exit(1);
 }
 
@@ -746,15 +756,16 @@ export async function main() {
   });
   // SIGCONT: re-draw fullscreen after sleep/wake or Ctrl+Z (SIGTSTP).
   // Without this the terminal stays blank until the next keystroke or output.
+  // Also re-enables stdin raw mode — background/foreground can reset the
+  // terminal to cooked mode on Windows, making keyboard input appear dead.
   process.on('SIGCONT', () => {
-    // Write a terminal-reset sequence to force the fullscreen re-renderer to
-    // refresh its alt-screen content on the next frame.
+    try { if (process.stdin.setRawMode) process.stdin.setRawMode(true); } catch {}
     process.stdout.write('\x1b[2J\x1b[1;1H');
   });
   // SIGTSTP (Ctrl+Z): save terminal state before suspending. Node default
   // handler suspends the process, but npx/bun run wrappers may swallow it.
   process.on('SIGTSTP', () => {
-    process.stdout.write('[?1049l');
+    process.stdout.write(' [?1049l');
     process.kill(process.pid, 'SIGSTOP');
   });
   // Catch uncaught exceptions and unhandled rejections so terminal-closing
@@ -1123,7 +1134,12 @@ async function run(): Promise<CommanderCommand> {
     // Settings are applied via hot-reload when they arrive
     // Must happen after init() to ensure config reading is allowed
     // ForceRemoteSettingsRefresh policy: block startup until remote settings are fetched
-    if (isPolicyAllowed('forceRemoteSettingsRefresh')) {
+    // Auth commands (login/logout/status) must never be blocked by this policy —
+    // if credentials are expired, the user needs auth commands to fix them
+    const isAuthSubcommand = process.argv[2] === 'auth' && (
+      process.argv[3] === 'login' || process.argv[3] === 'logout' || process.argv[3] === 'status'
+    )
+    if (isPolicyAllowed('forceRemoteSettingsRefresh') && !isAuthSubcommand) {
       // Fail-closed: wait for remote settings to load
       void waitForRemoteManagedSettingsToLoad().then(() => {
         // After waiting, check again - if fetch failed, exit
@@ -1383,6 +1399,17 @@ async function run(): Promise<CommanderCommand> {
         // These replace the CLAUDE_CODE_* environment variables
         const teammateOpts = extractTeammateOptions(options);
         storedTeammateOpts = teammateOpts;
+
+        // If running as the team leader (not a spawned teammate), activate
+        // coordinator mode so the coordinator system prompt and tool filter
+        // apply from the first turn. Teammates set this via --agent-id, so
+        // the absence of agent-id means this is the leader session.
+        if (
+          !teammateOpts?.agentId &&
+          !process.env.CLAUDE_CODE_COORDINATOR_MODE
+        ) {
+          process.env.CLAUDE_CODE_COORDINATOR_MODE = '1'
+        }
 
         // If any teammate identity option is provided, all three required ones must be present
         const hasAnyTeammateOpt = teammateOpts.agentId || teammateOpts.agentName || teammateOpts.teamName;
@@ -2063,7 +2090,7 @@ async function run(): Promise<CommanderCommand> {
 
       // Apply coordinator mode tool filtering for headless path
       // (mirrors useMergedTools.ts filtering for REPL/interactive path)
-      if (feature('COORDINATOR_MODE') && isEnvTruthy(process.env.CLAUDE_CODE_COORDINATOR_MODE)) {
+      if (isEnvTruthy(process.env.CLAUDE_CODE_COORDINATOR_MODE)) {
         const {
           applyCoordinatorToolFilter
         } = await import('./utils/toolPool.js');
@@ -3121,6 +3148,7 @@ async function run(): Promise<CommanderCommand> {
       const initialState: AppState = {
         settings: getInitialSettings(),
         tasks: {},
+        toolUseConfirmQueue: [],
         agentNameRegistry: new Map(),
         verbose: verbose ?? getGlobalConfig().verbose ?? false,
         mainLoopModel: initialMainLoopModel,
@@ -3962,9 +3990,7 @@ async function run(): Promise<CommanderCommand> {
         maybeActivateProactive(options);
         maybeActivateBrief(options);
         // Persist the current mode for fresh sessions so future resumes know what mode was used
-        if (feature('COORDINATOR_MODE')) {
-          saveMode(coordinatorModeModule?.isCoordinatorMode() ? 'coordinator' : 'normal');
-        }
+        saveMode(coordinatorModeModule.isCoordinatorMode() ? 'coordinator' : 'normal');
 
         // If launched via a deep link, show a provenance banner so the user
         // knows the session originated externally. Linux xdg-open and
@@ -4194,7 +4220,7 @@ async function run(): Promise<CommanderCommand> {
       } = await import('./server/lockfile.js');
       const existing = await probeRunningServer();
       if (existing) {
-        process.stderr.write(`A claude server is already running (pid ${existing.pid}) at ${existing.httpUrl}\n`);
+        console.error(`A claude server is already running (pid ${existing.pid}) at ${existing.httpUrl}`);
         process.exit(1);
       }
       const authToken = opts.authToken ?? `sk-ant-cc-${randomBytes(16).toString('base64url')}`;
@@ -4806,7 +4832,7 @@ async function logTenguInit({
         appendSystemPromptFlag: appendSystemPromptFlag as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
       }),
       is_simple: isBareMode() || undefined,
-      is_coordinator: feature('COORDINATOR_MODE') && coordinatorModeModule?.isCoordinatorMode() ? true : undefined,
+      is_coordinator: coordinatorModeModule.isCoordinatorMode() ? true : undefined,
       ...(assistantActivationPath && {
         assistantActivationPath: assistantActivationPath as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
       }),

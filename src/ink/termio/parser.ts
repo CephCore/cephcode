@@ -18,6 +18,7 @@ import { DEC } from './dec.js'
 import { parseEsc } from './esc.js'
 import { parseOSC } from './osc.js'
 import { applySGR } from './sgr.js'
+import { stringWidth } from '../stringWidth.js'
 import { createTokenizer, type Token, type Tokenizer } from './tokenize.js'
 import type { Action, Grapheme, TextStyle } from './types.js'
 import { defaultStyle } from './types.js'
@@ -26,46 +27,11 @@ import { defaultStyle } from './types.js'
 // Grapheme Utilities
 // =============================================================================
 
-function isEmoji(codePoint: number): boolean {
-  return (
-    (codePoint >= 0x2600 && codePoint <= 0x26ff) ||
-    (codePoint >= 0x2700 && codePoint <= 0x27bf) ||
-    (codePoint >= 0x1f300 && codePoint <= 0x1f9ff) ||
-    (codePoint >= 0x1fa00 && codePoint <= 0x1faff) ||
-    (codePoint >= 0x1f1e0 && codePoint <= 0x1f1ff)
-  )
-}
-
-function isEastAsianWide(codePoint: number): boolean {
-  return (
-    (codePoint >= 0x1100 && codePoint <= 0x115f) ||
-    (codePoint >= 0x2e80 && codePoint <= 0x9fff) ||
-    (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
-    (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
-    (codePoint >= 0xfe10 && codePoint <= 0xfe1f) ||
-    (codePoint >= 0xfe30 && codePoint <= 0xfe6f) ||
-    (codePoint >= 0xff00 && codePoint <= 0xff60) ||
-    (codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
-    (codePoint >= 0x20000 && codePoint <= 0x2fffd) ||
-    (codePoint >= 0x30000 && codePoint <= 0x3fffd)
-  )
-}
-
-function hasMultipleCodepoints(str: string): boolean {
-  let count = 0
-  for (const _ of str) {
-    count++
-    if (count > 1) return true
-  }
-  return false
-}
-
 function graphemeWidth(grapheme: string): 1 | 2 {
-  if (hasMultipleCodepoints(grapheme)) return 2
-  const codePoint = grapheme.codePointAt(0)
-  if (codePoint === undefined) return 1
-  if (isEmoji(codePoint) || isEastAsianWide(codePoint)) return 2
-  return 1
+  // Use stringWidth for accurate width calculation including Thai/Lao scripts
+  // that were previously miscalculated by the hardcoded eastAsianWidth ranges.
+  const width = stringWidth(grapheme)
+  return width >= 2 ? 2 : 1
 }
 
 function* segmentGraphemes(str: string): Generator<Grapheme> {

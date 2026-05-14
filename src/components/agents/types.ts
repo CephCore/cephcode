@@ -19,6 +19,7 @@ export type ModeState =
   | { mode: 'create-agent' }
   | ({ mode: 'edit-agent' } & WithAgent & WithPreviousMode)
   | ({ mode: 'delete-confirm' } & WithAgent & WithPreviousMode)
+  | { mode: 'agent-view' }
 
 export type AgentValidationResult = {
   isValid: boolean

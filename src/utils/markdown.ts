@@ -4,6 +4,7 @@ import type { CliHighlight } from './cliHighlight.js'
 import { logForDebugging } from './debug.js'
 import { createHyperlink } from './hyperlink.js'
 import { stripPromptXMLTags } from './messages.js'
+import { decodeHtmlEntities } from './htmlEntities.js'
 import type { ThemeName } from './theme.js'
 import { color } from '../components/design-system/color.js'
 import { BLOCKQUOTE_BAR } from '../constants/figures.js'
@@ -210,12 +211,31 @@ export function formatToken(
         // in an OSC 8 hyperlink. Linkifying here would nest a second OSC 8
         // sequence, and terminals honor the innermost one, overriding the
         // link's actual href.
-        return token.text
+        return decodeHtmlEntities(token.text)
       }
       if (parent?.type === 'list_item') {
-        return `${orderedListNumber === null ? '-' : getListNumber(listDepth, orderedListNumber) + '.'} ${token.tokens ? token.tokens.map(_ => formatToken(_, theme, listDepth, orderedListNumber, token, highlight)).join('') : linkifyIssueReferences(token.text)}${EOL}`
+        const textToken = token as Tokens.Text
+        const innerContent = textToken.tokens
+          ? textToken.tokens
+              .map(_ =>
+                formatToken(
+                  _,
+                  theme,
+                  listDepth,
+                  orderedListNumber,
+                  token,
+                  highlight,
+                ),
+              )
+              .join('')
+          : linkifyIssueReferences(decodeHtmlEntities(textToken.text))
+        const reset =
+          innerContent.includes('\x1b') && !innerContent.endsWith('\x1b[0m')
+            ? '\x1b[0m'
+            : ''
+        return `${orderedListNumber === null ? '-' : getListNumber(listDepth, orderedListNumber) + '.'} ${innerContent}${reset}${EOL}`
       }
-      return linkifyIssueReferences(token.text)
+      return linkifyIssueReferences(decodeHtmlEntities(token.text))
     case 'table': {
       const tableToken = token as Tokens.Table
 
@@ -384,12 +404,15 @@ export function padAligned(
   align: 'left' | 'center' | 'right' | null | undefined,
 ): string {
   const padding = Math.max(0, targetWidth - displayWidth)
+  // If content contains ANSI, append a reset before padding to prevent style leakage
+  const safeContent = content.includes('\x1b') ? content + '\x1b[0m' : content
+
   if (align === 'center') {
     const leftPad = Math.floor(padding / 2)
-    return ' '.repeat(leftPad) + content + ' '.repeat(padding - leftPad)
+    return ' '.repeat(leftPad) + safeContent + ' '.repeat(padding - leftPad)
   }
   if (align === 'right') {
-    return ' '.repeat(padding) + content
+    return ' '.repeat(padding) + safeContent
   }
-  return content + ' '.repeat(padding)
+  return safeContent + ' '.repeat(padding)
 }

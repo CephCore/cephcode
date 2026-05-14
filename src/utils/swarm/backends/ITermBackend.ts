@@ -227,10 +227,9 @@ export class ITermBackend implements PaneBackend {
 
         teammateSessionIds.push(paneId)
 
-        // Set pane color and title
-        // Skip color and title for now - each it2 call is slow (Python process + API)
-        // The pane is functional without these cosmetic features
-        // TODO: Consider batching these or making them async/fire-and-forget
+        // Skip pane color and title — each it2 call spawns a ~50ms Python
+        // process. The leader screen already shows teammates via TeamsDialog,
+        // so this cosmetic detail doesn't add value for the latency cost.
 
         return { paneId, isFirstTeammate }
       }
@@ -339,27 +338,56 @@ export class ITermBackend implements PaneBackend {
   }
 
   /**
-   * Stub for hiding a pane - not supported in iTerm2 backend.
-   * iTerm2 doesn't have a direct equivalent to tmux's break-pane.
+   * Hides a pane by closing it via the it2 CLI.
+   *
+   * Unlike tmux's break-pane (which moves the pane to a detached session while
+   * the process keeps running), iTerm2 has no equivalent "detach and keep alive"
+   * API in its it2 CLI. The closest equivalent is closing the session's view.
+   *
+   * The process inside the pane receives SIGHUP — for teammates that have already
+   * completed their work (the typical hide case), this is harmless since the
+   * process is already idle/inactive.
    */
   async hidePane(
-    _paneId: PaneId,
+    paneId: PaneId,
     _useExternalSession?: boolean,
   ): Promise<boolean> {
-    logForDebugging('[ITermBackend] hidePane not supported in iTerm2')
+    logForDebugging(`[ITermBackend] hidePane: closing pane ${paneId}`)
+    const result = await runIt2(['session', 'close', '-f', '-s', paneId])
+    if (result.code === 0) {
+      // Remove from tracked session IDs so subsequent spawns don't split from a dead pane.
+      const idx = teammateSessionIds.indexOf(paneId)
+      if (idx !== -1) {
+        teammateSessionIds.splice(idx, 1)
+      }
+      if (teammateSessionIds.length === 0) {
+        firstPaneUsed = false
+      }
+      return true
+    }
+    logForDebugging(
+      `[ITermBackend] hidePane failed: ${result.stderr}`,
+    )
     return false
   }
 
   /**
-   * Stub for showing a hidden pane - not supported in iTerm2 backend.
-   * iTerm2 doesn't have a direct equivalent to tmux's join-pane.
+   * Showing a previously hidden pane is not supported in iTerm2 backend.
+   *
+   * Unlike tmux's join-pane, iTerm2 has no way to re-attach a closed session
+   * to the current view. Once a session is closed, restoring it requires
+   * re-creating the pane and re-launching the process.
+   *
+   * @returns false — use createTeammatePaneInSwarmView to create a new pane instead.
    */
   async showPane(
     _paneId: PaneId,
     _targetWindowOrPane: string,
     _useExternalSession?: boolean,
   ): Promise<boolean> {
-    logForDebugging('[ITermBackend] showPane not supported in iTerm2')
+    logForDebugging(
+      '[ITermBackend] showPane not supported in iTerm2 — create a new pane instead',
+    )
     return false
   }
 }

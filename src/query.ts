@@ -1387,6 +1387,15 @@ async function* queryLoop(
         }
       }
 
+      // Increment goal turn counter so /goal status line reflects turns since goal was set
+      const goalState = toolUseContext.getAppState()
+      if (goalState.sessionGoal) {
+        toolUseContext.setAppState(prev => ({
+          ...prev,
+          sessionGoalTurnCount: (prev.sessionGoalTurnCount ?? 0) + 1,
+        }))
+      }
+
       return { reason: 'completed' }
     }
 

@@ -11,7 +11,8 @@
  * - Return result objects indicating success/failure with messages
  * - Can throw errors for unexpected failures
  */
-import { dirname, join } from 'path'
+import { dirname, join, relative } from 'path'
+import { readlink, symlink } from 'fs/promises'
 import { getOriginalCwd } from '../../bootstrap/state.js'
 import { isBuiltinPluginId } from '../../plugins/builtinPlugins.js'
 import type { LoadedPlugin, PluginManifest } from '../../types/plugin.js'
@@ -214,8 +215,12 @@ function findPluginByIdentifier(
   const nameLower = name.toLowerCase()
 
   return plugins.find(p => {
-    // Check exact name match (case-insensitive)
+    // Check exact name match (case-insensitive) — matches marketplace key (p.name)
     if (p.name.toLowerCase() === pluginLower || p.name.toLowerCase() === nameLower) return true
+
+    // Also match by manifest name — marketplace key may differ from manifest name (H5)
+    const manifestName = p.manifest?.name
+    if (manifestName && manifestName.toLowerCase() === nameLower) return true
 
     // If marketplace specified, check if it matches the source
     if (marketplace && p.source) {
@@ -366,9 +371,61 @@ export async function installPluginOp(
     const location = marketplaceName
       ? `marketplace "${marketplaceName}"`
       : 'any configured marketplace'
-    return {
-      success: false,
-      message: `Plugin "${pluginName}" not found in ${location}`,
+
+    // G29: Auto-refresh marketplace cache and retry before reporting "not found"
+    const { clearMarketplacesCache } = await import('../../utils/plugins/marketplaceManager.js')
+    const { refreshMarketplace } = await import('../../utils/plugins/marketplaceManager.js')
+    clearMarketplacesCache()
+
+    // Refresh specific marketplace or all marketplaces
+    if (marketplaceName) {
+      try {
+        await refreshMarketplace(marketplaceName)
+      } catch {
+        // Ignore refresh errors and retry with whatever cache we have
+      }
+    } else {
+      const marketplaces = await loadKnownMarketplacesConfig()
+      for (const mktName of Object.keys(marketplaces)) {
+        try {
+          await refreshMarketplace(mktName)
+        } catch {
+          // Continue refreshing other marketplaces
+        }
+      }
+    }
+
+    // Retry: search marketplaces again after refresh
+    if (marketplaceName) {
+      const pluginInfo = await getPluginById(plugin)
+      if (pluginInfo) {
+        foundPlugin = pluginInfo.entry
+        foundMarketplace = marketplaceName
+        marketplaceInstallLocation = pluginInfo.marketplaceInstallLocation
+      }
+    } else {
+      const marketplaces = await loadKnownMarketplacesConfig()
+      for (const [mktName, mktConfig] of Object.entries(marketplaces)) {
+        try {
+          const marketplace = await getMarketplace(mktName)
+          const pluginEntry = marketplace.plugins.find(p => p.name === pluginName)
+          if (pluginEntry) {
+            foundPlugin = pluginEntry
+            foundMarketplace = mktName
+            marketplaceInstallLocation = mktConfig.installLocation
+            break
+          }
+        } catch {
+          continue
+        }
+      }
+    }
+
+    if (!foundPlugin || !foundMarketplace) {
+      return {
+        success: false,
+        message: `Plugin "${pluginName}" not found in ${location}`,
+      }
     }
   }
 
@@ -1057,6 +1114,11 @@ async function performPluginUpdate({
     )
 
     if (oldVersionPath && oldVersionPath !== versionedPath) {
+      // Preserve cross-plugin symlinks: before the old version is cleaned up,
+      // scan for symlinks inside OTHER plugins' directories that point to
+      // the old version. Recreate them pointing to the new version instead.
+      await preserveCrossPluginSymlinks(oldVersionPath, versionedPath)
+
       const updatedDiskData = loadInstalledPluginsFromDisk()
       const isOldVersionStillReferenced = Object.values(
         updatedDiskData.plugins,
@@ -1087,6 +1149,70 @@ async function performPluginUpdate({
       sourcePath !== getVersionedCachePath(pluginId, newVersion)
     ) {
       await fs.rm(sourcePath, { recursive: true, force: true })
+    }
+  }
+}
+
+/**
+ * Scan for symlinks inside OTHER plugin installations that point to files
+ * within oldVersionPath, and recreate them pointing to newVersionPath.
+ * This prevents cross-plugin symlinks from breaking after a plugin update.
+ */
+async function preserveCrossPluginSymlinks(
+  oldVersionPath: string,
+  newVersionPath: string,
+): Promise<void> {
+  const { readdir, readlink, symlink: makeSymlink, unlink: rmLink } = await import('fs/promises')
+  const { stat } = await import('fs/promises')
+  // Get all versioned cache directories (peer plugins' install dirs)
+  const cacheDir = dirname(oldVersionPath)
+  let entries: string[]
+  try {
+    entries = await readdir(cacheDir)
+  } catch {
+    return // Cache dir doesn't exist yet — nothing to preserve
+  }
+  for (const entry of entries) {
+    const candidatePath = join(cacheDir, entry)
+    if (candidatePath === oldVersionPath || candidatePath === newVersionPath) {
+      continue
+    }
+    // Recursively scan this peer's directory for symlinks
+    await scanAndRemapSymlinksDir(candidatePath, oldVersionPath, newVersionPath)
+  }
+}
+
+async function scanAndRemapSymlinksDir(
+  dir: string,
+  oldTarget: string,
+  newTarget: string,
+): Promise<void> {
+  const { readdir, readlink, symlink: makeSymlink, unlink: rmLink } = await import('fs/promises')
+  const { stat } = await import('fs/promises')
+  let entries: { name: string; isDirectory: () => boolean; isSymbolicLink: () => boolean }[]
+  try {
+    const raw = await readdir(dir, { withFileTypes: true })
+    entries = raw as unknown as { name: string; isDirectory: () => boolean; isSymbolicLink: () => boolean }[]
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      await scanAndRemapSymlinksDir(fullPath, oldTarget, newTarget)
+    } else if (entry.isSymbolicLink()) {
+      try {
+        const linkTarget = await readlink(fullPath)
+        // If the symlink points to a path under the old version, remap it
+        if (linkTarget.startsWith(oldTarget)) {
+          const relativePath = linkTarget.slice(oldTarget.length)
+          const newLinkTarget = join(newTarget, relativePath)
+          await rmLink(fullPath)
+          await makeSymlink(newLinkTarget, fullPath)
+        }
+      } catch {
+        // Best-effort: broken or inaccessible symlinks are silently skipped
+      }
     }
   }
 }

@@ -82,6 +82,10 @@ export type LoadedPlugin = {
   outputStylesPath?: string;
   outputStylesPaths?: string[]; // Additional output style paths from manifest
   hooksConfig?: HooksSettings;
+  /** Component folder names (e.g. "commands") that exist on disk but are
+   *  ignored because plugin.json sets the matching key. Shown as warnings
+   *  in /doctor, claude plugin list, and /plugin. */
+  suppressedFolders?: string[];
   mcpServers?: Record<string, McpServerConfig>;
   lspServers?: Record<string, LspServerConfig>;
   settings?: Record<string, unknown>;

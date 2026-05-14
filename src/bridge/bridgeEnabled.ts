@@ -70,6 +70,10 @@ export async function isBridgeEnabledBlocking(): Promise<boolean> {
 export async function getBridgeDisabledReason(): Promise<string | null> {
   if (feature('BRIDGE_MODE')) {
     if (!isClaudeAISubscriber()) {
+      // Provide a more specific message when API key blocks OAuth features
+      if (hasApiKeyOverride()) {
+        return 'Remote Control requires a claude.ai subscription. ANTHROPIC_API_KEY, apiKeyHelper, or ANTHROPIC_AUTH_TOKEN is set — unset it to use Remote Control with your claude.ai login.'
+      }
       return 'Remote Control requires a claude.ai subscription. Run `claude auth login` to sign in with your claude.ai account.'
     }
     if (!hasProfileScope()) {
@@ -112,6 +116,29 @@ function getOauthAccountInfo(): ReturnType<
     return authModule.getOauthAccountInfo()
   } catch {
     return undefined
+  }
+}
+
+/**
+ * Check if an API key source is overriding OAuth features.
+ * When ANTHROPIC_API_KEY, apiKeyHelper, or ANTHROPIC_AUTH_TOKEN is set,
+ * OAuth-dependent features (Remote Control, /schedule, claude.ai MCP
+ * connectors, notification preferences) are disabled even if a claude.ai
+ * login also exists. The user must unset the API key to use these features.
+ */
+function hasApiKeyOverride(): boolean {
+  try {
+    // Check env vars and config for API key sources
+    const apiKeyEnv = process.env.ANTHROPIC_API_KEY
+    const authToken = process.env.ANTHROPIC_AUTH_TOKEN
+    if (apiKeyEnv || authToken) {
+      return true
+    }
+    // Check apiKeyHelper in settings
+    const { getConfiguredApiKeyHelper } = authModule
+    return !!getConfiguredApiKeyHelper()
+  } catch {
+    return false
   }
 }
 

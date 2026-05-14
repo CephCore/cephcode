@@ -113,6 +113,7 @@ export async function generateUnifiedSuggestions(
   mcpResources: Record<string, ServerResource[]>,
   agents: AgentDefinition[],
   showOnEmpty = false,
+  connectedServers?: Set<string>,
 ): Promise<SuggestionItem[]> {
   if (!query && !showOnEmpty) {
     return []
@@ -134,7 +135,17 @@ export async function generateUnifiedSuggestions(
     }),
   )
 
-  const mcpSources: McpResourceSuggestionSource[] = Object.values(mcpResources)
+  // Filter out resources from disconnected MCP servers so @server: autocomplete
+  // doesn't show stale entries from servers that have been disconnected.
+  const activeResources = connectedServers
+    ? Object.fromEntries(
+        Object.entries(mcpResources).filter(([serverName]) =>
+          connectedServers.has(serverName),
+        ),
+      )
+    : mcpResources
+
+  const mcpSources: McpResourceSuggestionSource[] = Object.values(activeResources)
     .flat()
     .map(resource => ({
       type: 'mcp_resource' as const,

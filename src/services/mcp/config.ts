@@ -1340,8 +1340,10 @@ export function parseMcpConfig(params: {
       config: null,
       errors: schemaResult.error.issues.map(issue => ({
         ...(filePath && { file: filePath }),
-        path: issue.path.join('.'),
-        message: 'Does not adhere to MCP server configuration schema',
+        path: issue.path.length > 0 ? issue.path.join('.') : '(root)',
+        message: issue.message === 'Required'
+          ? `Does not adhere to MCP server configuration schema: Missing required field '${issue.path.length > 0 ? issue.path.at(-1) : '(root)'}'`
+          : `Does not adhere to MCP server configuration schema: ${issue.message}`,
         mcpErrorMetadata: {
           scope,
           severity: 'fatal',

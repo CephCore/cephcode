@@ -1224,7 +1224,7 @@ async function hasPermissionsToUseToolInner(
       SandboxManager.isAutoAllowBashIfSandboxedEnabled() &&
       shouldUseSandbox(input)
 
-    if (!canSandboxAutoAllow) {
+    if (!canSandboxAutoAllow && appState.toolPermissionContext.mode !== 'yoloMax') {
       return {
         behavior: 'ask',
         decisionReason: {
@@ -1276,7 +1276,8 @@ async function hasPermissionsToUseToolInner(
   if (
     toolPermissionResult?.behavior === 'ask' &&
     toolPermissionResult.decisionReason?.type === 'rule' &&
-    toolPermissionResult.decisionReason.rule.ruleBehavior === 'ask'
+    toolPermissionResult.decisionReason.rule.ruleBehavior === 'ask' &&
+    appState.toolPermissionContext.mode !== 'yoloMax'
   ) {
     return toolPermissionResult
   }
@@ -1286,7 +1287,8 @@ async function hasPermissionsToUseToolInner(
   // checkPathSafetyForAutoEdit returns {type:'safetyCheck'} for these paths.
   if (
     toolPermissionResult?.behavior === 'ask' &&
-    toolPermissionResult.decisionReason?.type === 'safetyCheck'
+    toolPermissionResult.decisionReason?.type === 'safetyCheck' &&
+    appState.toolPermissionContext.mode !== 'yoloMax'
   ) {
     return toolPermissionResult
   }

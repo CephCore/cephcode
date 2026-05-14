@@ -46,6 +46,7 @@ import {
   doesEnterpriseMcpConfigExist,
   filterMcpServersByPolicy,
   getClaudeCodeMcpConfigs,
+  getMcpConfigByName,
   isMcpServerDisabled,
   setMcpServerEnabled,
 } from 'src/services/mcp/config.js'
@@ -357,6 +358,14 @@ export function useManageMCPConnections(
                 client.name,
                 `Server is disabled, skipping automatic reconnection`,
               )
+              // G3: Clear stale tools/commands/resources so @server references don't linger
+              updateServer({
+                ...client,
+                type: 'disabled',
+                tools: [],
+                commands: [],
+                resources: [],
+              })
               return
             }
 
@@ -472,7 +481,8 @@ export function useManageMCPConnections(
 
               void reconnectWithBackoff()
             } else {
-              updateServer({ ...client, type: 'failed' })
+              // G3: Clear stale tools/commands/resources for servers that don't reconnect
+              updateServer({ ...client, type: 'failed', tools: [], commands: [], resources: [] })
             }
           }
 
@@ -1076,7 +1086,17 @@ export function useManageMCPConnections(
         reconnectTimersRef.current.delete(serverName)
       }
 
-      const result = await reconnectMcpServerImpl(serverName, client.config)
+      // Re-read config from disk so that .mcp.json edits made mid-session
+      // are picked up by the reconnection. Falls back to the app-state config
+      // (which was loaded at session start) for servers not backed by local
+      // config files (e.g. claude.ai connectors).
+      let config = client.config
+      const freshConfig = getMcpConfigByName(serverName)
+      if (freshConfig) {
+        config = freshConfig
+      }
+
+      const result = await reconnectMcpServerImpl(serverName, config)
 
       onConnectionAttempt(result)
 

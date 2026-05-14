@@ -170,6 +170,8 @@ interface SlashCommandInfo {
 interface SkillFrontmatter {
   name: string
   source: SettingSource | 'plugin'
+  /** G30: The plugin name when source is 'plugin', so /context shows which plugin provides the skill */
+  pluginName?: string
   tokens: number
 }
 
@@ -555,6 +557,7 @@ async function countSkillTokens(
   tools: Tools,
   getToolPermissionContext: () => Promise<ToolPermissionContext>,
   agentInfo: AgentDefinitionsResult | null,
+  model?: string,
 ): Promise<{
   skillTokens: number
   skillInfo: {
@@ -582,17 +585,29 @@ async function countSkillTokens(
       [slashCommandTool],
       getToolPermissionContext,
       agentInfo,
+      model,
     )
 
     // Calculate per-skill token estimates based on frontmatter only
     // (name, description, whenToUse) since full content is only loaded on invocation
-    const skillFrontmatter: SkillFrontmatter[] = skills.map(skill => ({
-      name: getCommandName(skill),
-      source: (skill.type === 'prompt' ? skill.source : 'plugin') as
-        | SettingSource
-        | 'plugin',
-      tokens: estimateSkillFrontmatterTokens(skill),
-    }))
+    const skillFrontmatter: SkillFrontmatter[] = skills.map(skill => {
+      const isPlugin = skill.type === 'plugin' || skill.source === 'plugin'
+      const pluginName = isPlugin
+        ? (skill as any).pluginInfo?.pluginManifest?.name
+        : undefined
+      // G30: Append plugin name to display name so /context shows
+      // which plugin provides each skill (e.g. "security-review (security-review)")
+      const displayName =
+        pluginName ? `${getCommandName(skill)} (${pluginName})` : getCommandName(skill)
+      return {
+        name: displayName,
+        source: (skill.type === 'prompt' ? skill.source : 'plugin') as
+          | SettingSource
+          | 'plugin',
+        pluginName,
+        tokens: estimateSkillFrontmatterTokens(skill),
+      }
+    })
 
     return {
       skillTokens,
@@ -983,10 +998,12 @@ export async function analyzeContextUsage(
   ])
 
   // Count skills separately with error isolation
+  // G28: Pass model so per-skill token estimates use model-specific tokenizer
   const skillResult = await countSkillTokens(
     tools,
     getToolPermissionContext,
     agentDefinitions,
+    runtimeModel,
   )
   const skillInfo = skillResult.skillInfo
   // Use sum of individual skill token estimates (matches what's shown in details)

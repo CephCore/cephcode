@@ -13,6 +13,7 @@ import {
   getEmptyToolPermissionContext,
   type Tool,
   type ToolPermissionContext,
+  type ToolUseConfirm,
 } from '../Tool.js'
 import type { TaskState } from '../tasks/types.js'
 import type { AgentColorName } from '../tools/AgentTool/agentColorManager.js'
@@ -161,9 +162,20 @@ export type AppState = DeepImmutable<{
   computerUseEnabled: boolean
   // Track if rate limit options have been opened in this turn to prevent infinite loops
   rateLimitOptionsOpened: boolean
+  // Session goal set via /goal command, shown in the status line footer
+  sessionGoal?: string
+  // Timestamp when session goal was set (epoch ms)
+  sessionGoalStartTime?: number
+  // Turn count since goal was set (incremented each prompt submit)
+  sessionGoalTurnCount?: number
+  // Transcript shortcuts panel visibility (toggled by ? or v)
+  showTranscriptShortcuts?: boolean
 }> & {
   // Unified task state - excluded from DeepImmutable because TaskState contains function types
   tasks: { [taskId: string]: TaskState }
+  // Global queue of pending tool use confirmations.
+  // In the REPL, the leader agent uses this. Background agents also push here.
+  toolUseConfirmQueue: ToolUseConfirm[]
   // Name → AgentId registry populated by Agent tool when `name` is provided.
   // Latest-wins on collision. Used by SendMessage to route by name.
   agentNameRegistry: Map<string, AgentId>
@@ -211,6 +223,7 @@ export type AppState = DeepImmutable<{
      * structure, context fields, and display format.
      */
     errors: PluginError[]
+    warnings: string[]
     // Installation status for background plugin/marketplace installation
     installationStatus: {
       marketplaces: Array<{
@@ -489,6 +502,7 @@ export function getDefaultAppState(): AppState {
   return {
     settings: getInitialSettings(),
     tasks: {},
+    toolUseConfirmQueue: [],
     agentNameRegistry: new Map(),
     verbose: false,
     mainLoopModel: null, // alias, full name (as with --model or env var), or null (default)
@@ -544,6 +558,7 @@ export function getDefaultAppState(): AppState {
       disabled: [],
       commands: [],
       errors: [],
+      warnings: [],
       installationStatus: {
         marketplaces: [],
         plugins: [],

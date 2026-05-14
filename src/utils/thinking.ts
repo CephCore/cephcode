@@ -4,7 +4,7 @@ import { feature } from 'bun:bundle'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import { getCanonicalName } from './model/model.js'
 import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
-import { getAPIProvider } from './model/providers.js'
+import { getAPIProvider, isAnthropicProvider } from './model/providers.js'
 import { getSettingsWithErrors } from './settings/settings.js'
 
 export type ThinkingConfig =
@@ -132,6 +132,24 @@ export function modelSupportsThinking(model: string): boolean {
   // launch DRI and research. This can greatly affect model quality and bashing.
   const canonical = getCanonicalName(model)
   const provider = getAPIProvider()
+
+  // Non-Anthropic providers: check provider capabilities from registry
+  if (!isAnthropicProvider()) {
+    // Most modern models from major providers support reasoning/thinking.
+    // Models known to support it: GPT-5+, Gemini 2.5+, DeepSeek V4+, etc.
+    // For providers without explicit thinking support, return false.
+    const modelLower = model.toLowerCase()
+    // OpenAI GPT models with reasoning
+    if (modelLower.includes('gpt-5') || modelLower.includes('o1') || modelLower.includes('o3') || modelLower.includes('o4')) return true
+    // Google Gemini models
+    if (modelLower.includes('gemini-2.5') || modelLower.includes('gemini-3')) return true
+    // DeepSeek V4+
+    if (modelLower.includes('deepseek-v4')) return true
+    // OpenRouter: delegate to underlying model check by name
+    if (modelLower.includes('claude-opus-4') || modelLower.includes('claude-sonnet-4')) return true
+    return false
+  }
+
   // 1P and Foundry: all Claude 4+ models (including Haiku 4.5)
   if (provider === 'foundry' || provider === 'firstParty') {
     return !canonical.includes('claude-3-')

@@ -29,6 +29,7 @@ import { createBaseHookInput, executeStatusLineCommand } from '../utils/hooks.js
 import { getLastAssistantMessage } from '../utils/messages.js';
 import { getRuntimeMainLoopModel, type ModelName, renderModelName } from '../utils/model/model.js';
 import { getCurrentSessionTitle } from '../utils/sessionStorage.js';
+import { decodeHtmlEntities } from '../utils/htmlEntities.js';
 import { doesMostRecentAssistantMessageExceed200k, getCurrentUsage } from '../utils/tokens.js';
 import { roughTokenCountEstimationForMessages } from '../services/tokenEstimation.js';
 import { getCurrentWorktreeSession } from '../utils/worktree.js';
@@ -442,6 +443,9 @@ function StatusLineInner({
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
   const permissionMode = useAppState(s => s.toolPermissionContext.mode);
   const additionalWorkingDirectories = useAppState(s => s.toolPermissionContext.additionalWorkingDirectories);
+  const sessionGoal = useAppState(s => s.sessionGoal);
+  const sessionGoalStartTime = useAppState(s => s.sessionGoalStartTime);
+  const sessionGoalTurnCount = useAppState(s => s.sessionGoalTurnCount);
   const statusLineText = useAppState(s => s.statusLineText);
   const setAppState = useSetAppState();
   const settings = useSettings();
@@ -570,7 +574,8 @@ function StatusLineInner({
   }, []);
 
   const paddingX = settings?.statusLine?.padding ?? 0;
-  const filteredStatusLineText = statusLineText && /mode on \([^)]*cycle\)/i.test(statusLineText) ? undefined : statusLineText;
+  const decodedStatusLineText = statusLineText ? decodeHtmlEntities(statusLineText) : statusLineText;
+  const filteredStatusLineText = decodedStatusLineText && /mode on \([^)]*cycle\)/i.test(decodedStatusLineText) ? undefined : decodedStatusLineText;
 
   const defaultStatusLine = (() => {
     const runtimeModel = getRuntimeMainLoopModel({
@@ -653,11 +658,23 @@ function StatusLineInner({
     const activeProviderDisplay = activeProvider ? chalk.hex('#888888')(`[${activeProvider}]`) : ''
     const cwdShort = cwd.length > 40 ? '...' + cwd.slice(-37) : cwd
     const cwdDisplay = chalk.hex('#666666')(cwdShort)
+    let sessionGoalDisplay = '';
+    if (sessionGoal) {
+      const elapsed = sessionGoalStartTime
+        ? Math.floor((Date.now() - sessionGoalStartTime) / 1000)
+        : 0;
+      const elapsedStr = elapsed > 0
+        ? `${Math.floor(elapsed / 60)}m${elapsed % 60}s`
+        : '0s';
+      const turns = sessionGoalTurnCount ?? 0;
+      sessionGoalDisplay = chalk.yellow(` [${sessionGoal} ${elapsedStr} t${turns}]`);
+    }
     const line1 =
+      cwdDisplay +
+      chalk.dim(' ') +
       chalk.cyan(`[${modelName}]`) +
       activeProviderDisplay +
-      chalk.dim(' ') +
-      cwdDisplay +
+      sessionGoalDisplay +
       chalk.dim(' | ') +
       bar +
       ' ' +

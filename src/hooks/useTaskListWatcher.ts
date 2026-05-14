@@ -57,10 +57,17 @@ export function useTaskListWatcher({
   // per render. Stored in a ref so the watcher effect can call it without
   // depending on it.
   const checkForTasksRef = useRef<() => Promise<void>>(async () => {})
+  const isDisposedRef = useRef(false)
   checkForTasksRef.current = async () => {
     if (!enabled) {
       return
     }
+
+    // Guard against resurrection: if the component unmounted while a
+    // previous async check was in flight (e.g. listTasks awaiting I/O),
+    // don't continue processing results — the watcher has been closed
+    // and any state updates would leak.
+    if (isDisposedRef.current) return
 
     // Don't need to submit new tasks if we are already working
     if (isLoadingRef.current) {
@@ -167,6 +174,7 @@ export function useTaskListWatcher({
       // This cleanup only fires when taskListId changes or on unmount —
       // never per-turn. That keeps watcher.close() out of the Bun
       // PathWatcherManager deadlock window.
+      isDisposedRef.current = true
       scheduleCheckRef.current = () => {}
       if (watcher) {
         watcher.close()

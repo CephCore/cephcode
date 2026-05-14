@@ -227,6 +227,25 @@ function worktreePathFor(repoRoot: string, slug: string): string {
 }
 
 /**
+ * Check whether a worktree path is still registered with git (active) or
+ * orphaned (stale). An active worktree appears in `git worktree list`;
+ * a stale one has the directory on disk but is no longer tracked by git.
+ */
+async function checkWorktreeStatus(
+  repoRoot: string,
+  worktreePath: string,
+): Promise<'active' | 'stale'> {
+  const { stdout } = await execFileNoThrowWithCwd(
+    gitExe(),
+    ['worktree', 'list'],
+    { cwd: repoRoot },
+  )
+  const lines = stdout?.split('\n') ?? []
+  const isListed = lines.some(line => line.trim().startsWith(worktreePath))
+  return isListed ? 'active' : 'stale'
+}
+
+/**
  * Creates a new git worktree for the given slug, or resumes it if it already exists.
  * Named worktrees reuse the same path across invocations, so the existence check
  * prevents unconditionally running `git fetch` (which can hang waiting for credentials)
@@ -338,8 +357,9 @@ async function getOrCreateWorktree(
       errMsg.includes('existing')
     ) {
       // A worktree branch or path already exists — likely from a previous
-      // session that was interrupted before cleanup completed. Suggest the
-      // --force flag or manual removal so the user can recover.
+      // session that was interrupted before cleanup completed. Check whether
+      // the worktree is still active (registered in git list) or stale
+      // (orphaned directory) and show the status in the error message.
       if (errMsg.includes('branch')) {
         throw new Error(
           `Worktree branch "${worktreeBranch}" already exists. This may be a stale ` +
@@ -347,10 +367,15 @@ async function getOrCreateWorktree(
             `git branch -D ${worktreeBranch}`,
         )
       }
+      const status = await checkWorktreeStatus(repoRoot, worktreePath)
+      const statusLabel = status === 'active' ? 'active' : 'stale'
+      const forceHint = status === 'stale'
+        ? `  git worktree remove --force ${worktreePath}\n`
+        : `  git worktree remove ${worktreePath}\n`
       throw new Error(
-        `Worktree "${slug}" already exists at ${worktreePath}. This may be a stale ` +
-          `worktree from a previous session. To remove it, run:\n` +
-          `  git worktree remove --force ${worktreePath}\n` +
+        `Worktree "${slug}" already exists at ${worktreePath} (${statusLabel}).\n` +
+          `To remove it, run:\n` +
+          forceHint +
           `or use the /worktree command inside a Claude session.`,
       )
     }

@@ -6,7 +6,7 @@ import type { SettingSource } from 'src/utils/settings/constants.js';
 import type { CommandResultDisplay } from '../../commands.js';
 import { useExitOnCtrlCDWithKeybindings } from '../../hooks/useExitOnCtrlCDWithKeybindings.js';
 import { useMergedTools } from '../../hooks/useMergedTools.js';
-import { Box, Text } from '../../ink.js';
+import { Box, Text, useInput } from '../../ink.js';
 import { useAppState, useSetAppState } from '../../state/AppState.js';
 import type { Tools } from '../../Tool.js';
 import { type ResolvedAgent, resolveAgentOverrides } from '../../tools/AgentTool/agentDisplay.js';
@@ -21,6 +21,9 @@ import { AgentNavigationFooter } from './AgentNavigationFooter.js';
 import { AgentsList } from './AgentsList.js';
 import { deleteAgentFromFile } from './agentFileUtils.js';
 import { CreateAgentWizard } from './new-agent-creation/CreateAgentWizard.js';
+import { AgentViewDashboard } from './AgentViewDashboard.js';
+import { isLocalAgentTask, registerAsyncAgent } from '../../tasks/LocalAgentTask/LocalAgentTask.js';
+import { GENERAL_PURPOSE_AGENT } from '../../tools/AgentTool/built-in/generalPurposeAgent.js';
 import type { ModeState } from './types.js';
 type Props = {
   tools: Tools;
@@ -48,6 +51,16 @@ export function AgentsMenu(t0) {
   const agentDefinitions = useAppState(_temp);
   const mcpTools = useAppState(_temp2);
   const toolPermissionContext = useAppState(_temp3);
+  const tasks = useAppState((s: any) => s.tasks);
+  
+  // Auto-switch to agent-view if background tasks exist and we just opened the menu
+  React.useEffect(() => {
+    const hasBg = Object.values(tasks || {}).some(task => isLocalAgentTask(task) && (task as any).isBackgrounded);
+    if (hasBg && modeState.mode === 'list-agents') {
+      setModeState({ mode: 'agent-view' } as any);
+    }
+  }, []); // Only on mount
+
   const setAppState = useSetAppState();
   const {
     allAgents,
@@ -191,7 +204,30 @@ export function AgentsMenu(t0) {
     t12 = $[27];
   }
   const handleAgentDeleted = t12;
+
+  const backgroundTaskCount = useMemo(() => {
+    return Object.values(tasks || {}).filter(task => isLocalAgentTask(task) && task.isBackgrounded).length;
+  }, [tasks]);
+
+  useInput((input, key) => {
+    if (input === 'v' && backgroundTaskCount > 0 && modeState.mode === 'list-agents') {
+      setModeState({ mode: 'agent-view' } as any);
+    }
+  });
+
   switch (modeState.mode) {
+    case "agent-view":
+      return <AgentViewDashboard onBack={() => setModeState({ mode: 'list-agents', source: 'all' })} onDispatch={(prompt) => {
+        const defaultAgent = agents?.[0] ?? GENERAL_PURPOSE_AGENT;
+        registerAsyncAgent({
+          agentId: `agent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          description: prompt.slice(0, 80),
+          prompt,
+          selectedAgent: defaultAgent,
+          setAppState,
+        });
+      }} />;
+
     case "list-agents":
       {
         let t13;
@@ -264,7 +300,7 @@ export function AgentsMenu(t0) {
         }
         let t19;
         if ($[46] === Symbol.for("react.memo_cache_sentinel")) {
-          t19 = <AgentNavigationFooter />;
+          t19 = <AgentNavigationFooter instructions={backgroundTaskCount > 0 ? "Press 'v' to view active background agents" : undefined} />;
           $[46] = t19;
         } else {
           t19 = $[46];

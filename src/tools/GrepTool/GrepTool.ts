@@ -16,6 +16,26 @@ import {
   normalizePatternsToPath,
 } from '../../utils/permissions/filesystem.js'
 import type { PermissionDecision } from '../../utils/permissions/PermissionResult.js'
+import { getPlatform } from '../../utils/platform.js'
+
+/**
+ * On Windows, ripgrep returns paths like C:\Users\...\file.ts:42:content.
+ * The drive letter colon (after C) is not a separator — find the correct
+ * colon that separates the file path from the rest (line number or content).
+ */
+function findPathContentSplit(line: string): number {
+  if (getPlatform() === 'windows' && /^[A-Za-z]:[/\\]/.test(line)) {
+    let colonsFound = 0
+    for (let i = 2; i < line.length; i++) {
+      if (line[i] === ':') {
+        colonsFound++
+        if (colonsFound === 2) return i
+      }
+    }
+    return line.lastIndexOf(':')
+  }
+  return line.indexOf(':')
+}
 import { matchWildcardPattern } from '../../utils/permissions/shellRuleMatching.js'
 import { getGlobExclusionsForPluginCache } from '../../utils/plugins/orphanedPluginFilter.js'
 import { ripGrep } from '../../utils/ripgrep.js'
@@ -455,7 +475,9 @@ export const GrepTool = buildTool({
 
       const finalLines = limitedResults.map(line => {
         // Lines have format: /absolute/path:line_content or /absolute/path:num:content
-        const colonIndex = line.indexOf(':')
+        // On Windows, paths like C:\Users\... have colons in the drive letter.
+        // Find the correct path/rest split by handling drive-letter prefixes.
+        const colonIndex = findPathContentSplit(line)
         if (colonIndex > 0) {
           const filePath = line.substring(0, colonIndex)
           const rest = line.substring(colonIndex)

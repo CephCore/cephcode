@@ -4,11 +4,20 @@ import { supportsHyperlinks } from '../ink/supports-hyperlinks.js'
 // OSC 8 hyperlink escape sequences
 // Format: \e]8;;URL\e\\TEXT\e]8;;\e\\
 // Using \x07 (BEL) as terminator which is more widely supported
-export const OSC8_START = '\x1b]8;;'
-export const OSC8_END = '\x07'
 
 type HyperlinkOptions = {
   supportsHyperlinks?: boolean
+}
+
+/**
+ * Generate a deterministic ID for a URL to group wrapped link segments.
+ */
+function getOsc8Id(url: string): string {
+  let h = 0
+  for (let i = 0; i < url.length; i++) {
+    h = ((h << 5) - h + url.charCodeAt(i)) | 0
+  }
+  return (h >>> 0).toString(36)
 }
 
 /**
@@ -31,9 +40,15 @@ export function createHyperlink(
     return url
   }
 
-  // Apply basic ANSI blue color - wrap-ansi preserves this across line breaks
-  // RGB colors (like theme colors) are NOT preserved by wrap-ansi with OSC 8
+  // Apply basic ANSI cyan color — wrap-ansi preserves this across line breaks.
+  // RGB colors (like theme colors) are NOT preserved by wrap-ansi with OSC 8.
+  // Cyan is readable on both light and dark terminal themes, unlike plain blue
+  // which appears dark-navy and is hard to read on dark backgrounds.
   const displayText = content ?? url
-  const coloredText = chalk.blue(displayText)
-  return `${OSC8_START}${url}${OSC8_END}${coloredText}${OSC8_START}${OSC8_END}`
+  const coloredText = chalk.cyan(displayText)
+
+  // Use id parameter to help terminals group wrapped segments of the same link.
+  // Format: \e]8;id=ID;URL\e\\TEXT\e]8;;\e\\
+  const id = getOsc8Id(url)
+  return `\x1b]8;id=${id};${url}\x07${coloredText}\x1b]8;;\x07`
 }

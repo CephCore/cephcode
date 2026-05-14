@@ -13,7 +13,7 @@ import { safeParseJSON } from '../json.js'
 import { lazySchema } from '../lazySchema.js'
 import { isEssentialTrafficOnly } from '../privacyLevel.js'
 import { jsonStringify } from '../slowOperations.js'
-import { getAPIProvider, isFirstPartyAnthropicBaseUrl } from './providers.js'
+import { getActiveProviderId, getAPIProvider, isFirstPartyAnthropicBaseUrl } from './providers.js'
 
 // .strip() — don't persist internal-only fields (mycro_deployments etc.) to disk
 const ModelCapabilitySchema = lazySchema(() =>
@@ -73,13 +73,37 @@ const loadCache = memoize(
 )
 
 export function getModelCapability(model: string): ModelCapability | undefined {
-  if (!isModelCapabilitiesEligible()) return undefined
-  const cached = loadCache(getCachePath())
-  if (!cached || cached.length === 0) return undefined
-  const m = model.toLowerCase()
-  const exact = cached.find(c => c.id.toLowerCase() === m)
-  if (exact) return exact
-  return cached.find(c => m.includes(c.id.toLowerCase()))
+  // Anthropic first-party path: use cached capabilities from API
+  if (isModelCapabilitiesEligible()) {
+    const cached = loadCache(getCachePath())
+    if (cached && cached.length > 0) {
+      const m = model.toLowerCase()
+      const exact = cached.find(c => c.id.toLowerCase() === m)
+      if (exact) return exact
+      return cached.find(c => m.includes(c.id.toLowerCase()))
+    }
+  }
+
+  // Non-Anthropic providers: return known capabilities from provider registry
+  const providerId = getActiveProviderId()
+  if (providerId !== 'anthropic') {
+    const modelLower = model.toLowerCase()
+    // Known context windows for popular non-Anthropic models
+    const KNOWN_CAPABILITIES: Record<string, ModelCapability> = {
+      'deepseek-v4-pro': { id: 'deepseek-v4-pro', max_input_tokens: 1_000_000, max_tokens: 128_000 },
+      'deepseek-v4-flash': { id: 'deepseek-v4-flash', max_input_tokens: 1_000_000, max_tokens: 128_000 },
+      'gpt-5.5': { id: 'gpt-5.5', max_input_tokens: 1_050_000, max_tokens: 128_000 },
+      'gpt-5.5-pro': { id: 'gpt-5.5-pro', max_input_tokens: 1_050_000, max_tokens: 128_000 },
+      'gemini-3.1-pro': { id: 'gemini-3.1-pro', max_input_tokens: 2_000_000, max_tokens: 128_000 },
+      'gemini-3.1-flash': { id: 'gemini-3.1-flash', max_input_tokens: 2_000_000, max_tokens: 128_000 },
+    }
+    // Try exact match first, then substring match
+    for (const [key, cap] of Object.entries(KNOWN_CAPABILITIES)) {
+      if (modelLower.includes(key)) return cap
+    }
+  }
+
+  return undefined
 }
 
 export async function refreshModelCapabilities(): Promise<void> {

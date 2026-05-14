@@ -720,6 +720,13 @@ export const SettingsSchema = lazySchema(() =>
           "Skip the WebFetch blocklist check for enterprise environments with restrictive security policies",
         ),
       sandbox: SandboxSettingsSchema().optional(),
+      disableAgentView: z
+        .boolean()
+        .optional()
+        .describe(
+          "Disable background agents and agent view (claude agents command). " +
+            "Set to true to turn off agent view entirely.",
+        ),
       feedbackSurveyRate: z
         .number()
         .min(0)

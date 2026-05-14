@@ -40,10 +40,20 @@ function embedTextInBorder(
   borderChar: string,
 ): [before: string, text: string, after: string] {
   const textLength = stringWidth(text)
-  const borderLength = borderLine.length
+  // Use stringWidth for border length to handle wide characters correctly (G42)
+  const borderLength = stringWidth(borderLine)
 
   if (textLength >= borderLength - 2) {
-    return ['', text.substring(0, borderLength), '']
+    // Use width-aware truncation for CJK/emoji where stringWidth > 1 per char (G42)
+    let truncated = ''
+    let w = 0
+    for (const ch of text) {
+      const chWidth = stringWidth(ch)
+      if (w + chWidth > borderLength - 2) break
+      truncated += ch
+      w += chWidth
+    }
+    return ['', truncated, '']
   }
 
   let position: number
@@ -56,13 +66,15 @@ function embedTextInBorder(
     position = borderLength - textLength - offset - 1 // -1 for corner character
   }
 
-  // Ensure position is valid
+  // Ensure position is valid and repeat counts are non-negative (G42)
   position = Math.max(1, Math.min(position, borderLength - textLength - 1))
 
-  const before = borderLine.substring(0, 1) + borderChar.repeat(position - 1)
+  const repeatBefore = Math.max(0, position - 1)
+  const repeatAfter = Math.max(0, borderLength - position - textLength - 1)
+  const before = borderLine.substring(0, 1) + borderChar.repeat(repeatBefore)
   const after =
-    borderChar.repeat(borderLength - position - textLength - 1) +
-    borderLine.substring(borderLength - 1)
+    borderChar.repeat(repeatAfter) +
+    borderLine.substring(borderLine.length - 1)
 
   return [before, text, after]
 }

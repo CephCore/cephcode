@@ -73,6 +73,27 @@ import { getMCPUserAgent } from '../../utils/http.js'
 import { maybeNotifyIDEConnected } from '../../utils/ide.js'
 import { maybeResizeAndDownsampleImageBuffer } from '../../utils/imageResizer.js'
 import { logMCPDebug, logMCPError } from '../../utils/log.js'
+
+// G4: Cap MCP stdio ReadBuffer at 16MB to prevent unbounded memory growth
+// when a server streams non-protocol data without newline delimiters.
+// Must use relative path since this module isn't in the SDK's package.json exports.
+// eslint-disable-next-line import/no-unresolved
+import { ReadBuffer as MCPReadBuffer } from '../../../../node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js'
+const MCP_STDIO_BUFFER_MAX = 16 * 1024 * 1024 // 16 MB
+const _origReadBufferAppend = MCPReadBuffer.prototype.append
+MCPReadBuffer.prototype.append = function (this: { _buffer?: Buffer }, chunk: Buffer) {
+  const currentSize = this._buffer?.length ?? 0
+  if (currentSize + chunk.length > MCP_STDIO_BUFFER_MAX) {
+    logMCPDebug(
+      'ReadBuffer',
+      `Buffer exceeded ${MCP_STDIO_BUFFER_MAX} bytes (${currentSize}+${chunk.length}), clearing. ` +
+        'MCP server may be streaming non-protocol data.',
+    )
+    this._buffer = undefined
+    return
+  }
+  return _origReadBufferAppend.call(this, chunk)
+}
 import {
   getBinaryBlobSavedMessage,
   getFormatDescription,
@@ -539,6 +560,111 @@ const MCP_STREAMABLE_HTTP_ACCEPT = 'application/json, text/event-stream'
  *
  * @param baseFetch - The fetch function to wrap
  */
+/**
+ * Maximum response body size for SSE/StreamableHTTP POST requests (16 MB).
+ * Matches the stdio ReadBuffer cap above — prevents unbounded memory growth
+ * when an MCP server sends oversized responses.
+ */
+const MCP_SSE_RESPONSE_MAX = 16 * 1024 * 1024
+
+/**
+ * Wraps a fetch function to cap POST response bodies at MCP_SSE_RESPONSE_MAX (16 MB).
+ * GET requests are excluded — they are long-lived SSE streams where per-event
+ * size is handled by the SDK's internal SSE parser.
+ *
+ * The check works in two phases:
+ *   1. Fast path: if `content-length` header exceeds the limit, reject immediately.
+ *   2. Stream path: read the body in chunks, tracking accumulated size. If the
+ *      limit is exceeded during streaming, cancel the reader and throw.
+ *
+ * This catches the primary unbounded-memory case: a single oversized tool call
+ * result from an SSE/HTTP MCP server, mirroring the stdio ReadBuffer cap.
+ *
+ * @param baseFetch - The fetch function to wrap
+ */
+export function wrapFetchWithResponseSizeLimit(baseFetch: FetchLike): FetchLike {
+  return async (url: string | URL, init?: RequestInit) => {
+    const method = (init?.method ?? 'GET').toUpperCase()
+
+    // Skip GET — long-lived SSE streams should not be body-capped here.
+    if (method === 'GET') {
+      return baseFetch(url, init)
+    }
+
+    const response = await baseFetch(url, init)
+
+    // Fast path: check content-length header
+    const contentLength = response.headers.get('content-length')
+    if (contentLength !== null) {
+      const length = parseInt(contentLength, 10)
+      if (!isNaN(length) && length > MCP_SSE_RESPONSE_MAX) {
+        logMCPDebug(
+          'ResponseSizeLimit',
+          `Response content-length ${length} exceeds ${MCP_SSE_RESPONSE_MAX} bytes, rejecting`,
+        )
+        response.body?.cancel()
+        throw new Error(
+          `MCP response body (${length} bytes) exceeded maximum of ${MCP_SSE_RESPONSE_MAX} bytes`,
+        )
+      }
+      return response
+    }
+
+    // Stream path: read chunks and track accumulated size.
+    // content-length may be absent (SSE/chunked transfer encoding).
+    // Only applicable when a readable body is present.
+    if (!response.body) {
+      return response
+    }
+
+    const reader = response.body.getReader()
+    const chunks: Uint8Array[] = []
+    let totalBytes = 0
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        totalBytes += value.length
+        if (totalBytes > MCP_SSE_RESPONSE_MAX) {
+          await reader.cancel()
+          logMCPDebug(
+            'ResponseSizeLimit',
+            `Streamed response exceeded ${MCP_SSE_RESPONSE_MAX} bytes (${totalBytes}), rejecting`,
+          )
+          throw new Error(
+            `MCP response body exceeded maximum of ${MCP_SSE_RESPONSE_MAX} bytes`,
+          )
+        }
+        chunks.push(value)
+      }
+    } catch (error) {
+      // If the error is already our size-limit error, rethrow it.
+      // Otherwise, try to cancel the reader and rethrow the original error.
+      if (error instanceof Error && error.message.includes('exceeded maximum')) {
+        throw error
+      }
+      await reader.cancel().catch(() => {})
+      throw error
+    }
+
+    // Reconstruct the response with a new body from the accumulated chunks
+    const body = new Uint8Array(totalBytes)
+    let offset = 0
+    for (const chunk of chunks) {
+      body.set(chunk, offset)
+      offset += chunk.length
+    }
+
+    return new Response(body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    })
+  }
+}
+
 export function wrapFetchWithTimeout(baseFetch: FetchLike): FetchLike {
   return async (url: string | URL, init?: RequestInit) => {
     const method = (init?.method ?? 'GET').toUpperCase()
@@ -726,8 +852,12 @@ export const connectToServer = memoize(
           // Use fresh timeout per request to avoid stale AbortSignal bug.
           // Step-up detection wraps innermost so the 403 is seen before the
           // SDK's handler calls auth() → tokens().
-          fetch: wrapFetchWithTimeout(
-            wrapFetchWithStepUpDetection(createFetchWithInit(), authProvider),
+          // G4: Cap POST response bodies at 16MB — outermost wrapper so the
+          // size check runs before the caller processes the response.
+          fetch: wrapFetchWithResponseSizeLimit(
+            wrapFetchWithTimeout(
+              wrapFetchWithStepUpDetection(createFetchWithInit(), authProvider),
+            ),
           ),
           requestInit: {
             headers: {
@@ -738,10 +868,12 @@ export const connectToServer = memoize(
         }
 
         // IMPORTANT: Always set eventSourceInit with a fetch that does NOT use the
-        // timeout wrapper. The EventSource connection is long-lived (stays open indefinitely
-        // to receive server-sent events), so applying a 60-second timeout would kill it.
-        // The timeout is only meant for individual API requests (POST, auth refresh), not
-        // the persistent SSE stream.
+        // timeout or size-limit wrapper. The EventSource connection is long-lived
+        // (stays open indefinitely to receive server-sent events), so applying a
+        // 60-second timeout would kill it, and a 16MB body cap on GET doesn't apply
+        // (per-event size is handled by the SDK's internal SSE parser).
+        // The timeout/size-limit are only meant for individual API requests
+        // (POST, auth refresh), not the persistent SSE stream.
         transportOptions.eventSourceInit = {
           fetch: async (url: string | URL, init?: RequestInit) => {
             // Get auth headers from the auth provider
@@ -920,8 +1052,11 @@ export const connectToServer = memoize(
           // Use fresh timeout per request to avoid stale AbortSignal bug.
           // Step-up detection wraps innermost so the 403 is seen before the
           // SDK's handler calls auth() → tokens().
-          fetch: wrapFetchWithTimeout(
-            wrapFetchWithStepUpDetection(createFetchWithInit(), authProvider),
+          // G4: Cap POST response bodies at 16MB — outermost wrapper.
+          fetch: wrapFetchWithResponseSizeLimit(
+            wrapFetchWithTimeout(
+              wrapFetchWithStepUpDetection(createFetchWithInit(), authProvider),
+            ),
           ),
           requestInit: {
             ...proxyOptions,
@@ -983,8 +1118,11 @@ export const connectToServer = memoize(
 
         const proxyOptions = getProxyFetchOptions()
         const transportOptions: StreamableHTTPClientTransportOptions = {
-          // Wrap fetchWithAuth with fresh timeout per request
-          fetch: wrapFetchWithTimeout(fetchWithAuth),
+          // Wrap fetchWithAuth with fresh timeout per request.
+          // G4: Cap POST response bodies at 16MB — outermost wrapper.
+          fetch: wrapFetchWithResponseSizeLimit(
+            wrapFetchWithTimeout(fetchWithAuth),
+          ),
           requestInit: {
             ...proxyOptions,
             headers: {
@@ -1807,6 +1945,10 @@ export const connectToServer = memoize(
 getServerCacheKey,
 )
 
+// Replace lodash's MapCache (no entries()) with native Map so
+// clearAllMcpServerCaches can iterate cached connections for cleanup.
+connectToServer.cache = new Map()
+
 /**
  * Clears the memoize cache for a specific server
  * @param name Server name
@@ -2326,6 +2468,8 @@ export async function reconnectMcpServerImpl(
         client,
         tools: [],
         commands: [],
+        // G3: Include empty resources to trigger cleanup of stale entries in AppState
+        resources: [],
       }
     }
 
@@ -2365,11 +2509,31 @@ export async function reconnectMcpServerImpl(
     }
   } catch (error) {
     // Handle errors gracefully - connection might have closed during fetch
-    logMCPError(name, `Error during reconnection: ${errorMessage(error)}`)
+    const errMsg = errorMessage(error)
 
-    // Return with failed status
+    // Extract HTTP status and URL for user-friendly display (G27)
+    const err = error as Error & { code?: number; url?: string; status?: number }
+    const httpStatus = err.code ?? err.status
+    const urlInfo = config.url ?? ''
+    const httpDetail = httpStatus
+      ? `HTTP ${httpStatus}${urlInfo ? ` — ${urlInfo}` : ''}`
+      : urlInfo
+        ? urlInfo
+        : ''
+
+    logMCPError(name, `Error during reconnection: ${errMsg}`)
+    if (httpDetail) {
+      logMCPError(name, `Details: ${httpDetail}`)
+    }
+
+    // Return with failed status including error detail
     return {
-      client: { name, type: 'failed' as const, config },
+      client: {
+        name,
+        type: 'failed' as const,
+        config,
+        error: httpDetail ? `${errMsg} (${httpDetail})` : errMsg,
+      },
       tools: [],
       commands: [],
     }
@@ -2445,6 +2609,8 @@ export async function getMcpToolsCommandsAndResources(
     sseIdeCount,
     wsIdeCount,
   }
+
+  logForDebugging(`[MCP] Initializing ${totalServers} servers (stdio: ${stdioCount}, sse: ${sseCount}, http: ${httpCount}, sse-ide: ${sseIdeCount}, ws-ide: ${wsIdeCount})`);
 
   const processServer = async ([name, config]: [
     string,

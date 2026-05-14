@@ -28,7 +28,7 @@ import { has1mContext } from './context.js'
 import { isEnvDefinedFalsy, isEnvTruthy } from './envUtils.js'
 import { getCanonicalName } from './model/model.js'
 import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
-import { getAPIProvider } from './model/providers.js'
+import { getAPIProvider, isAnthropicProvider } from './model/providers.js'
 import { getInitialSettings } from './settings/settings.js'
 
 /**
@@ -233,6 +233,10 @@ export function shouldUseGlobalCacheScope(): boolean {
 }
 
 export const getAllModelBetas = memoize((model: string): string[] => {
+  // Beta headers are Anthropic-specific. Non-Anthropic providers use
+  // their own feature flags (e.g. OpenAI reasoning_effort, Google thinking_config).
+  if (!isAnthropicProvider()) return []
+
   const betaHeaders = []
   const isHaiku = getCanonicalName(model).includes('haiku')
   const provider = getAPIProvider()

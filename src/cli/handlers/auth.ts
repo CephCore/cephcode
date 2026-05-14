@@ -120,6 +120,11 @@ export async function authLogin({
   console?: boolean
   claudeai?: boolean
 }): Promise<void> {
+  // Clear policy limits cache to prevent deadlocks from forceRemoteSettingsRefresh
+  // with expired credentials — auth commands must always work
+  const { clearPolicyLimitsCache: _clearPolicyLimits } = await import('../../services/policyLimits/index.js')
+  await _clearPolicyLimits()
+
   if (useConsole && claudeai) {
     process.stderr.write(
       'Error: --console and --claudeai cannot be used together.\n',

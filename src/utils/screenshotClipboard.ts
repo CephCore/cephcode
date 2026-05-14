@@ -7,6 +7,24 @@ import { logError } from './log.js'
 import { getPlatform } from './platform.js'
 
 /**
+ * On Linux/X11, terminal flow control (XON/XOFF) intercepts Ctrl+S before
+ * it reaches the app. Detect and disable it so Ctrl+S-based copy works.
+ * Returns true if flow control was active and was disabled.
+ */
+async function ensureFlowControlDisabled(): Promise<boolean> {
+  if (process.platform !== 'linux') return false
+  try {
+    const { execa } = await import('execa')
+    const { stdout } = await execa('stty', ['-a'], { reject: false })
+    if (!stdout?.includes('ixon')) return false
+    await execa('stty', ['-ixon'], { reject: false })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Copies an image (from ANSI text) to the system clipboard.
  * Supports macOS, Linux (with xclip/xsel), and Windows.
  *
@@ -17,6 +35,10 @@ export async function copyAnsiToClipboard(
   ansiText: string,
   options?: AnsiToPngOptions,
 ): Promise<{ success: boolean; message: string }> {
+  // H36: Disable XON/XOFF flow control on Linux so Ctrl+S-based screenshot
+  // copy reaches the app instead of being intercepted by the terminal.
+  const flowControlFixed = await ensureFlowControlDisabled()
+
   try {
     const tempDir = join(tmpdir(), 'claude-code-screenshots')
     await mkdir(tempDir, { recursive: true })
@@ -33,7 +55,9 @@ export async function copyAnsiToClipboard(
       // Ignore cleanup errors
     }
 
-    return result
+    return flowControlFixed
+      ? { ...result, message: `${result.message} · disabled terminal flow control` }
+      : result
   } catch (error) {
     logError(error)
     return {

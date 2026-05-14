@@ -353,11 +353,9 @@ import { errorMessage, toError } from '../utils/errors.js'
 import { sleep } from '../utils/sleep.js'
 import { isExtractModeActive } from '../memdir/paths.js'
 
-// Dead code elimination: conditional imports
 /* eslint-disable @typescript-eslint/no-require-imports */
-const coordinatorModeModule = feature('COORDINATOR_MODE')
-  ? (require('../coordinator/coordinatorMode.js') as typeof import('../coordinator/coordinatorMode.js'))
-  : null
+const coordinatorModeModule =
+  require('../coordinator/coordinatorMode.js') as typeof import('../coordinator/coordinatorMode.js')
 const proactiveModule =
   feature('PROACTIVE') || feature('KAIROS')
     ? (require('../proactive/index.js') as typeof import('../proactive/index.js'))
@@ -380,9 +378,9 @@ const SHUTDOWN_TEAM_PROMPT = `<system-reminder>
 You are running in non-interactive mode and cannot return a response to the user until your team is shut down.
 
 You MUST shut down your team before preparing your final response:
-1. Use requestShutdown to ask each team member to shut down gracefully
+1. Use RequestShutdown to ask each team member to shut down gracefully
 2. Wait for shutdown approvals
-3. Use the cleanup operation to clean up the team
+3. Use TeamDelete to clean up the team
 4. Only then provide your final response to the user
 
 The user cannot receive your response until the team is completely shut down.
@@ -2672,6 +2670,12 @@ function runHeadlessStreaming(
         suggestionState.abortController?.abort()
         suggestionState.abortController = null
         await finalizePendingAsyncHooks()
+        // Flush the active-time counter before closing output — in -p mode
+        // the process exits right after output.done() without going through
+        // gracefulShutdown, so the OTEL meter (including active_time.total)
+        // would never be emitted. Run cleanup functions to flush it now.
+        const { runCleanupFunctions } = await import('../utils/cleanupRegistry.js')
+        await runCleanupFunctions()
         unsubscribeSkillChanges()
         unsubscribeAuthStatus?.()
         statusListeners.delete(rateLimitListener)
@@ -4132,6 +4136,10 @@ function runHeadlessStreaming(
       suggestionState.abortController?.abort()
       suggestionState.abortController = null
       await finalizePendingAsyncHooks()
+      // Flush OTEL meter (active_time.total) before exit — Process will exit
+      // right after output.done() without going through gracefulShutdown.
+      const { runCleanupFunctions } = await import('../utils/cleanupRegistry.js')
+      await runCleanupFunctions()
       unsubscribeSkillChanges()
       unsubscribeAuthStatus?.()
       statusListeners.delete(rateLimitListener)
@@ -4915,7 +4923,7 @@ async function loadInitialMessages(
       )
       if (result) {
         // Match coordinator mode to the resumed session's mode
-        if (feature('COORDINATOR_MODE') && coordinatorModeModule) {
+        if (coordinatorModeModule) {
           const warning = coordinatorModeModule.matchSessionMode(result.mode)
           if (warning) {
             process.stderr.write(warning + '\n')
@@ -4964,7 +4972,7 @@ async function loadInitialMessages(
         )
 
         // Write mode entry for the resumed session
-        if (feature('COORDINATOR_MODE') && coordinatorModeModule) {
+        if (coordinatorModeModule) {
           saveMode(
             coordinatorModeModule.isCoordinatorMode()
               ? 'coordinator'
@@ -5120,7 +5128,7 @@ async function loadInitialMessages(
       }
 
       // Match coordinator mode to the resumed session's mode
-      if (feature('COORDINATOR_MODE') && coordinatorModeModule) {
+      if (coordinatorModeModule) {
         const warning = coordinatorModeModule.matchSessionMode(result.mode)
         if (warning) {
           process.stderr.write(warning + '\n')
@@ -5164,7 +5172,7 @@ async function loadInitialMessages(
       )
 
       // Write mode entry for the resumed session
-      if (feature('COORDINATOR_MODE') && coordinatorModeModule) {
+      if (coordinatorModeModule) {
         saveMode(
           coordinatorModeModule.isCoordinatorMode() ? 'coordinator' : 'normal',
         )

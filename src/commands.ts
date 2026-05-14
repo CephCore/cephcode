@@ -124,6 +124,9 @@ import perfIssue from './commands/perf-issue/index.js'
 import sandboxToggle from './commands/sandbox-toggle/index.js'
 import chrome from './commands/chrome/index.js'
 import stickers from './commands/stickers/index.js'
+import goal from './commands/goal/index.js'
+import scrollSpeed from './commands/scroll-speed/index.js'
+import pluginDetails from './commands/plugin-details/index.js'
 import advisor from './commands/advisor.js'
 import capabilities from './commands/capabilities/index.js'
 import { logError } from './utils/log.js'
@@ -258,6 +261,7 @@ const COMMANDS = memoize((): Command[] => [
   explorer,
   fast,
   files,
+  goal,
   heapDump,
   help,
   ide,
@@ -276,6 +280,7 @@ setpath,
   providerSelect,
   remoteEnv,
   plugin,
+  pluginDetails,
   pr_comments,
   releaseNotes,
   reloadPlugins,
@@ -289,6 +294,7 @@ setpath,
   stickers,
   theme,
   feedback,
+  scrollSpeed,
   review,
   ultrareview,
   rewind,

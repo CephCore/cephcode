@@ -221,6 +221,13 @@ export const TeamCreateTool: Tool<InputSchema, Output> = buildTool({
         getResolvedTeammateMode() as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
 
+    // Activate coordinator mode for the team lead so the coordinator system
+    // prompt is applied on the next (and subsequent) turns.
+    // Gated behind the COORDINATOR_MODE feature flag.
+    if (!process.env.CLAUDE_CODE_COORDINATOR_MODE) {
+      process.env.CLAUDE_CODE_COORDINATOR_MODE = '1'
+    }
+
     // Note: We intentionally don't set CLAUDE_CODE_AGENT_ID for the team lead because:
     // 1. The lead is not a "teammate" - isTeammate() should return false for them
     // 2. Their ID is deterministic (team-lead@teamName) and can be derived when needed

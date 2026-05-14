@@ -1402,6 +1402,30 @@ export async function createPluginFromPath(
     !manifest.bin ? pathExists(join(pluginPath, "bin")) : false,
   ]);
 
+  // Detect suppressed folders: when plugin.json sets a component key AND the
+  // matching default directory exists on disk, the directory is silently ignored.
+  // Collect warnings for display in /doctor, claude plugin list, and /plugin.
+  const suppressedOverrides = (
+    await Promise.all(
+      (['commands', 'agents', 'hooks', 'output-styles'] as const).map(async key => {
+        const manifestKey = key === 'output-styles' ? 'outputStyles' : key;
+        if (!(manifest as any)[manifestKey]) return null;
+        const dirPath = join(pluginPath, key);
+        const exists = await pathExists(dirPath);
+        return exists ? key : null;
+      }),
+    )
+  ).filter((k): k is string => k !== null);
+  if (suppressedOverrides.length > 0) {
+    plugin.suppressedFolders = suppressedOverrides;
+    errors.push({
+      type: 'generic-error',
+      source: source,
+      plugin: manifest.name,
+      error: `plugin.json suppresses default folder(s) that exist on disk: ${suppressedOverrides.join(', ')}. Files in these folders are ignored — delete the folders or remove the matching key from plugin.json.`,
+    });
+  }
+
   const commandsPath = join(pluginPath, "commands");
   if (commandsDirExists) {
     plugin.commandsPath = commandsPath;

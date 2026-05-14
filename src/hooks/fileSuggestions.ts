@@ -69,8 +69,11 @@ let ignorePatternsCacheKey: string | null = null
 let lastRefreshMs = 0
 let lastGitIndexMtime: number | null = null
 
-// Cache for ripgrep fallback results in non-git directories.
+// E60 / H32: Cache for ripgrep fallback results in non-git directories.
 // Stores the path list and its signature to avoid re-scanning on every turn.
+// Without this cache, files created mid-session in small non-git directories
+// wouldn't appear until the 5s refresh throttle expired.
+const NON_GIT_CACHE_TTL_MS = 2_000
 let lastNonGitResult: { paths: string[]; sig: string; timestamp: number } | null = null
 
 // Signatures of the path lists loaded into the Rust index. Two separate
@@ -287,6 +290,15 @@ async function getFilesUsingGit(
 
     const trackedFiles = trackedResult.stdout.trim().split('\n').filter(Boolean)
 
+    // E60: If no files are tracked yet (fresh repo), fall back to ripgrep
+    // so we can show untracked files immediately.
+    if (trackedFiles.length === 0) {
+      logForDebugging(
+        `[FileIndex] git ls-files returned no files, falling back to ripgrep`,
+      )
+      return null
+    }
+
     // Normalize paths relative to the current working directory
     let normalizedTracked = normalizeGitPaths(trackedFiles, repoRoot, cwd)
 
@@ -477,6 +489,20 @@ async function getProjectFiles(
     return gitFiles
   }
 
+  // E60 / H32: Check non-git cache before falling back to ripgrep.
+  // In small non-git directories (or fresh git repos), files created mid-session
+  // are otherwise invisible for up to 5s (the refresh throttle). A short-lived
+  // cache (2s TTL) serves stale results quickly while the background refresh rebuilds.
+  if (
+    lastNonGitResult &&
+    Date.now() - lastNonGitResult.timestamp < NON_GIT_CACHE_TTL_MS
+  ) {
+    logForDebugging(
+      `[FileIndex] using cached non-git ripgrep result (${lastNonGitResult.paths.length} files)`,
+    )
+    return lastNonGitResult.paths
+  }
+
   // Fall back to ripgrep
   logForDebugging(
     `[FileIndex] git ls-files returned null, falling back to ripgrep`,
@@ -515,6 +541,14 @@ async function getProjectFiles(
     file_count: relativePaths.length,
     duration_ms: duration,
   })
+
+  // H32: Cache ripgrep results so files created mid-session in non-git dirs
+  // are picked up without waiting for the full 5s refresh throttle.
+  lastNonGitResult = {
+    paths: relativePaths,
+    sig: relativePaths.join('\n'),
+    timestamp: Date.now(),
+  }
 
   return relativePaths
 }

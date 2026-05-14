@@ -72,9 +72,8 @@ const getTeammateUtils = () => require('./utils/teammate.js') as typeof import('
 const getTeammatePromptAddendum = () => require('./utils/swarm/teammatePromptAddendum.js') as typeof import('./utils/swarm/teammatePromptAddendum.js');
 const getTeammateModeSnapshot = () => require('./utils/swarm/backends/teammateModeSnapshot.js') as typeof import('./utils/swarm/backends/teammateModeSnapshot.js');
 /* eslint-enable @typescript-eslint/no-require-imports */
-// Dead code elimination: conditional import for COORDINATOR_MODE
 /* eslint-disable @typescript-eslint/no-require-imports */
-const coordinatorModeModule = feature('COORDINATOR_MODE') ? require('./coordinator/coordinatorMode.js') as typeof import('./coordinator/coordinatorMode.js') : null;
+const coordinatorModeModule = require('./coordinator/coordinatorMode.js') as typeof import('./coordinator/coordinatorMode.js');
 /* eslint-enable @typescript-eslint/no-require-imports */
 // Dead code elimination: conditional import for KAIROS (assistant mode)
 /* eslint-disable @typescript-eslint/no-require-imports */

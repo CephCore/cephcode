@@ -614,7 +614,13 @@ function wordDiffStrings(oldStr: string, newStr: string): [Range[], Range[]] {
   let newOff = 0
 
   for (const op of ops) {
-    const len = op.value.reduce((s, t) => s + t.length, 0)
+    // H38: Filter boundary artifacts ("undefined" text) from ReasonML and
+    // other lang diffs — the `diff` package can produce undefined token
+    // references at word-diff boundaries when the original text has
+    // consecutive same-looking adjacent tokens.
+    const len = op.value
+      .filter((t): t is string => typeof t === 'string' && t !== 'undefined')
+      .reduce((s, t) => s + t.length, 0)
     if (op.removed) {
       changedLen += len
       oldRanges.push({ start: oldOff, end: oldOff + len })

@@ -463,6 +463,12 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
         const prefix = normalizedRule.slice(0, -2) // Remove ':*'
         return commandName.startsWith(prefix)
       }
+      // Check space-wildcard prefix match (e.g., "code *" matches "code-review")
+      // matching Bash(ls *) behavior
+      if (normalizedRule.endsWith(' *')) {
+        const prefix = normalizedRule.slice(0, -2) // Remove ' *'
+        return commandName.startsWith(prefix)
+      }
       return false
     }
 

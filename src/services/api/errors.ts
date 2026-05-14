@@ -570,12 +570,16 @@ export function getAssistantMessageFromError(
     }
 
     const provider = getAPIProvider()
+    // @[MULTI_PROVIDER] Rate limit hints for different providers.
+    // Non-Anthropic providers (OpenAI, Google, etc.) need their own status pages.
     const retryHint =
       provider === 'bedrock'
         ? 'Check the AWS Health Dashboard for Bedrock service status.'
         : provider === 'vertex'
           ? 'Check the GCP Status Dashboard for Vertex AI service status.'
-          : 'Check status.anthropic.com for current API status.'
+          : provider === 'firstParty' || provider === 'foundry'
+            ? 'Check status.anthropic.com for current API status.'
+            : 'Check your provider status page for current API status.'
     return createAssistantAPIErrorMessage({
       content: `${API_ERROR_MESSAGE_PREFIX}: Rate limited (429)${detail ? ` · ${detail}` : ''} · ${retryHint}`,
       error: 'rate_limit',
@@ -1014,6 +1018,81 @@ function get3PModelFallbackSuggestion(model: string): string | undefined {
  * Classifies an API error into a specific error type for analytics tracking.
  * Returns a standardized error type string suitable for Datadog tagging.
  */
+// ── J5: Provider-Specific Error Classification ────────────────────────────────
+
+/**
+ * Structured error info attached by ProviderAdapter.normalizeError().
+ * Used by classifyProviderError() and withRetry() for provider-agnostic handling.
+ */
+export interface ProviderErrorInfo {
+  category: 'rate_limit' | 'content_filter' | 'auth' | 'server_error' | 'network'
+  status?: number
+  retryAfter?: string | number
+}
+
+/**
+ * Extract the provider error info attached by an adapter's normalizeError().
+ */
+export function getProviderErrorInfo(error: unknown): ProviderErrorInfo | undefined {
+  return (error as any)?._providerError as ProviderErrorInfo | undefined
+}
+
+/**
+ * Classify an error from any provider into a standardised category.
+ * Checks adapter-attached _providerError first, then falls back to
+ * Anthropic-specific error classification.
+ */
+export function classifyProviderError(error: unknown): ProviderErrorInfo {
+  const attached = getProviderErrorInfo(error)
+  if (attached) return attached
+
+  // Fallback: Anthropic SDK error patterns
+  if (error instanceof APIError) {
+    if (error.status === 429) return { category: 'rate_limit', status: 429 }
+    if (error.status === 401 || error.status === 403) return { category: 'auth', status: error.status }
+    if (error.status && error.status >= 500) return { category: 'server_error', status: error.status }
+  }
+
+  if (error instanceof APIConnectionError) return { category: 'network' }
+  if (error instanceof Error && error.message.includes('timeout')) return { category: 'network' }
+
+  return { category: 'server_error' }
+}
+
+/**
+ * Provider-specific retry-after extraction.
+ *   OpenAI:  x-ratelimit-reset-requests / retry-after headers
+ *   Google:  retryDelay in error body (parsed by GoogleAdapter)
+ *   Anthropic: anthropic-ratelimit-unified-reset header (existing path)
+ *   OpenRouter: x-ratelimit-reset + retry-after
+ */
+export function getProviderRetryAfterMs(error: unknown): number | null {
+  const info = getProviderErrorInfo(error)
+  if (info?.retryAfter != null) {
+    const ms = typeof info.retryAfter === 'number'
+      ? info.retryAfter
+      : parseFloat(info.retryAfter) * 1000
+    if (Number.isFinite(ms) && ms > 0) return ms
+  }
+
+  if (error instanceof APIError) {
+    // Anthropic unified reset
+    const resetHeader = error.headers?.get?.('anthropic-ratelimit-unified-reset')
+    if (resetHeader) {
+      const ms = Number(resetHeader) * 1000 - Date.now()
+      if (ms > 0) return ms
+    }
+    // Standard retry-after
+    const retryAfter = error.headers?.get?.('retry-after')
+    if (retryAfter) {
+      const seconds = parseFloat(retryAfter)
+      if (!isNaN(seconds)) return seconds * 1000
+    }
+  }
+
+  return null
+}
+
 export function classifyAPIError(error: unknown): string {
   // Aborted requests
   if (error instanceof Error && error.message === 'Request was aborted.') {

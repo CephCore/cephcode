@@ -1,4 +1,3 @@
-import { feature } from 'bun:bundle'
 import { ASYNC_AGENT_ALLOWED_TOOLS } from '../constants/tools.js'
 import { checkStatsigFeatureGate_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import {
@@ -33,11 +32,13 @@ const INTERNAL_WORKER_TOOLS = new Set([
   SYNTHETIC_OUTPUT_TOOL_NAME,
 ])
 
+/**
+ * Pure runtime check: coordinator mode is active when the env var is set.
+ * No compile-time feature gate — the caller (TeamCreateTool, --agent-teams
+ * flag handler) is responsible for setting the env var.
+ */
 export function isCoordinatorMode(): boolean {
-  if (feature('COORDINATOR_MODE')) {
-    return isEnvTruthy(process.env.CLAUDE_CODE_COORDINATOR_MODE)
-  }
-  return false
+  return isEnvTruthy(process.env.CLAUDE_CODE_COORDINATOR_MODE)
 }
 
 /**
@@ -355,7 +356,7 @@ User:
   </task-notification>
 
 You:
-  Found the bug — null pointer in validate.ts:42. 
+  Found the bug — null pointer in validate.ts:42.
 
   ${SEND_MESSAGE_TOOL_NAME}({ to: "agent-a1b", message: "Fix the null pointer in src/auth/validate.ts:42. Add a null check before accessing user.id — if null, ... Commit and report the hash." })
 

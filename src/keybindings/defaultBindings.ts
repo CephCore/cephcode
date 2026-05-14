@@ -169,6 +169,14 @@ export const DEFAULT_BINDINGS: KeybindingBlock[] = [
       // q — pager convention (less, tmux copy-mode). Transcript is a modal
       // reading view with no prompt, so q-as-literal-char has no owner.
       q: 'transcript:exit',
+      // ? — show shortcuts help overlay
+      '?': 'transcript:showHelp',
+      // { — jump to previous user prompt message in transcript
+      '{': 'transcript:jumpPrevPrompt',
+      // } — jump to next user prompt message in transcript
+      '}': 'transcript:jumpNextPrompt',
+      // v — toggle shortcut panel
+      v: 'transcript:toggleShortcuts',
     },
   },
   {

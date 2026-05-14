@@ -684,3 +684,14 @@ export async function runAsyncAgentLifecycle({
     clearDumpState(agentIdForCleanup)
   }
 }
+
+/**
+ * Normalize an agent type string for case- and separator-insensitive matching.
+ *
+ * Models sometimes produce variants like "Code Reviewer", "code_reviewer", or
+ * "Code-Reviewer" — this normalizes to "code-reviewer" so they match the
+ * kebab-case agentType used in agent definitions and registries.
+ */
+export function normalizeAgentType(t: string): string {
+  return t.trim().toLowerCase().replace(/[\s_-]+/g, '-')
+}

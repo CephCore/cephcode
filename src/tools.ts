@@ -50,6 +50,7 @@ const getWorkflowTool = () => {
 // Stable static imports
 import { TaskOutputTool } from "./tools/TaskOutputTool/TaskOutputTool.js";
 import { WebSearchTool } from "./tools/WebSearchTool/WebSearchTool.js";
+import { WebFetchTool } from "./tools/WebFetchTool/WebFetchTool.js";
 import { MultiSearchTool } from "./tools/MultiSearchTool/MultiSearchTool.js";
 import { JsonPathTool } from "./tools/JsonPathTool/JsonPathTool.js";
 import { TodoWriteTool } from "./tools/TodoWriteTool/TodoWriteTool.js";
@@ -59,6 +60,8 @@ import { GrepTool } from "./tools/GrepTool/GrepTool.js";
 import { TungstenTool } from "./tools/TungstenTool/TungstenTool.js";
 import { TeamCreateTool } from "./tools/TeamCreateTool/TeamCreateTool.js";
 import { TeamDeleteTool } from "./tools/TeamDeleteTool/TeamDeleteTool.js";
+import { RequestShutdownTool } from "./tools/RequestShutdownTool/RequestShutdownTool.js";
+import { SubscribePrActivityTool, UnsubscribePrActivityTool } from "./tools/PrSubscriptionTool/PrSubscriptionTool.js";
 import { SendMessageTool } from "./tools/SendMessageTool/SendMessageTool.js";
 import { AskUserQuestionTool } from "./tools/AskUserQuestionTool/AskUserQuestionTool.js";
 import { LSPTool } from "./tools/LSPTool/LSPTool.js";
@@ -165,8 +168,9 @@ export function getAllBaseTools(): Tools {
     FileWriteTool,
     NotebookEditTool,
     TodoWriteTool,
-    // WebSearchTool, // Hidden in favor of faster dedicated search tools
-    MultiSearchTool,
+    WebSearchTool,
+    WebFetchTool,
+    // MultiSearchTool, // Using official WebSearch instead
     JsonPathTool,
     TaskStopTool,
     AskUserQuestionTool,
@@ -186,7 +190,10 @@ export function getAllBaseTools(): Tools {
     SendMessageTool,
     ...(listPeersTool ? [listPeersTool] : []),
     ...(isAgentSwarmsEnabled()
-      ? [TeamCreateTool, TeamDeleteTool]
+      ? [TeamCreateTool, TeamDeleteTool, RequestShutdownTool]
+      : []),
+    ...(isAgentSwarmsEnabled()
+      ? [SubscribePrActivityTool, UnsubscribePrActivityTool]
       : []),
     ...(verifyPlanExecutionTool ? [verifyPlanExecutionTool] : []),
     ...(process.env.USER_TYPE === "ant" && replTool ? [replTool] : []),

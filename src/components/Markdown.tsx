@@ -7,6 +7,7 @@ import { type CliHighlight, getCliHighlightPromise } from '../utils/cliHighlight
 import { hashContent } from '../utils/hash.js';
 import { configureMarked, formatToken } from '../utils/markdown.js';
 import { stripPromptXMLTags } from '../utils/messages.js';
+import { decodeHtmlEntities } from '../utils/htmlEntities.js';
 import { MarkdownTable } from './MarkdownTable.js';
 type Props = {
   children: string;
@@ -131,12 +132,14 @@ function MarkdownBody(t0) {
   configureMarked();
   let elements;
   if ($[0] !== children || $[1] !== dimColor || $[2] !== highlight || $[3] !== theme) {
-    const tokens = cachedLexer(stripPromptXMLTags(children));
+    const tokens = cachedLexer(decodeHtmlEntities(stripPromptXMLTags(children)));
     elements = [];
     let nonTableContent = "";
     const flushNonTableContent = function flushNonTableContent() {
       if (nonTableContent) {
-        elements.push(<Ansi key={elements.length} dimColor={dimColor}>{nonTableContent.trim()}</Ansi>);
+        // Append reset if content has ANSI but no trailing reset
+        const content = nonTableContent.includes('\x1b') && !nonTableContent.endsWith('\x1b[0m') ? nonTableContent + '\x1b[0m' : nonTableContent;
+        elements.push(<Ansi key={elements.length} dimColor={dimColor}>{content.trim()}</Ansi>);
         nonTableContent = "";
       }
     };
@@ -146,7 +149,6 @@ function MarkdownBody(t0) {
         elements.push(<MarkdownTable key={elements.length} token={token as Tokens.Table} highlight={highlight} />);
       } else {
         nonTableContent = nonTableContent + formatToken(token, theme, 0, null, null, highlight);
-        nonTableContent;
       }
     }
     flushNonTableContent();
@@ -199,7 +201,7 @@ export function StreamingMarkdown({
   // (line 29). When a closing tag arrives, stripped(N+1) is not a prefix
   // of stripped(N), but the startsWith reset below handles that with a
   // one-time re-lex on the smaller stripped string.
-  const stripped = stripPromptXMLTags(children);
+  const stripped = decodeHtmlEntities(stripPromptXMLTags(children));
   const stablePrefixRef = useRef('');
 
   // Reset if text was replaced (defensive; normally unmount handles this)

@@ -1,6 +1,13 @@
 /**
- * Environment variables that control inference routing: which provider to use,
- * which endpoint to hit, and which model IDs to send.
+ * @[MULTI_PROVIDER] Environment variables that control inference routing.
+ *
+ * These are primarily Anthropic-specific (ANTHROPIC_*, CLAUDE_CODE_USE_BEDROCK, etc.).
+ * Non-Anthropic providers (OpenAI, Google, OpenRouter, Ollama) use their own env vars:
+ * - OpenAI: OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
+ * - Google: GOOGLE_API_KEY, GOOGLE_MODEL
+ * - OpenRouter: OPENROUTER_API_KEY, OPENROUTER_MODEL
+ * - Ollama: OLLAMA_HOST, OLLAMA_MODEL (local, no API key needed)
+ * Provider config is managed via ~/.claude/provider.json (ProviderManager).
  *
  * When CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST is truthy in the spawn env, these
  * are stripped from settings-sourced env so the host's routing config isn't

@@ -1,7 +1,8 @@
 import { c as _c } from "react/compiler-runtime";
-import React from 'react';
+import React, { useRef } from 'react';
 import { type ExitState, useExitOnCtrlCDWithKeybindings } from '../../hooks/useExitOnCtrlCDWithKeybindings.js';
 import { Box, Text } from '../../ink.js';
+import ScrollBox from '../../ink/components/ScrollBox.js';
 import { useKeybinding } from '../../keybindings/useKeybinding.js';
 import type { Theme } from '../../utils/theme.js';
 import { ConfigurableShortcutHint } from '../ConfigurableShortcutHint.js';
@@ -16,6 +17,8 @@ type DialogProps = {
   color?: keyof Theme;
   hideInputGuide?: boolean;
   hideBorder?: boolean;
+  /** When true, wraps children in a ScrollBox for vertical scrolling when content overflows. */
+  scrollable?: boolean;
   /** Custom input guide content. Receives exitState for Ctrl+C/D pending display. */
   inputGuide?: (exitState: ExitState) => React.ReactNode;
   /**
@@ -28,7 +31,7 @@ type DialogProps = {
   isCancelActive?: boolean;
 };
 export function Dialog(t0) {
-  const $ = _c(27);
+  const $ = _c(29);
   const {
     title,
     subtitle,
@@ -37,24 +40,27 @@ export function Dialog(t0) {
     color: t1,
     hideInputGuide,
     hideBorder,
+    scrollable: t2,
     inputGuide,
-    isCancelActive: t2
+    isCancelActive: t3
   } = t0;
   const color = t1 === undefined ? "permission" : t1;
-  const isCancelActive = t2 === undefined ? true : t2;
+  const scrollable = t2 === undefined ? false : t2;
+  const isCancelActive = t3 === undefined ? true : t3;
+  const scrollRef = useRef(null);
   const exitState = useExitOnCtrlCDWithKeybindings(undefined, undefined, isCancelActive);
-  let t3;
+  let t3_opt;
   if ($[0] !== isCancelActive) {
-    t3 = {
+    t3_opt = {
       context: "Confirmation",
       isActive: isCancelActive
     };
     $[0] = isCancelActive;
-    $[1] = t3;
+    $[1] = t3_opt;
   } else {
-    t3 = $[1];
+    t3_opt = $[1];
   }
-  useKeybinding("confirm:no", onCancel, t3);
+  useKeybinding("confirm:no", onCancel, t3_opt);
   let t4;
   if ($[2] !== exitState.keyName || $[3] !== exitState.pending) {
     t4 = exitState.pending ? <Text>Press {exitState.keyName} again to exit</Text> : <Byline><KeyboardShortcutHint shortcut="Enter" action="confirm" /><ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="cancel" /></Byline>;
@@ -92,22 +98,23 @@ export function Dialog(t0) {
     t7 = $[12];
   }
   let t8;
-  if ($[13] !== children || $[14] !== t7) {
-    t8 = <Box flexDirection="column" gap={1}>{t7}{children}</Box>;
+  if ($[13] !== children || $[14] !== t7 || $[15] !== scrollable) {
+    t8 = <Box flexDirection="column" gap={1}>{t7}{scrollable ? <ScrollBox ref={scrollRef}>{children}</ScrollBox> : children}</Box>;
     $[13] = children;
     $[14] = t7;
-    $[15] = t8;
+    $[15] = scrollable;
+    $[16] = t8;
   } else {
-    t8 = $[15];
+    t8 = $[16];
   }
   let t9;
-  if ($[16] !== defaultInputGuide || $[17] !== exitState || $[18] !== hideInputGuide || $[19] !== inputGuide) {
+  if ($[17] !== defaultInputGuide || $[18] !== exitState || $[19] !== hideInputGuide || $[20] !== inputGuide) {
     t9 = !hideInputGuide && <Box marginTop={1}><Text dimColor={true} italic={true}>{inputGuide ? inputGuide(exitState) : defaultInputGuide}</Text></Box>;
-    $[16] = defaultInputGuide;
-    $[17] = exitState;
-    $[18] = hideInputGuide;
-    $[19] = inputGuide;
-    $[20] = t9;
+    $[17] = defaultInputGuide;
+    $[18] = exitState;
+    $[19] = hideInputGuide;
+    $[20] = inputGuide;
+    $[21] = t9;
   } else {
     t9 = $[20];
   }

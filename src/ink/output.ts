@@ -5,7 +5,10 @@ import {
   tokenize,
 } from '@alcalzone/ansi-tokenize'
 import { logForDebugging } from '../utils/debug.js'
+import emojiRegex from 'emoji-regex'
 import { getGraphemeSegmenter } from '../utils/intl.js'
+
+const EMOJI_REGEX = emojiRegex()
 import sliceAnsi from '../utils/sliceAnsi.js'
 import { reorderBidi } from './bidi.js'
 import { type Rectangle, unionRect } from './layout/geometry.js'
@@ -22,6 +25,7 @@ import {
   setCellAt,
   shiftRows,
 } from './screen.js'
+import { eastAsianWidth } from 'get-east-asian-width'
 import { stringWidth } from './stringWidth.js'
 import { widestLine } from './widest-line.js'
 
@@ -367,26 +371,54 @@ export default class Output {
             blitCells += (maxY - startY) * (maxX - startX)
             continue
           }
-          let rowStart = startY
-          for (let row = startY; row <= maxY; row++) {
-            const excluded =
-              row < maxY &&
-              absoluteClears.some(
+
+          // When absolute overlays are present, we must skip blitting cells
+          // covered by their clear regions. prevScreen in those regions holds
+          // the overlay's stale paint, which would ghost if blitted back.
+          for (let row = startY; row < maxY; row++) {
+            let colStart = startX
+            while (colStart < maxX) {
+              // Find the first clear rect that covers this column in this row
+              const clear = absoluteClears.find(
                 r =>
                   row >= r.y &&
                   row < r.y + r.height &&
-                  startX >= r.x &&
-                  maxX <= r.x + r.width,
+                  colStart >= r.x &&
+                  colStart < r.x + r.width,
               )
-            if (excluded || row === maxY) {
-              if (row > rowStart) {
-                blitRegion(screen, src, startX, rowStart, maxX, row)
-                blitCells += (row - rowStart) * (maxX - startX)
+
+              if (clear) {
+                // Skip the portion covered by the clear rect
+                colStart = Math.min(maxX, clear.x + clear.width)
+              } else {
+                // Find the next clear rect in this row to determine how far we can blit
+                let nextClearStart = maxX
+                for (const r of absoluteClears) {
+                  if (
+                    row >= r.y &&
+                    row < r.y + r.height &&
+                    r.x > colStart &&
+                    r.x < nextClearStart
+                  ) {
+                    nextClearStart = r.x
+                  }
+                }
+
+                const blitWidth = nextClearStart - colStart
+                blitRegion(
+                  screen,
+                  src,
+                  colStart,
+                  row,
+                  colStart + blitWidth,
+                  row + 1,
+                )
+                blitCells += blitWidth
+                colStart = nextClearStart
               }
-              rowStart = row + 1
             }
           }
-          continue
+          continue;
         }
 
         case 'shift': {
@@ -492,6 +524,17 @@ export default class Output {
               this.charCache,
             )
             writeCells += contentEnd - x
+            // H27: Extend damage to full row width so prev content beyond the
+            // new text (e.g., shrunken table borders, stale overlay edges) is
+            // checked by diff and cleared from the terminal scrollback.
+            if (contentEnd < screenWidth) {
+              const d = screen.damage
+              if (d) {
+                d.width = Math.max(d.width, screenWidth - d.x)
+              } else {
+                screen.damage = { x, y: lineY, width: screenWidth - x, height: 1 }
+              }
+            }
             // See Screen.softWrap docstring for the encoding. contentEnd
             // from writeLineToScreen is tab-expansion-aware, unlike
             // x+stringWidth(line) which treats tabs as width 0.
@@ -610,9 +653,43 @@ function flushBuffer(
   const styleId = stylePool.intern(filteredStyles)
 
   for (const { segment: grapheme } of getGraphemeSegmenter().segment(buffer)) {
+    const width = stringWidth(grapheme)
+
+    // Intl.Segmenter can group multiple narrow characters into one grapheme
+    // when the second character is a special precomposed form like Thai SARA AM
+    // (U+0E33, which canonically decomposes to U+0E4D + U+0E32). This groups
+    // "กำ" (ก+ำ) into a single grapheme with width 2, which the render loop
+    // then treats as a CJK-wide character — writing a SpacerTail at offset+1
+    // silently drops the second visual column.
+    //
+    // Check whether any codepoint in the grapheme is genuinely wide (EA width
+    // >= 2, e.g. CJK ideographs) or the grapheme is an emoji sequence (flag
+    // pairs, ZWJ composites). If neither, it's a segmenter false positive —
+    // emit each char as its own cell.
+    if (width >= 2) {
+      const chars = [...grapheme]
+      const hasTrueWide = chars.some(ch => {
+        const cp = ch.codePointAt(0)!
+        return cp !== undefined && eastAsianWidth(cp, { ambiguousAsWide: false }) >= 2
+      })
+      EMOJI_REGEX.lastIndex = 0
+      const isEmoji = EMOJI_REGEX.test(grapheme)
+      if (!hasTrueWide && !isEmoji) {
+        for (const char of chars) {
+          out.push({
+            value: char,
+            width: stringWidth(char),
+            styleId,
+            hyperlink,
+          })
+        }
+        continue
+      }
+    }
+
     out.push({
       value: grapheme,
-      width: stringWidth(grapheme),
+      width,
       styleId,
       hyperlink,
     })
@@ -756,12 +833,35 @@ function writeLineToScreen(
       continue
     }
 
-    // Zero-width characters (combining marks, ZWNJ, ZWS, etc.)
-    // don't occupy terminal cells — storing them as Narrow cells
-    // desyncs the virtual cursor from the real terminal cursor.
-    // Width was computed once during clustering (cached via charCache).
     const charWidth = character.width
+
+    // Zero-width combining marks (Thai vowels, Indic matras, diacritics,
+    // ZWNJ, ZWS, etc.) don't advance the cursor, but they MUST be written
+    // to the terminal. Appending them to the previous cell lets the
+    // terminal render the combined glyph (e.g., ก +  ิ = ก ิ).
+    // Skipping them entirely (the old behavior) silently dropped all Thai
+    // above/below vowels, tone marks, and similar combining characters.
     if (charWidth === 0) {
+      // Find the nearest previous cell that isn't a spacer, then append
+      // the combining mark to its character value so the terminal sees
+      // the full cluster (base + mark).
+      for (let searchX = offsetX - 1; searchX >= 0; searchX--) {
+        const prev = cellAt(screen, searchX, y)
+        if (
+          prev &&
+          prev.width !== CellWidth.SpacerHead &&
+          prev.width !== CellWidth.SpacerTail
+        ) {
+          setCellAt(screen, searchX, y, {
+            char: prev.char + character.value,
+            styleId: character.styleId,
+            width: prev.width,
+            hyperlink: character.hyperlink ?? prev.hyperlink,
+          })
+          break
+        }
+      }
+      // Do not advance offsetX — combining mark shares the base cell.
       continue
     }
 

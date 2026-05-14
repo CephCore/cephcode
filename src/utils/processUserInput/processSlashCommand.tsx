@@ -834,7 +834,7 @@ async function getMessagesForPromptSlashCommand(command: CommandBase & PromptCom
   // parent env, so we also check !context.agentId: agentId is only set for
   // subagents, letting workers fall through to getPromptForCommand and receive
   // the real skill content when they invoke the Skill tool.
-  if (feature('COORDINATOR_MODE') && isEnvTruthy(process.env.CLAUDE_CODE_COORDINATOR_MODE) && !context.agentId) {
+  if (isEnvTruthy(process.env.CLAUDE_CODE_COORDINATOR_MODE) && !context.agentId) {
     const metadata = formatCommandLoadingMetadata(command, args);
     const parts: string[] = [`Skill "/${command.name}" is available for workers.`];
     if (command.description) {

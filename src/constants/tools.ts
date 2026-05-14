@@ -109,4 +109,6 @@ export const COORDINATOR_MODE_ALLOWED_TOOLS = new Set([
   TASK_STOP_TOOL_NAME,
   SEND_MESSAGE_TOOL_NAME,
   SYNTHETIC_OUTPUT_TOOL_NAME,
+  'subscribe_pr_activity',
+  'unsubscribe_pr_activity',
 ])

@@ -14,6 +14,10 @@ import { createUserMessage } from '../../utils/messages.js'
 import { getMainLoopModel, getSmallFastModel } from '../../utils/model/model.js'
 import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
 import { asSystemPrompt } from '../../utils/systemPromptType.js'
+import {
+  isProviderConfigured,
+  searchWithProvider,
+} from '../../services/search/index.js'
 import { getWebSearchPrompt, WEB_SEARCH_TOOL_NAME } from './prompt.js'
 import {
   getToolUseSummary,
@@ -72,6 +76,27 @@ export type Output = z.infer<OutputSchema>
 export type { WebSearchProgress } from '../../types/tools.js'
 
 import type { WebSearchProgress } from '../../types/tools.js'
+
+/**
+ * Select the best available direct search provider.
+ * Priority: tavily > brave > serper > duckduckgo (always available, free)
+ */
+function selectBestDirectProvider(): string {
+  if (isProviderConfigured('tavily')) return 'tavily'
+  if (isProviderConfigured('brave')) return 'brave'
+  if (isProviderConfigured('serper')) return 'serper'
+  return 'duckduckgo'
+}
+
+/**
+ * Check whether the Anthropic server-side web_search returned any
+ * actual search result blocks (as opposed to just text commentary).
+ */
+function hasWebSearchResults(contentBlocks: BetaContentBlock[]): boolean {
+  return contentBlocks.some(
+    block => block.type === 'web_search_tool_result' && Array.isArray(block.content) && block.content.length > 0,
+  )
+}
 
 function makeToolSchema(input: Input): BetaWebSearchTool20250305 {
   return {
@@ -167,29 +192,27 @@ export const WebSearchTool = buildTool({
   },
   isEnabled() {
     const provider = getAPIProvider()
-    const model = getMainLoopModel()
 
-    // Enable for firstParty
-    if (provider === 'firstParty') {
+    // Anthropic providers use the native server-side web_search tool
+    if (provider === 'firstParty' || provider === 'foundry') {
       return true
     }
 
-    // Enable for Vertex AI with supported models (Claude 4.0+)
+    // Vertex AI with Claude 4.0+ models supports web_search
     if (provider === 'vertex') {
+      const model = getMainLoopModel()
       const supportsWebSearch =
         model.includes('claude-opus-4') ||
         model.includes('claude-sonnet-4') ||
         model.includes('claude-haiku-4')
-
       return supportsWebSearch
     }
 
-    // Foundry only ships models that already support Web Search
-    if (provider === 'foundry') {
-      return true
-    }
-
-    return false
+    // For all other providers (OpenAI, Google, OpenRouter, Ollama,
+    // DeepSeek, etc.), the tool is enabled but will fall back to direct
+    // search providers (Tavily/Brave/Serper/DuckDuckGo) when the
+    // Anthropic server-side web_search returns no results.
+    return true
   },
   get inputSchema(): InputSchema {
     return inputSchema()
@@ -296,8 +319,10 @@ export const WebSearchTool = buildTool({
     let currentToolUseJson = ''
     let progressCounter = 0
     const toolUseQueries = new Map() // Map of tool_use_id to query
+    let streamError: Error | null = null
 
-    for await (const event of queryStream) {
+    try {
+      for await (const event of queryStream) {
       if (event.type === 'assistant') {
         allContentBlocks.push(...event.message.content)
         continue
@@ -385,12 +410,91 @@ export const WebSearchTool = buildTool({
             })
           }
         }
+        }
       }
+    } catch (err) {
+      // If the Anthropic streaming call fails entirely (e.g., provider
+      // doesn't support the model), capture the error and let the
+      // fallback below handle it.
+      streamError = err instanceof Error ? err : new Error(String(err))
+      logError(streamError)
     }
 
     // Process the final result
     const endTime = performance.now()
     const durationSeconds = (endTime - startTime) / 1000
+
+    // If the Anthropic server-side web_search returned 0 results (e.g.,
+    // non-Anthropic provider, model doesn't support the tool, or search
+    // returned nothing), fall back to direct search providers.
+    const useFallback = streamError !== null || !hasWebSearchResults(allContentBlocks)
+    if (useFallback) {
+      try {
+        const fallbackProvider = selectBestDirectProvider()
+
+        // Report progress so the UI doesn't look stuck
+        if (onProgress) {
+          onProgress({
+            toolUseID: `search-progress-${progressCounter + 1}`,
+            data: {
+              type: 'query_update',
+              query: `[${fallbackProvider}] ${query}`,
+            },
+          })
+        }
+
+        const fallbackStart = performance.now()
+        const response = await searchWithProvider(fallbackProvider, query, {
+          num: 10,
+        })
+        const fallbackDuration =
+          (performance.now() - fallbackStart) / 1000 + durationSeconds
+
+        progressCounter++
+        if (onProgress) {
+          onProgress({
+            toolUseID: `search-progress-${progressCounter}`,
+            data: {
+              type: 'search_results_received',
+              resultCount: response.results.length,
+              query: `[${fallbackProvider}] ${query}`,
+            },
+          })
+        }
+
+        if (response.results.length > 0) {
+          const results: (SearchResult | string)[] = [
+            ...(allContentBlocks
+              .filter(b => b.type === 'text')
+              .map(b => (b as any).text?.trim?.())
+              .filter(Boolean) as string[]),
+          ]
+
+          // Build a search result from the direct provider response
+          results.push({
+            tool_use_id: `direct-${fallbackProvider}`,
+            content: response.results.map(r => ({
+              title: r.title,
+              url: r.url,
+            })),
+          })
+
+          const data: Output = {
+            query,
+            results,
+            durationSeconds: fallbackDuration,
+          }
+          return { data }
+        }
+      } catch (err) {
+        // Log but continue — fall back to the original (empty) result below.
+        logError(
+          new Error(
+            `WebSearch direct-search fallback failed: ${err instanceof Error ? err.message : String(err)}`,
+          ),
+        )
+      }
+    }
 
     const data = makeOutputFromSearchResponse(
       allContentBlocks,

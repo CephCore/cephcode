@@ -169,7 +169,11 @@ export function ListItem(t0) {
     t5 = $[9];
   }
   const textColor = t5;
-  const t6 = isFocused && !disabled && declareCursor !== false;
+  // G34: List items are NOT text inputs — only declare cursor when the parent
+  // explicitly opts in via declareCursor={true} (e.g. TextInput inside a select
+  // option). The blinking terminal cursor on tab names, list pointers, and
+  // select rows makes the UI look unsettled.
+  const t6 = isFocused && !disabled && declareCursor === true;
   let t7;
   if ($[10] !== t6) {
     t7 = {

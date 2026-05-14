@@ -149,6 +149,16 @@ No configuration needed. Just use Shift+Enter to add newlines.`;
     return null;
   }
 
+  // H40: Windows Terminal natively supports Shift+Enter — show the same
+  // native-support message as CSI u terminals, matching the command description.
+  if (process.env.WT_SESSION) {
+    const message = `Shift+Enter is natively supported in Windows Terminal.
+
+No configuration needed. Just use Shift+Enter to add newlines.`;
+    onDone(message);
+    return null;
+  }
+
   // Check if terminal is supported
   if (!shouldOfferTerminalSetup()) {
     const terminalName = env.terminal || 'your current terminal';

@@ -45,7 +45,12 @@ import {
   checkMockRateLimitError,
   isMockRateLimitError,
 } from '../rateLimitMocking.js'
-import { REPEATED_529_ERROR_MESSAGE } from './errors.js'
+import {
+  REPEATED_529_ERROR_MESSAGE,
+  classifyProviderError,
+  getProviderRetryAfterMs,
+  type ProviderErrorInfo,
+} from './errors.js'
 import { extractConnectionErrorDetails } from './errorUtils.js'
 
 const abortError = () => new APIUserAbortError()
@@ -705,6 +710,15 @@ function shouldRetry(error: APIError): boolean {
   ) {
     return true
   }
+
+  // J5: Check adapter-attached provider error info for rate_limit / auth / network
+  // before falling back to Anthropic-specific status-code checks.
+  const providerError = classifyProviderError(error)
+  if (providerError.category === 'rate_limit') return true
+  if (providerError.category === 'auth') return true
+  if (providerError.category === 'network') return true
+  // content_filter errors are never retryable — the same content will be blocked again
+  if (providerError.category === 'content_filter') return false
 
   // Non-interactive (headless) mode: fail fast on non-transient 4xx errors.
   // 4xx errors are client errors that won't succeed on retry (e.g., bad request,

@@ -632,13 +632,10 @@ export function visibleCellAtIndex(
   const charId = cells[ci]!
   if (charId === 1) return undefined // spacer
   const word1 = cells[ci + 1]!
-  // For spaces: 0x3fffc masks bits 2-17 (hyperlinkId + styleId visibility
-  // bit). If zero, the space has no hyperlink and at most a fg-only style.
-  // Then word1 >>> STYLE_SHIFT is the foreground style — skip if it's zero
-  // (truly invisible) or matches the last rendered style on this line.
-  if (charId === 0 && (word1 & 0x3fffc) === 0) {
-    const fgStyle = word1 >>> STYLE_SHIFT
-    if (fgStyle === 0 || fgStyle === lastRenderedStyleId) return undefined
+  // For spaces: skip if it has no hyperlink, no visibility bit (bg/inverse/etc),
+  // and NO foreground style (truly empty).
+  if (charId === 0 && (word1 & 0x3fffc) === 0 && (word1 >>> STYLE_SHIFT) === 0) {
+    return undefined
   }
   const hid = (word1 >>> HYPERLINK_SHIFT) & HYPERLINK_MASK
   return {

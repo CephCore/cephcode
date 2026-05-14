@@ -5,6 +5,7 @@ import { stopCapturingEarlyInput } from '../../utils/earlyInput.js';
 import { isEnvTruthy } from '../../utils/envUtils.js';
 import { isMouseClicksDisabled } from '../../utils/fullscreen.js';
 import { logError } from '../../utils/log.js';
+import { getForegroundedSessionActive } from '../../hooks/foregroundedSessionFlag.js';
 import { EventEmitter } from '../events/emitter.js';
 import { InputEvent } from '../events/input-event.js';
 import { TerminalFocusEvent } from '../events/terminal-focus-event.js';
@@ -229,6 +230,12 @@ export default class App extends PureComponent<Props, State> {
         stdin.ref();
         stdin.setRawMode(true);
         stdin.addListener('readable', this.handleReadable);
+        // H22: On Windows, stdin can enter a paused state (readableFlowing === false)
+        // when re-opening a background session. Resume the stream to re-enable reading.
+        // This matches the same fix in Ink.resumeStdin().
+        if (process.platform === 'win32' && stdin.isTTY && (stdin as NodeJS.ReadStream).readableFlowing === false) {
+          stdin.resume();
+        }
         // Enable bracketed paste mode
         this.props.stdout.write(EBP);
         // Enable terminal focus reporting (DECSET 1004)
@@ -384,8 +391,14 @@ export default class App extends PureComponent<Props, State> {
   };
   handleTerminalFocus = (isFocused: boolean): void => {
     // setTerminalFocused notifies subscribers: TerminalFocusProvider (context)
-    // and Clock (interval speed) — no App setState needed.
+    // and Clock (interval speed). When regaining focus, also force a
+    // re-render so the native cursor is re-parked at the input caret —
+    // some emulators move the physical cursor during focus loss/regain
+    // and IME / screen readers depend on it being at the caret.
     setTerminalFocused(isFocused);
+    if (isFocused) {
+      this.props.onSelectionChange();
+    }
   };
   handleSuspend = (): void => {
     if (!this.isRawModeSupported()) {
@@ -496,11 +509,19 @@ function processKeysInBatch(app: App, items: ParsedInput[], _unused1: undefined,
       setTerminalFocused(true);
     }
 
-    // Handle Ctrl+Z (suspend) using parsed key to support both raw (\x1a) and
-    // CSI u format (\x1b[122;5u) from Kitty keyboard protocol terminals
-    if (item.name === 'z' && item.ctrl && SUPPORTS_SUSPEND) {
-      app.handleSuspend();
-      continue;
+    // Handle Ctrl+Z: force-detach from agent view if a background session is
+    // foregrounded (dialog has focus and ← doesn't work). Otherwise suspend.
+    if (item.name === 'z' && item.ctrl) {
+      if (getForegroundedSessionActive()) {
+        // Force-detach back to agent view — submit /agents as if ← was pressed
+        // on an empty prompt. This works even when a dialog has focus.
+        app.handleInput('/agents\r')
+        continue
+      }
+      if (SUPPORTS_SUSPEND) {
+        app.handleSuspend()
+      }
+      continue
     }
     app.handleInput(sequence);
     const event = new InputEvent(item);

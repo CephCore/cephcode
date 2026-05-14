@@ -183,7 +183,9 @@ export class EndTruncatingAccumulator {
       return this.content
     }
 
-    const truncatedBytes = this.totalBytesReceived - this.maxSize
+    // Use Math.max to prevent negative counts on surrogate-pair strings
+    // where .length overcounts vs actual byte content (H30).
+    const truncatedBytes = Math.max(0, this.totalBytesReceived - this.maxSize)
     const truncatedKB = Math.round(truncatedBytes / 1024)
     return this.content + `\n... [output truncated - ${truncatedKB}KB removed]`
   }

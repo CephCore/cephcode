@@ -128,6 +128,7 @@ export async function refreshActivePlugins(
       disabled,
       commands: pluginCommands,
       errors: mergePluginErrors(prev.plugins.errors, errors),
+      warnings: [...enabled, ...disabled].filter(p => p.suppressedFolders?.length).map(p => "Plugin " + p.name + ": plugin.json suppresses default folder(s) that exist on disk: " + p.suppressedFolders.join(", ")),
       needsRefresh: false,
     },
     agentDefinitions,

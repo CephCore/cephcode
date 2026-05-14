@@ -5,6 +5,7 @@ import { useContext } from 'react';
 import { useQueuedMessage } from '../../context/QueuedMessageContext.js';
 import { Box, Text } from '../../ink.js';
 import { formatBriefTimestamp } from '../../utils/formatBriefTimestamp.js';
+import { decodeHtmlEntities } from '../../utils/htmlEntities.js';
 import { findThinkingTriggerPositions, getRainbowColor, isUltrathinkEnabled } from '../../utils/thinking.js';
 import { MessageActionsSelectedContext } from '../messageActions.js';
 type Props = {
@@ -12,13 +13,14 @@ type Props = {
   useBriefLayout?: boolean;
   timestamp?: string;
 };
-export function HighlightedThinkingText(t0) {
+export function HighlightedThinkingText(t0: Props) {
   const $ = _c(31);
   const {
-    text,
+    text: rawText,
     useBriefLayout,
     timestamp
   } = t0;
+  const text = decodeHtmlEntities(rawText);
   const isQueued = useQueuedMessage()?.isQueued ?? false;
   const isSelected = useContext(MessageActionsSelectedContext);
   const pointerColor = isSelected ? "suggestion" : "subtle";
