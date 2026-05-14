@@ -283,7 +283,12 @@ export function ResumeConversation({
         success: false
       });
       logError(e as Error);
-      throw e;
+      // Show error in the picker instead of crashing the process with
+      // an unhandled promise rejection. The user sees the message and
+      // can dismiss with Escape.
+      setResuming(false);
+      setLogs([]);
+      return;
     }
   }
   if (crossProjectCommand) {

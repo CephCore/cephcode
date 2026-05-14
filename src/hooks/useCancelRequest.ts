@@ -136,27 +136,33 @@ export function CancelRequestHandler(props: CancelRequestHandlerProps): null {
   // When viewing a teammate's transcript, let useBackgroundTaskNavigation handle Escape
   const isViewingTeammate = viewSelectionMode === 'viewing-agent'
   // Context guards: other screens/overlays handle their own cancel
+  // NOTE: vim INSERT/VISUAL mode is NOT excluded here — it's only excluded
+  // from isEscapeActive below. Ctrl+C (app:interrupt) must work even in
+  // vim modes so users can interrupt a running turn while inserting text.
   const isContextActive =
     screen !== 'transcript' &&
     !isSearchingHistory &&
     !isMessageSelectorVisible &&
     !isLocalJSXCommand &&
     !isHelpOpen &&
-    !isOverlayActive &&
-    !(isVimModeEnabled() && vimMode === 'INSERT')
+    !isOverlayActive
 
   // Escape (chat:cancel) defers to mode-exit when in special mode with empty
-  // input, and to useBackgroundTaskNavigation when viewing a teammate
+  // input, and to useBackgroundTaskNavigation when viewing a teammate.
+  // In vim INSERT mode, Escape should exit to NORMAL mode, not cancel.
   const isEscapeActive =
     isContextActive &&
     (canCancelRunningTask || hasQueuedCommands) &&
     !isInSpecialModeWithEmptyInput &&
-    !isViewingTeammate
+    !isViewingTeammate &&
+    !(isVimModeEnabled() && (vimMode === 'INSERT' || vimMode === 'VISUAL'))
 
   // Ctrl+C (app:interrupt): when viewing a teammate, stops everything and
   // returns to main thread. Otherwise just handleCancel. Must NOT claim
   // ctrl+c when main is idle at the prompt — that blocks the copy-selection
   // handler and double-press-to-exit from ever seeing the keypress.
+  // Unlike Escape, Ctrl+C must work in vim INSERT/VISUAL modes so users
+  // can interrupt a running turn without first pressing Escape to NORMAL mode.
   const isCtrlCActive =
     isContextActive &&
     (canCancelRunningTask || hasQueuedCommands || isViewingTeammate)

@@ -30,12 +30,14 @@ type Props = {
   onExit: (result?: string, options?: {
     display?: CommandResultDisplay;
   }) => void;
+  cwd?: string;
 };
 export function AgentsMenu(t0) {
   const $ = _c(157);
   const {
     tools,
-    onExit
+    onExit,
+    cwd
   } = t0;
   let t1;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
@@ -217,13 +219,19 @@ export function AgentsMenu(t0) {
 
   switch (modeState.mode) {
     case "agent-view":
-      return <AgentViewDashboard onBack={() => setModeState({ mode: 'list-agents', source: 'all' })} onDispatch={(prompt) => {
+      return <AgentViewDashboard cwd={cwd} onBack={() => setModeState({ mode: 'list-agents', source: 'all' })} onDispatch={(prompt) => {
         const defaultAgent = agents?.[0] ?? GENERAL_PURPOSE_AGENT;
+        // Preserve the current session's permission mode when launching
+        // a background agent from agent view dispatch.
+        const currentPermissionMode = toolPermissionContext?.mode;
+        const agentWithMode = currentPermissionMode && defaultAgent.permissionMode !== currentPermissionMode
+          ? { ...defaultAgent, permissionMode: currentPermissionMode }
+          : defaultAgent;
         registerAsyncAgent({
           agentId: `agent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           description: prompt.slice(0, 80),
           prompt,
-          selectedAgent: defaultAgent,
+          selectedAgent: agentWithMode,
           setAppState,
         });
       }} />;

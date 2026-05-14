@@ -47,8 +47,8 @@ function ResumeError(t0) {
   let t2;
   if ($[0] !== onDone) {
     t1 = () => {
-      const timer = setTimeout(onDone, 0);
-      return () => clearTimeout(timer);
+      // No auto-dismiss — let the user see the error and dismiss manually
+      return () => {};
     };
     t2 = [onDone];
     $[0] = onDone;
@@ -194,7 +194,11 @@ export function filterResumableSessions(logs: LogOption[], currentSessionId: str
 export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   const onResume = async (sessionId: UUID, log: LogOption, entrypoint: ResumeEntrypoint) => {
     try {
-      await context.resume?.(sessionId, log, entrypoint);
+      if (!context.resume) {
+        onDone('Resume is not available in this context. Run /resume from the main chat session.');
+        return;
+      }
+      await context.resume(sessionId, log, entrypoint);
       onDone(undefined, {
         display: 'skip'
       });

@@ -729,14 +729,14 @@ function StatusLineInner({
 
     return (
       <Box flexDirection="column" gap={0} marginTop={0}>
-        <Box>
+        <Box overflowX="hidden">
           <Text>
             <Ansi>{line1}</Ansi>
           </Text>
         </Box>
 
         {activityLine && (
-          <Box>
+          <Box overflowX="hidden">
             <Text>
               <Ansi>{activityLine}</Ansi>
             </Text>
@@ -744,7 +744,7 @@ function StatusLineInner({
         )}
 
         {agentLines.map((line, index) => (
-          <Box key={`agent-line-${index}`}>
+          <Box key={`agent-line-${index}`} overflowX="hidden">
             <Text>
               <Ansi>{line}</Ansi>
             </Text>
@@ -752,7 +752,7 @@ function StatusLineInner({
         ))}
 
         {todoLine && (
-          <Box>
+          <Box overflowX="hidden">
             <Text>
               <Ansi>{todoLine}</Ansi>
             </Text>

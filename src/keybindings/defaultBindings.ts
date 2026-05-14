@@ -73,6 +73,8 @@ export const DEFAULT_BINDINGS: KeybindingBlock[] = [
       'meta+t': 'chat:thinkingToggle',
       'ctrl+shift+t': 'chat:thinkingToggle',
       enter: 'chat:submit',
+      'meta+enter': 'chat:submit',
+      'ctrl+enter': 'chat:submit',
       up: 'history:previous',
       down: 'history:next',
       // Editing shortcuts (defined here, migration in progress)

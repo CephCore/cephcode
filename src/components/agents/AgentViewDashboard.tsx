@@ -37,6 +37,7 @@ type GroupMode = 'state' | 'directory'
 type Props = {
   onBack: () => void
   onDispatch?: (prompt: string) => void
+  cwd?: string
 }
 
 const CATEGORY_ORDER: TaskCategory[] = ['needs-input', 'working', 'failed', 'stopped', 'completed']
@@ -51,7 +52,7 @@ const CATEGORY_LABELS: Record<TaskCategory, { label: string; color: string }> = 
 
 const FILTER_SYNTAX_HINT = 'a:<name> agent · s:<state> state · s:blocked waiting · #<N> PR lookup · @<agent> dispatch with agent'
 
-export function AgentViewDashboard({ onBack, onDispatch }: Props) {
+export function AgentViewDashboard({ onBack, onDispatch, cwd }: Props) {
   const tasks = useAppState((s: any) => s.tasks) as Record<string, TaskState>
   const toolUseConfirmQueue = useAppState((s: any) => s.toolUseConfirmQueue) as ToolUseConfirm[]
   const agentDefinitions = useAppState((s: any) => s.agentDefinitions) as { activeAgents: any[]; allAgents: any[] }
@@ -96,10 +97,19 @@ export function AgentViewDashboard({ onBack, onDispatch }: Props) {
 
   // Collect background tasks
   const backgroundTasks = React.useMemo(() => {
-    return (Object.values(tasks) as TaskState[]).filter(task =>
+    let result = (Object.values(tasks) as TaskState[]).filter(task =>
       isLocalAgentTask(task) && (task as any).isBackgrounded
     ) as LocalAgentTaskState[]
-  }, [tasks])
+    // When --cwd is specified, scope the session list to tasks in that directory
+    if (cwd) {
+      const cwdNormalized = cwd.replace(/\\/g, '/').toLowerCase()
+      result = result.filter(task => {
+        const taskCwd = ((task as any).cwd ?? (task as any).agentCwd ?? '') as string
+        return taskCwd.replace(/\\/g, '/').toLowerCase().startsWith(cwdNormalized)
+      })
+    }
+    return result
+  }, [tasks, cwd])
 
   // Parse advanced filter from filterText
   const parsedFilter = React.useMemo(() => parseDispatchSyntax(filterText), [filterText])

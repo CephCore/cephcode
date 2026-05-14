@@ -37,12 +37,16 @@ export default function ErrorOverview({
     try {
       // eslint-disable-next-line custom-rules/no-sync-fs -- sync render path; error overlay can't go async without suspense restructuring
       const sourceCode = readFileSync(filePath, 'utf8');
-      excerpt = codeExcerpt(sourceCode, origin.line);
-      if (excerpt) {
-        for (const {
-          line
-        } of excerpt) {
-          lineWidth = Math.max(lineWidth, String(line).length);
+      // Skip source excerpt for bundled/minified files (single long line = bundle)
+      const isBundled = !sourceCode.includes('\n') || sourceCode.length > 50000;
+      if (!isBundled) {
+        excerpt = codeExcerpt(sourceCode, origin.line);
+        if (excerpt) {
+          for (const {
+            line
+          } of excerpt) {
+            lineWidth = Math.max(lineWidth, String(line).length);
+          }
         }
       }
     } catch {

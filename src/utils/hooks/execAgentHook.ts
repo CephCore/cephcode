@@ -19,6 +19,7 @@ import { createUserMessage, handleMessageFromStream } from '../messages.js'
 import { getSmallFastModel } from '../model/model.js'
 import { hasPermissionsToUseTool } from '../permissions/permissions.js'
 import { getAgentTranscriptPath, getTranscriptPath } from '../sessionStorage.js'
+import { getCwd } from '../cwd.js'
 import type { AgentHook } from '../settings/types.js'
 import { jsonStringify } from '../slowOperations.js'
 import { asSystemPrompt } from '../systemPromptType.js'
@@ -50,10 +51,15 @@ export async function execAgentHook(
 ): Promise<HookResult> {
   const effectiveToolUseID = toolUseID || `hook-${randomUUID()}`
 
-  // Get transcript path from context
+  // Get transcript path from context, resolving through getCwd() so worktree
+  // switches (EnterWorktreeTool) produce a valid path. The helper functions
+  // use getOriginalCwd() which is intentionally stable and NOT updated by
+  // mid-session worktree changes — but hooks that run after a worktree switch
+  // need the live path.
+  const liveCwd = getCwd()
   const transcriptPath = toolUseContext.agentId
-    ? getAgentTranscriptPath(toolUseContext.agentId)
-    : getTranscriptPath()
+    ? getAgentTranscriptPath(toolUseContext.agentId, liveCwd)
+    : getTranscriptPath(liveCwd)
   const hookStartTime = Date.now()
   try {
     // Replace $ARGUMENTS with the JSON input

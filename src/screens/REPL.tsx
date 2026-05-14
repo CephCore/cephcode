@@ -1698,6 +1698,11 @@ export function REPL({
   // Check if any permission or ask question prompt is currently visible
   // This is used to prevent the survey from opening while prompts are active
   const hasActivePrompt = toolUseConfirmQueue.length > 0 || promptQueue.length > 0 || sandboxPermissionRequestQueue.length > 0 || elicitation.queue.length > 0 || workerSandboxPermissions.queue.length > 0;
+  // Ref tracked alongside hasActivePrompt so onSubmit can check it without
+  // adding hasActivePrompt to useCallback deps (which would destabilize the
+  // callback and cause unnecessary re-renders of PromptInput).
+  const hasActivePromptRef = useRef(hasActivePrompt);
+  hasActivePromptRef.current = hasActivePrompt;
   const feedbackSurveyOriginal = useFeedbackSurvey(messages, isLoading, submitCount, 'session', hasActivePrompt);
   const skillImprovementSurvey = useSkillImprovementSurvey(setMessages);
   const showIssueFlagBanner = useIssueFlagBanner(messages, submitCount);
@@ -2531,6 +2536,12 @@ export function REPL({
 
   // Session backgrounding (Ctrl+B to background/foreground)
   const handleBackgroundQuery = useCallback(() => {
+    // G66: Don't create empty placeholder sessions. If there are no
+    // messages and no input text, skip backgrounding entirely — the
+    // agent view will open with onboarding text instead.
+    if (messagesRef.current.length === 0 && !inputValueRef.current?.trim()) {
+      return;
+    }
     // Stop the foreground query so the background one takes over
     abortController?.abort('background');
     // Aborting subagents may produce task-completed notifications.
@@ -2667,6 +2678,7 @@ export function REPL({
     }, onStreamingText);
   }, [setMessages, setResponseLength, setStreamMode, setStreamingToolUses, setStreamingThinking, onStreamingText]);
   const onQueryImpl = useCallback(async (messagesIncludingNewMessages: MessageType[], newMessages: MessageType[], abortController: AbortController, shouldQuery: boolean, additionalAllowedTools: string[], mainLoopModelParam: string, effort?: EffortValue) => {
+    try {
     // Prepare IDE integration for new prompt. Read mcpClients fresh from
     // store — useManageMCPConnections may have populated it since the
     // render that captured this closure (same pattern as computeTools).
@@ -2690,7 +2702,7 @@ export function REPL({
     // processTextPrompt) — both pushed length past 1 on turn one, so the
     // title silently fell through to the "Claude Code" default.
     if (!titleDisabled && !sessionTitle && !agentTitle && !haikuTitleAttemptedRef.current) {
-      const firstUserMessage = newMessages.find(m => m.type === 'user' && !m.isMeta);
+      const firstUserMessage = newMessages.find(m => m.type === 'user' && !m.isMeta && (!('origin' in m) || !m.origin || m.origin.kind === 'human'));
       const text = firstUserMessage?.type === 'user' ? getContentText(firstUserMessage.message.content) : null;
       // Skip synthetic breadcrumbs — slash-command output, prompt-skill
       // expansions (/commit → <command-message>), local-command headers
@@ -2857,6 +2869,13 @@ export function REPL({
 
     // Signal that a query turn has completed successfully
     await onTurnComplete?.(messagesRef.current);
+    } catch (error) {
+      // Catch all errors during query execution to prevent unhandled rejections
+      // from crashing the session. The onQuery finally block handles cleanup.
+      // Common failure modes: stream watchdog timeout, provider connection lost,
+      // network blip during response processing, or cleanup throwing synchronously.
+      logError(error);
+    }
   }, [initialMcpClients, resetLoadingState, getToolUseContext, toolPermissionContext, setAppState, customSystemPrompt, onTurnComplete, appendSystemPrompt, canUseTool, mainThreadAgentDefinition, onQueryEvent, sessionTitle, titleDisabled]);
   const onQuery = useCallback(async (newMessages: MessageType[], abortController: AbortController, shouldQuery: boolean, additionalAllowedTools: string[], mainLoopModelParam: string, onBeforeQueryCallback?: (input: string, newMessages: MessageType[]) => Promise<boolean>, input?: string, effort?: EffortValue): Promise<void> => {
     // If this is a teammate, mark them as active when starting a turn
@@ -3019,9 +3038,13 @@ export function REPL({
         if (lastUserMsg) {
           const idx = msgs.lastIndexOf(lastUserMsg);
           if (messagesAfterAreOnlySynthetic(msgs, idx)) {
-            // The submit is being undone — undo its history entry too,
-            // otherwise Up-arrow shows the restored text twice.
-            removeLastFromHistory();
+            // Keep the history entry so Up-arrow can still navigate to it.
+            // Previously this called removeLastFromHistory to "undo" the
+            // history entry, but that caused:
+            //   - Cancelled prompts to be silently dropped from Up-arrow
+            //     history (no way to retrieve them).
+            //   - Duplicate entries when the restored text was re-submitted
+            //     and re-added to history.
             restoreMessageSyncRef.current(lastUserMsg);
           }
         }
@@ -3152,6 +3175,10 @@ export function REPL({
   }, options?: {
     fromKeybinding?: boolean;
   }) => {
+    // Guard: if a permission/dialog prompt is open, Enter is meant for the
+    // prompt button, not for submitting input text. Suppress submission.
+    if (hasActivePromptRef.current) return;
+
     // Re-pin scroll to bottom on submit so the user always sees the new
     // exchange (matches OpenCode's auto-scroll behavior).
     repinScroll();

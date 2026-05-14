@@ -2,10 +2,12 @@
 import type { Theme } from './theme.js'
 import { feature } from 'bun:bundle'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
+import { resolveAntModel } from './model/antModels.js'
 import { getCanonicalName } from './model/model.js'
 import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
 import { getAPIProvider, isAnthropicProvider } from './model/providers.js'
 import { getSettingsWithErrors } from './settings/settings.js'
+import { getProviderRegistryEntry, PROVIDER_IDS } from '../services/ai/providerRegistry.js'
 
 export type ThinkingConfig =
   | { type: 'adaptive' }
@@ -135,17 +137,29 @@ export function modelSupportsThinking(model: string): boolean {
 
   // Non-Anthropic providers: check provider capabilities from registry
   if (!isAnthropicProvider()) {
-    // Most modern models from major providers support reasoning/thinking.
-    // Models known to support it: GPT-5+, Gemini 2.5+, DeepSeek V4+, etc.
-    // For providers without explicit thinking support, return false.
     const modelLower = model.toLowerCase()
-    // OpenAI GPT models with reasoning
+
+    // Check all providers in registry for matching model with reasoningEffort
+    for (const providerId of PROVIDER_IDS) {
+      try {
+        const entry = getProviderRegistryEntry(providerId as any)
+        if (!entry?.capabilities?.reasoningEffort) continue
+
+        const modelInfo = entry.models?.find(m =>
+          m.id.toLowerCase() === modelLower ||
+          m.id.toLowerCase().includes(modelLower) ||
+          modelLower.includes(m.id.toLowerCase())
+        )
+        if (modelInfo?.capabilities?.reasoning) return true
+      } catch {
+        // Provider not available, skip
+      }
+    }
+
+    // Fallback: check known patterns for providers not in registry
     if (modelLower.includes('gpt-5') || modelLower.includes('o1') || modelLower.includes('o3') || modelLower.includes('o4')) return true
-    // Google Gemini models
     if (modelLower.includes('gemini-2.5') || modelLower.includes('gemini-3')) return true
-    // DeepSeek V4+
     if (modelLower.includes('deepseek-v4')) return true
-    // OpenRouter: delegate to underlying model check by name
     if (modelLower.includes('claude-opus-4') || modelLower.includes('claude-sonnet-4')) return true
     return false
   }

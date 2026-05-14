@@ -330,12 +330,18 @@ async function installVersionFromPackage(
   installPath: string,
 ) {
   try {
-    // Extract binary from npm package structure in staging
+    // Extract binary from npm package structure in staging.
+    // Prefer the exact platform match (e.g. claude-cli-native-linux-x64-musl)
+    // over a partial match, so that when both glibc and musl platform
+    // packages are installed, the one matching the current runtime wins.
     const nodeModulesDir = join(stagingPath, 'node_modules', '@anthropic-ai')
     const entries = await readdir(nodeModulesDir)
-    const nativePackage = entries.find((entry: string) =>
-      entry.startsWith('claude-cli-native-'),
-    )
+    const platform = getPlatform()
+    const nativePackage =
+      entries.find((entry: string) => entry === `claude-cli-native-${platform}`) ??
+      entries.find((entry: string) =>
+        entry.startsWith('claude-cli-native-'),
+      )
 
     if (!nativePackage) {
       logEvent('tengu_native_install_package_failure', {

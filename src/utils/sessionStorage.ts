@@ -200,12 +200,12 @@ export function getProjectsDir(): string {
   return join(getClaudeConfigHomeDir(), 'projects')
 }
 
-export function getTranscriptPath(): string {
-  const projectDir = getSessionProjectDir() ?? getProjectDir(getOriginalCwd())
+export function getTranscriptPath(cwd?: string): string {
+  const projectDir = getSessionProjectDir() ?? getProjectDir(cwd ?? getOriginalCwd())
   return join(projectDir, `${getSessionId()}.jsonl`)
 }
 
-export function getTranscriptPathForSession(sessionId: string): string {
+export function getTranscriptPathForSession(sessionId: string, cwd?: string): string {
   // When asking for the CURRENT session's transcript, honor sessionProjectDir
   // the same way getTranscriptPath() does. Without this, hooks get a
   // transcript_path computed from originalCwd while the actual file was
@@ -219,9 +219,9 @@ export function getTranscriptPathForSession(sessionId: string): string {
   // session's path should pass fullPath explicitly (most save* functions
   // already accept this).
   if (sessionId === getSessionId()) {
-    return getTranscriptPath()
+    return getTranscriptPath(cwd)
   }
-  const projectDir = getProjectDir(getOriginalCwd())
+  const projectDir = getProjectDir(cwd ?? getOriginalCwd())
   return join(projectDir, `${sessionId}.jsonl`)
 }
 
@@ -245,11 +245,11 @@ export function clearAgentTranscriptSubdir(agentId: string): void {
   agentTranscriptSubdirs.delete(agentId)
 }
 
-export function getAgentTranscriptPath(agentId: AgentId): string {
+export function getAgentTranscriptPath(agentId: AgentId, cwd?: string): string {
   // Same sessionProjectDir consistency as getTranscriptPathForSession —
   // subagent transcripts live under the session dir, so if the session
   // transcript is at sessionProjectDir, subagent transcripts are too.
-  const projectDir = getSessionProjectDir() ?? getProjectDir(getOriginalCwd())
+  const projectDir = getSessionProjectDir() ?? getProjectDir(cwd ?? getOriginalCwd())
   const sessionId = getSessionId()
   const subdir = agentTranscriptSubdirs.get(agentId)
   const base = subdir

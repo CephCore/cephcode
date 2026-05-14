@@ -209,6 +209,7 @@ export function isComputerUseCapable(provider: ProviderId): boolean {
     'openai',
     'openrouter',
     'opencode',
+    'opencode-go',
     'cline',
     'xai',
     'mistral',

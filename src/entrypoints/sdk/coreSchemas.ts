@@ -905,10 +905,30 @@ export const FileChangedHookSpecificOutputSchema = lazySchema(() =>
   }),
 )
 
+export const TerminalSequenceSchema = lazySchema(() =>
+  z
+    .object({
+      notification: z
+        .string()
+        .optional()
+        .describe('Desktop notification text'),
+      title: z.string().optional().describe('Window title'),
+      bell: z
+        .boolean()
+        .optional()
+        .describe('Terminal bell (stored, not rung directly)'),
+    })
+    .describe(
+      'Terminal capabilities that hooks can emit without a controlling terminal. ' +
+        'Returned as structured data from hook JSON output for the client to render.',
+    ),
+)
+
 export const SyncHookJSONOutputSchema = lazySchema(() =>
   z.object({
     continue: z.boolean().optional(),
     suppressOutput: z.boolean().optional(),
+    terminalSequence: TerminalSequenceSchema().optional(),
     stopReason: z.string().optional(),
     decision: z.enum(['approve', 'block']).optional(),
     systemMessage: z.string().optional(),

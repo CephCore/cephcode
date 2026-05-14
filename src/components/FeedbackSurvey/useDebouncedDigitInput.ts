@@ -55,18 +55,19 @@ export function useDebouncedDigitInput<T extends string = string>({
       const lastChar = normalizeFullWidthDigits(inputValue.slice(-1))
       if (callbacksRef.current.isValidDigit(lastChar)) {
         const trimmed = inputValue.slice(0, -1)
+        // Immediately strip the digit from the input buffer so that pressing
+        // Enter before the debounce fires doesn't submit the digit as a chat
+        // message (the digit was meant as a survey response, not chat content).
+        callbacksRef.current.setInputValue(trimmed)
         debounceRef.current = setTimeout(
-          (debounceRef, hasTriggeredRef, callbacksRef, trimmed, lastChar) => {
+          (hasTriggeredRef, callbacksRef, lastChar) => {
             debounceRef.current = null
             hasTriggeredRef.current = true
-            callbacksRef.current.setInputValue(trimmed)
             callbacksRef.current.onDigit(lastChar)
           },
           debounceMs,
-          debounceRef,
           hasTriggeredRef,
           callbacksRef,
-          trimmed,
           lastChar,
         )
       }

@@ -12,8 +12,9 @@ function getSearchSummary(results: (SearchResult | string | null | undefined)[])
   let searchCount = 0;
   let totalResultCount = 0;
   for (const result of results) {
-    if (result != null && typeof result !== 'string') {
-      searchCount++;
+    if (result == null) continue; // skip nulls/undefined but COUNT non-null strings (errors)
+    searchCount++;
+    if (typeof result !== 'string') {
       totalResultCount += result.content?.length ?? 0;
     }
   }

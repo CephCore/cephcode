@@ -285,8 +285,10 @@ function ChordInterceptor(t0) {
           }
         case "unbound":
           {
+            // Don't stop propagation — the key should pass through for
+            // normal input (e.g., unbinding space from voice:pushToTalk
+            // should still let space be typed).
             setPendingChord(null);
-            event.stopImmediatePropagation();
             break bb23;
           }
         case "none":

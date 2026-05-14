@@ -572,6 +572,11 @@ function processHookJSONOutput({
     result.systemMessage = json.systemMessage
   }
 
+  // Handle terminalSequence field
+  if (json.terminalSequence) {
+    result.terminalSequence = json.terminalSequence
+  }
+
   // Handle PreToolUse specific
   if (
     json.hookSpecificOutput?.hookEventName === 'PreToolUse' &&

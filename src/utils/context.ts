@@ -3,6 +3,7 @@ import { CONTEXT_1M_BETA_HEADER } from '../constants/betas.js'
 import { getProviderRegistryEntry } from '../services/ai/providerRegistry.js'
 import { getGlobalConfig } from './config.js'
 import { isEnvTruthy } from './envUtils.js'
+import { resolveAntModel } from './model/antModels.js'
 import { getCanonicalName } from './model/model.js'
 import { getModelCapability } from './model/modelCapabilities.js'
 
@@ -242,6 +243,7 @@ function getContextWindowFromRegistry(model: string): number | null {
     'openai': 'openai',
     'deepseek': 'deepseek',
     'opencode': 'opencode',
+    'opencode-go': 'opencode-go',
     'google': 'google',
     'anthropic': 'anthropic',
     'kilocode': 'kilocode',
@@ -277,7 +279,7 @@ function getContextWindowFromRegistry(model: string): number | null {
   }
 
   // Also check all providers for exact match (for models like "deepseek-v4-pro")
-  const allProviders = ['openrouter', 'openai', 'deepseek', 'opencode', 'google', 'anthropic', 'kilocode', 'ollama', 'cline', 'groq', 'xai', 'mistral']
+  const allProviders = ['openrouter', 'openai', 'deepseek', 'opencode', 'opencode-go', 'google', 'anthropic', 'kilocode', 'ollama', 'cline', 'groq', 'xai', 'mistral']
   for (const providerId of allProviders) {
     try {
       const entry = getProviderRegistryEntry(providerId as any)

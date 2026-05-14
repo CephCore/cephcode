@@ -10,9 +10,35 @@ import { Text } from '../../../ink.js';
 import { BashTool } from '../../../tools/BashTool/BashTool.js';
 import { applySedSubstitution, type SedEditInfo } from '../../../tools/BashTool/sedEditParser.js';
 import { FilePermissionDialog } from '../FilePermissionDialog/FilePermissionDialog.js';
+import { createSingleEditDiffConfig, type IDEDiffSupport, type IDEDiffConfig } from '../FilePermissionDialog/ideDiffConfig.js';
 import type { PermissionRequestProps } from '../PermissionRequest.js';
+import type { ToolInput } from '../FilePermissionDialog/useFilePermissionDialog.js';
 type SedEditPermissionRequestProps = PermissionRequestProps & {
   sedInfo: SedEditInfo;
+};
+
+// IDE diff support for sed edits. Computes edits from oldContent→newContent
+// and lets the user review/modify the diff in their IDE.
+const sedIdeDiffSupport: IDEDiffSupport<any> = {
+  getConfig: (input: any) => {
+    const sim: { filePath: string; newContent: string } | undefined = input?._simulatedSedEdit;
+    if (!sim) {
+      return { filePath: '', edits: [], editMode: 'single' };
+    }
+    return createSingleEditDiffConfig(sim.filePath, '(double-click to load)', sim.newContent);
+  },
+  applyChanges: (input: any, modifiedEdits) => {
+    if (modifiedEdits.length > 0) {
+      return {
+        ...input,
+        _simulatedSedEdit: {
+          filePath: input._simulatedSedEdit?.filePath ?? '',
+          newContent: modifiedEdits[0]?.new_string ?? input._simulatedSedEdit?.newContent ?? '',
+        },
+      };
+    }
+    return input;
+  },
 };
 type FileReadResult = {
   oldContent: string;
@@ -210,7 +236,7 @@ function SedEditPermissionRequestInner(t0) {
   }
   let t13;
   if ($[24] !== filePath || $[25] !== parseInput || $[26] !== props.onDone || $[27] !== props.onReject || $[28] !== props.toolUseConfirm || $[29] !== props.toolUseContext || $[30] !== props.workerBadge || $[31] !== t11 || $[32] !== t12 || $[33] !== t9) {
-    t13 = <FilePermissionDialog toolUseConfirm={t5} toolUseContext={t6} onDone={t7} onReject={t8} title="Edit file" subtitle={t9} question={t11} content={t12} path={filePath} completionType="str_replace_single" parseInput={parseInput} workerBadge={props.workerBadge} />;
+    t13 = <FilePermissionDialog toolUseConfirm={t5} toolUseContext={t6} onDone={t7} onReject={t8} title="Edit file" subtitle={t9} question={t11} content={t12} path={filePath} completionType="str_replace_single" parseInput={parseInput} workerBadge={props.workerBadge} ideDiffSupport={sedIdeDiffSupport} />;
     $[24] = filePath;
     $[25] = parseInput;
     $[26] = props.onDone;

@@ -219,7 +219,14 @@ function forceExit(exitCode: number): never {
       throw e
     }
     // Fall back to SIGKILL which doesn't try to flush anything.
-    process.kill(process.pid, 'SIGKILL')
+    try {
+      process.kill(process.pid, 'SIGKILL')
+    } catch {
+      // On Windows, SIGKILL may not be supported even with Bun's signal
+      // emulation. Fall back to process.abort() — it kills immediately
+      // without flushing streams or running handlers.
+      process.abort()
+    }
   }
   // In tests, process.exit may be mocked to return instead of exiting.
   // In production, we should never reach here.

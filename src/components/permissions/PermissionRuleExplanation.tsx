@@ -86,7 +86,7 @@ export function PermissionRuleExplanation(t0) {
   if (!strings) {
     return null;
   }
-  const themeColor = strings.themeColor ?? (permissionResult?.decisionReason?.type === "hook" && permissionMode === "auto" ? "warning" : undefined);
+  const themeColor = strings.themeColor ?? (permissionResult?.decisionReason?.type === "hook" && permissionMode === "auto" ? "warning" : permissionResult?.decisionReason?.type === "rule" && permissionMode === "auto" ? "warning" : undefined);
   let t3;
   if ($[3] !== strings.reasonString || $[4] !== themeColor) {
     t3 = themeColor ? <ThemedText color={themeColor}>{strings.reasonString}</ThemedText> : <Text><Ansi>{strings.reasonString}</Ansi></Text>;

@@ -57,6 +57,23 @@ export const syncHookResponseSchema = lazySchema(() =>
       .boolean()
       .describe('Hide stdout from transcript (default: false)')
       .optional(),
+    terminalSequence: z
+      .object({
+        notification: z
+          .string()
+          .optional()
+          .describe('Desktop notification text'),
+        title: z.string().optional().describe('Window title'),
+        bell: z
+          .boolean()
+          .optional()
+          .describe('Terminal bell (stored, not rung directly)'),
+      })
+      .describe(
+        'Terminal capabilities that hooks can emit without a controlling terminal. ' +
+          'Returned as structured data from hook JSON output for the client to render.',
+      )
+      .optional(),
     stopReason: z
       .string()
       .describe('Message shown when continue is false')
@@ -275,6 +292,11 @@ export type HookResult = {
   permissionRequestResult?: PermissionRequestResult
   retry?: boolean
   deferredMarker?: string
+  terminalSequence?: {
+    notification?: string
+    title?: string
+    bell?: boolean
+  }
 }
 
 export type AggregatedHookResult = {

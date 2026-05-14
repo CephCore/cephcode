@@ -20,9 +20,11 @@ const MIN_COLUMN_WIDTH = 3;
 /**
  * Maximum number of lines per row before switching to vertical format.
  * When wrapping would make rows taller than this, vertical (key-value)
- * format provides better readability.
+ * format provides better readability. Increased from 4 to 10 to reduce
+ * false positives — moderate cell wrapping (e.g. description columns
+ * with multi-sentence text) should stay in bordered-grid form.
  */
-const MAX_ROW_LINES = 4;
+const MAX_ROW_LINES = 10;
 
 /** ANSI escape codes for text formatting */
 const ANSI_BOLD_START = '\x1b[1m';

@@ -108,6 +108,19 @@ let firstPartyEventLoggerProvider: LoggerProvider | null = null
 // reinitialize1PEventLoggingIfConfigChanged to decide whether a rebuild is
 // needed when GrowthBook refreshes.
 let lastBatchConfig: BatchConfig | null = null
+
+/**
+ * Pre-init event queue: events fired before initialize1PEventLogging()
+ * completes are buffered here and drained once the logger is ready.
+ * This prevents the first ~tens of ms of startup events from being silently
+ * dropped when the analytics sink attaches before the 1P logger initializes
+ * (the sink is attached synchronously; initialize1PEventLogging is deferred
+ * behind dynamic imports in init.ts).
+ */
+const preInitQueue: Array<{
+  eventName: string
+  metadata: Record<string, number | boolean | undefined>
+}> = []
 /**
  * Flush and shutdown the 1P event logger.
  * This should be called as the final step before process exit to ensure
@@ -221,7 +234,14 @@ export function logEventTo1P(
     return
   }
 
-  if (!firstPartyEventLogger || isSinkKilled('firstParty')) {
+  if (isSinkKilled('firstParty')) {
+    return
+  }
+
+  // Queue event if logger hasn't initialized yet — prevents early startup
+  // events from being silently dropped between sink attachment and logger init.
+  if (!firstPartyEventLogger) {
+    preInitQueue.push({ eventName, metadata })
     return
   }
 
@@ -386,6 +406,15 @@ export function initialize1PEventLogging(): void {
     'com.anthropic.claude_code.events',
     MACRO.VERSION,
   )
+
+  // Drain any events queued before the logger was initialized.
+  // These are events fired between sink attachment and logger init (the
+  // startup gap where firstPartyEventLogger was null and logEventTo1P
+  // buffered them instead of dropping).
+  const queued = preInitQueue.splice(0)
+  for (const { eventName, metadata } of queued) {
+    void logEventTo1PAsync(firstPartyEventLogger, eventName, metadata)
+  }
 }
 
 /**

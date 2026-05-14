@@ -35,8 +35,19 @@ const THINKING_INACTIVE_SHIMMER = {
   g: 185,
   b: 185
 };
+const THINKING_AMBER = {
+  r: 255,
+  g: 191,
+  b: 0
+};
+const THINKING_AMBER_SHIMMER = {
+  r: 255,
+  g: 160,
+  b: 0
+};
 const THINKING_DELAY_MS = 1000; // Reduced from 3000ms to show thinking hints sooner
 const THINKING_GLOW_PERIOD_S = 2;
+const THINKING_AMBER_AFTER_MS = 10_000; // Switch to amber after 10s of continuous thinking
 export type SpinnerAnimationRowProps = {
   // Animation inputs
   mode: SpinnerMode;
@@ -207,7 +218,12 @@ export function SpinnerAnimationRow({
   // second useAnimationFrame(50) subscription.
   const thinkingElapsedSec = (time - THINKING_DELAY_MS) / 1000;
   const thinkingOpacity = time < THINKING_DELAY_MS ? 0 : (Math.sin(thinkingElapsedSec * Math.PI * 2 / THINKING_GLOW_PERIOD_S) + 1) / 2;
-  const thinkingShimmerColor = toRGBColor(interpolateColor(THINKING_INACTIVE, THINKING_INACTIVE_SHIMMER, thinkingOpacity));
+  // After 10 seconds of continuous thinking, switch to amber to signal that
+  // the model has been thinking for an extended period.
+  const showAmber = time >= THINKING_DELAY_MS + THINKING_AMBER_AFTER_MS;
+  const thinkingBaseColor = showAmber ? THINKING_AMBER : THINKING_INACTIVE;
+  const thinkingShimmerColor = showAmber ? THINKING_AMBER_SHIMMER : THINKING_INACTIVE_SHIMMER;
+  const thinkingFinalColor = toRGBColor(interpolateColor(thinkingBaseColor, thinkingShimmerColor, thinkingOpacity));
 
   // === Build status parts ===
   const parts = [...(spinnerSuffix ? [<Text dimColor key="suffix">
@@ -217,7 +233,7 @@ export function SpinnerAnimationRow({
           </Text>] : []), ...(showTokens ? [<Box flexDirection="row" key="tokens">
             {!hasRunningTeammates && <SpinnerModeGlyph mode={mode} />}
             <Text dimColor>{tokenCount} tokens</Text>
-          </Box>] : []), ...(showThinking && thinkingText ? [thinkingStatus === 'thinking' && !reducedMotion ? <Text key="thinking" color={thinkingShimmerColor}>
+          </Box>] : []), ...(showThinking && thinkingText ? [thinkingStatus === 'thinking' && !reducedMotion ? <Text key="thinking" color={thinkingFinalColor}>
               {thinkingOnly ? `(${thinkingText})` : thinkingText}
             </Text> : <Text dimColor key="thinking">
               {thinkingText}

@@ -512,7 +512,7 @@ export async function initializeTelemetry() {
   // Check if beta tracing is enabled - this is a separate code path
   // Available to all users who set ENABLE_BETA_TRACING_DETAILED=1 and BETA_TRACING_ENDPOINT
   if (isBetaTracingEnabled()) {
-    void initializeBetaTracing(resource).catch(e =>
+    await initializeBetaTracing(resource).catch(e =>
       logForDebugging(`Beta tracing init failed: ${e}`, { level: 'error' }),
     )
     // Still set up meter provider for metrics (but skip regular logs/traces setup)

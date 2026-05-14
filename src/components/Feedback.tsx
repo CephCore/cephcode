@@ -112,6 +112,41 @@ export function redactSensitiveInfo(text: string): string {
   return redacted;
 }
 
+/**
+ * JSON-aware variant of redactSensitiveInfo.
+ * Parses a JSON string, recursively redacts all string values, and re-stringifies.
+ * Falls back to plain redactSensitiveInfo if the input is not valid JSON.
+ * This prevents regex-based redaction from breaking JSON structure (e.g., when
+ * quoted values like session IDs get replaced with unquoted [REDACTED] tokens).
+ */
+export function redactSensitiveJSON(jsonText: string): string {
+  try {
+    const parsed = JSON.parse(jsonText)
+    const redacted = redactJSONValues(parsed)
+    return JSON.stringify(redacted)
+  } catch {
+    // Not valid JSON — fall back to regex-based redaction
+    return redactSensitiveInfo(jsonText)
+  }
+}
+
+function redactJSONValues(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return redactSensitiveInfo(value)
+  }
+  if (Array.isArray(value)) {
+    return value.map(redactJSONValues)
+  }
+  if (value !== null && typeof value === 'object') {
+    const result: Record<string, unknown> = {}
+    for (const [key, val] of Object.entries(value)) {
+      result[key] = redactJSONValues(val)
+    }
+    return result
+  }
+  return value
+}
+
 // Get sanitized error logs with sensitive information redacted
 function getSanitizedErrorLogs(): Array<{
   error?: string;
@@ -541,7 +576,7 @@ async function submitFeedback(data: FeedbackData, signal?: AbortSignal): Promise
       ...authResult.headers
     };
     const response = await axios.post('https://api.anthropic.com/api/claude_cli_feedback', {
-      content: jsonStringify(data)
+      content: redactSensitiveJSON(jsonStringify(data))
     }, {
       headers,
       timeout: 30000,

@@ -81,9 +81,11 @@ export function useKeybinding(
           keybindingContext.setPendingChord(null)
           break
         case 'unbound':
-          // Explicitly unbound - clear any pending chord
+          // Explicitly unbound - clear any pending chord but DON'T stop
+          // propagation. The key should pass through for normal input
+          // (e.g., unbinding space from voice:pushToTalk should still
+          // let space be typed).
           keybindingContext.setPendingChord(null)
-          event.stopImmediatePropagation()
           break
         case 'none':
           // No match - let other handlers try
@@ -180,9 +182,9 @@ export function useKeybindings(
           keybindingContext.setPendingChord(null)
           break
         case 'unbound':
-          // Explicitly unbound - clear any pending chord
+          // Explicitly unbound - clear any pending chord but DON'T stop
+          // propagation. The key should pass through for normal input.
           keybindingContext.setPendingChord(null)
-          event.stopImmediatePropagation()
           break
         case 'none':
           // No match - let other handlers try

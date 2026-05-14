@@ -293,7 +293,10 @@ function buildTheme(themeName: string, mode: ColorMode): Theme {
       deleteLine: DEFAULT_BG,
       deleteWord: DEFAULT_BG,
       deleteDecoration: ansiIdx(9),
-      foreground: ansiIdx(7),
+      // light-ansi renders on a light terminal background, so the foreground
+      // must be dark (ANSI 0 = black) to be visible. dark-ansi uses a dark
+      // background so white (ANSI 7) is correct.
+      foreground: isDark ? ansiIdx(7) : ansiIdx(0),
       background: DEFAULT_BG,
       scopes: ANSI_SCOPES,
     }

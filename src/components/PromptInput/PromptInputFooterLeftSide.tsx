@@ -313,11 +313,10 @@ function ModeIndicator({
   // Match the same logic as TeamStatus to avoid trailing separator
   // In-process mode uses Shift+Down/Up navigation, not footer teams menu
   const hasTeams = isAgentSwarmsEnabled() && !isInProcessEnabled() && teamContext !== undefined && count(Object.values(teamContext.teammates), t_0 => t_0.name !== 'team-lead') > 0;
-  if (mode === 'bash') {
-    return <Text color="bashBorder">! for bash mode</Text>;
-  }
+  // Move non-hook computations and ALL hooks before the early return
+  // to prevent "rendered too few hooks" (React error #300) when mode switches to 'bash'
   const currentMode = toolPermissionContext?.mode;
-  const hasActiveMode = true; // Always show for visual consistency
+  const hasActiveMode = true;
   const viewedTask = viewingAgentTaskId ? tasks[viewingAgentTaskId] : undefined;
   const isViewingTeammate = viewSelectionMode === 'viewing-agent' && viewedTask?.type === 'in_process_teammate';
   const isViewingCompletedTeammate = isViewingTeammate && viewedTask != null && viewedTask.status !== 'running';
@@ -343,6 +342,10 @@ function ModeIndicator({
     // briefly hydrates to a stale value from a prior session.
     setDisplayedMode(initialDisplayedModeRef.current);
   }, [currentMode]);
+
+  if (mode === 'bash') {
+    return <Text color="bashBorder">! for bash mode</Text>;
+  }
 
   // Count primary items (permission mode or coordinator mode, background tasks, and teams)
   const primaryItemCount = (isCoordinator || hasActiveMode ? 1 : 0) + (hasBackgroundTasks ? 1 : 0) + (hasTeams ? 1 : 0);
