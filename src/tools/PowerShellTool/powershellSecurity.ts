@@ -12,11 +12,8 @@ import {
   DANGEROUS_SCRIPT_BLOCK_CMDLETS,
   FILEPATH_EXECUTION_CMDLETS,
   MODULE_LOADING_CMDLETS,
-} from '../../utils/powershell/dangerousCmdlets.js'
-import type {
-  ParsedCommandElement,
-  ParsedPowerShellCommand,
-} from '../../utils/powershell/parser.js'
+} from '../../utils/powershell/dangerousCmdlets.js';
+import type { ParsedCommandElement, ParsedPowerShellCommand } from '../../utils/powershell/parser.js';
 import {
   COMMON_ALIASES,
   commandHasArgAbbreviation,
@@ -24,36 +21,31 @@ import {
   getAllCommands,
   getVariablesByScope,
   hasCommandNamed,
-} from '../../utils/powershell/parser.js'
-import { isClmAllowedType } from './clmTypes.js'
+} from '../../utils/powershell/parser.js';
+import { isClmAllowedType } from './clmTypes.js';
 
 type PowerShellSecurityResult = {
-  behavior: 'passthrough' | 'ask' | 'allow'
-  message?: string
-}
+  behavior: 'passthrough' | 'ask' | 'allow';
+  message?: string;
+};
 
-const POWERSHELL_EXECUTABLES = new Set([
-  'pwsh',
-  'pwsh.exe',
-  'powershell',
-  'powershell.exe',
-])
+const POWERSHELL_EXECUTABLES = new Set(['pwsh', 'pwsh.exe', 'powershell', 'powershell.exe']);
 
 /**
  * Extracts the base executable name from a command, handling full paths
  * like /usr/bin/pwsh, C:\Windows\...\powershell.exe, or .\pwsh.
  */
 function isPowerShellExecutable(name: string): boolean {
-  const lower = name.toLowerCase()
+  const lower = name.toLowerCase();
   if (POWERSHELL_EXECUTABLES.has(lower)) {
-    return true
+    return true;
   }
   // Extract basename from paths (both / and \ separators)
-  const lastSep = Math.max(lower.lastIndexOf('/'), lower.lastIndexOf('\\'))
+  const lastSep = Math.max(lower.lastIndexOf('/'), lower.lastIndexOf('\\'));
   if (lastSep >= 0) {
-    return POWERSHELL_EXECUTABLES.has(lower.slice(lastSep + 1))
+    return POWERSHELL_EXECUTABLES.has(lower.slice(lastSep + 1));
   }
-  return false
+  return false;
 }
 
 /**
@@ -69,7 +61,7 @@ const PS_ALT_PARAM_PREFIXES = new Set([
   '\u2013', // en-dash
   '\u2014', // em-dash
   '\u2015', // horizontal bar
-])
+]);
 
 /**
  * Wrapper around commandHasArgAbbreviation that also matches alternative
@@ -80,40 +72,31 @@ const PS_ALT_PARAM_PREFIXES = new Set([
  * checkDangerousFilePathExecution/checkForEachMemberName used bare
  * commandHasArgAbbreviation, so `Start-Process foo –Verb RunAs` bypassed.
  */
-function psExeHasParamAbbreviation(
-  cmd: ParsedCommandElement,
-  fullParam: string,
-  minPrefix: string,
-): boolean {
+function psExeHasParamAbbreviation(cmd: ParsedCommandElement, fullParam: string, minPrefix: string): boolean {
   if (commandHasArgAbbreviation(cmd, fullParam, minPrefix)) {
-    return true
+    return true;
   }
   // Normalize alternative prefixes to `-` and re-check. Build a synthetic cmd
   // with normalized args; commandHasArgAbbreviation handles colon-value split.
   const normalized: ParsedCommandElement = {
     ...cmd,
-    args: cmd.args.map(a =>
-      a.length > 0 && PS_ALT_PARAM_PREFIXES.has(a[0]!) ? '-' + a.slice(1) : a,
-    ),
-  }
-  return commandHasArgAbbreviation(normalized, fullParam, minPrefix)
+    args: cmd.args.map(a => (a.length > 0 && PS_ALT_PARAM_PREFIXES.has(a[0]!) ? '-' + a.slice(1) : a)),
+  };
+  return commandHasArgAbbreviation(normalized, fullParam, minPrefix);
 }
 
 /**
  * Checks if a PowerShell command uses Invoke-Expression or its alias (iex).
  * These are equivalent to eval and can execute arbitrary code.
  */
-function checkInvokeExpression(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkInvokeExpression(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   if (hasCommandNamed(parsed, 'Invoke-Expression')) {
     return {
       behavior: 'ask',
-      message:
-        'Command uses Invoke-Expression which can execute arbitrary code',
-    }
+      message: 'Command uses Invoke-Expression which can execute arbitrary code',
+    };
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -140,43 +123,38 @@ function checkInvokeExpression(
  * when elementTypes is absent (parse-detail unavailable — if parsing failed
  * entirely, valid=false already returns 'ask' earlier in the chain).
  */
-function checkDynamicCommandName(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkDynamicCommandName(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
     if (cmd.elementType !== 'CommandAst') {
-      continue
+      continue;
     }
-    const nameElementType = cmd.elementTypes?.[0]
+    const nameElementType = cmd.elementTypes?.[0];
     if (nameElementType !== undefined && nameElementType !== 'StringConstant') {
       return {
         behavior: 'ask',
-        message:
-          'Command name is a dynamic expression which cannot be statically validated',
-      }
+        message: 'Command name is a dynamic expression which cannot be statically validated',
+      };
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
  * Checks for encoded command parameters which obscure intent.
  * These are commonly used in malware to bypass security tools.
  */
-function checkEncodedCommand(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkEncodedCommand(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
     if (isPowerShellExecutable(cmd.name)) {
       if (psExeHasParamAbbreviation(cmd, '-encodedcommand', '-e')) {
         return {
           behavior: 'ask',
           message: 'Command uses encoded parameters which obscure intent',
-        }
+        };
       }
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -189,19 +167,16 @@ function checkEncodedCommand(
  * checkStartProcess vector 2: we cannot statically analyze what the child
  * process will run.
  */
-function checkPwshCommandOrFile(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkPwshCommandOrFile(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
     if (isPowerShellExecutable(cmd.name)) {
       return {
         behavior: 'ask',
-        message:
-          'Command spawns a nested PowerShell process which cannot be validated',
-      }
+        message: 'Command spawns a nested PowerShell process which cannot be validated',
+      };
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -220,47 +195,45 @@ const DOWNLOADER_NAMES = new Set([
   'irm',
   'new-object',
   'start-bitstransfer', // MITRE T1197
-])
+]);
 
 function isDownloader(name: string): boolean {
-  return DOWNLOADER_NAMES.has(name.toLowerCase())
+  return DOWNLOADER_NAMES.has(name.toLowerCase());
 }
 
 function isIex(name: string): boolean {
-  const lower = name.toLowerCase()
-  return lower === 'invoke-expression' || lower === 'iex'
+  const lower = name.toLowerCase();
+  return lower === 'invoke-expression' || lower === 'iex';
 }
 
-function checkDownloadCradles(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkDownloadCradles(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   // Per-statement: piped cradle (IWR ... | IEX)
   for (const statement of parsed.statements) {
-    const cmds = statement.commands
+    const cmds = statement.commands;
     if (cmds.length < 2) {
-      continue
+      continue;
     }
-    const hasDownloader = cmds.some(cmd => isDownloader(cmd.name))
-    const hasIex = cmds.some(cmd => isIex(cmd.name))
+    const hasDownloader = cmds.some(cmd => isDownloader(cmd.name));
+    const hasIex = cmds.some(cmd => isIex(cmd.name));
     if (hasDownloader && hasIex) {
       return {
         behavior: 'ask',
         message: 'Command downloads and executes remote code',
-      }
+      };
     }
   }
 
   // Cross-statement: split cradle ($r = IWR ...; IEX $r.Content).
   // No new false positives: if IEX is present, checkInvokeExpression already asks.
-  const all = getAllCommands(parsed)
+  const all = getAllCommands(parsed);
   if (all.some(c => isDownloader(c.name)) && all.some(c => isIex(c.name))) {
     return {
       behavior: 'ask',
       message: 'Command downloads and executes remote code',
-    }
+    };
   }
 
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -273,17 +246,15 @@ function checkDownloadCradles(
  * bare `certutil` has many legitimate cert-management uses.
  * bitsadmin /transfer: legacy BITS download (pre-PowerShell).
  */
-function checkDownloadUtilities(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkDownloadUtilities(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
-    const lower = cmd.name.toLowerCase()
+    const lower = cmd.name.toLowerCase();
     // Start-BitsTransfer is purpose-built for file transfer — no safe variant.
     if (lower === 'start-bitstransfer') {
       return {
         behavior: 'ask',
         message: 'Command downloads files via BITS transfer',
-      }
+      };
     }
     // certutil / certutil.exe — only when -urlcache is present. certutil has
     // many non-download uses (cert store queries, encoding, etc.).
@@ -291,14 +262,14 @@ function checkDownloadUtilities(
     // utility convention — check both forms (bitsadmin below does the same).
     if (lower === 'certutil' || lower === 'certutil.exe') {
       const hasUrlcache = cmd.args.some(a => {
-        const la = a.toLowerCase()
-        return la === '-urlcache' || la === '/urlcache'
-      })
+        const la = a.toLowerCase();
+        return la === '-urlcache' || la === '/urlcache';
+      });
       if (hasUrlcache) {
         return {
           behavior: 'ask',
           message: 'Command uses certutil to download from a URL',
-        }
+        };
       }
     }
     // bitsadmin /transfer — legacy BITS CLI, same threat as Start-BitsTransfer.
@@ -307,27 +278,25 @@ function checkDownloadUtilities(
         return {
           behavior: 'ask',
           message: 'Command downloads files via BITS transfer',
-        }
+        };
       }
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
  * Checks for Add-Type usage which compiles and loads .NET code at runtime.
  * This can be used to execute arbitrary compiled code.
  */
-function checkAddType(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkAddType(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   if (hasCommandNamed(parsed, 'Add-Type')) {
     return {
       behavior: 'ask',
       message: 'Command compiles and loads .NET code',
-    }
+    };
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -340,12 +309,10 @@ function checkAddType(
  * instantiation is an execution primitive. Method invocation on the result
  * (.Run(), .Exec()) is separately caught by checkMemberInvocations.
  */
-function checkComObject(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkComObject(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
     if (cmd.name.toLowerCase() !== 'new-object') {
-      continue
+      continue;
     }
     // -ComObject min abbrev is -com (New-Object params: -TypeName, -ComObject,
     // -ArgumentList, -Property, -Strict; -co is ambiguous in PS5.1 due to
@@ -353,37 +320,32 @@ function checkComObject(
     if (psExeHasParamAbbreviation(cmd, '-comobject', '-com')) {
       return {
         behavior: 'ask',
-        message:
-          'Command instantiates a COM object which may have execution capabilities',
-      }
+        message: 'Command instantiates a COM object which may have execution capabilities',
+      };
     }
     // SECURITY: checkTypeLiterals only sees [bracket] syntax from
     // parsed.typeLiterals. `New-Object System.Net.WebClient` passes the type
     // as a STRING ARG (StringConstantExpressionAst), not a TypeExpressionAst,
     // so CLM never fires. Extract -TypeName (named, colon-bound, or
     // positional-0) and run through isClmAllowedType. Closes attackVectors D4.
-    let typeName: string | undefined
+    let typeName: string | undefined;
     for (let i = 0; i < cmd.args.length; i++) {
-      const a = cmd.args[i]!
-      const lower = a.toLowerCase()
+      const a = cmd.args[i]!;
+      const lower = a.toLowerCase();
       // -TypeName abbrev: -t is unambiguous (no other New-Object -t* params).
       // Handle colon-bound form first: -TypeName:Foo.Bar
       if (lower.startsWith('-t') && lower.includes(':')) {
-        const colonIdx = a.indexOf(':')
-        const paramPart = lower.slice(0, colonIdx)
+        const colonIdx = a.indexOf(':');
+        const paramPart = lower.slice(0, colonIdx);
         if ('-typename'.startsWith(paramPart)) {
-          typeName = a.slice(colonIdx + 1)
-          break
+          typeName = a.slice(colonIdx + 1);
+          break;
         }
       }
       // Space-separated form: -TypeName Foo.Bar
-      if (
-        lower.startsWith('-t') &&
-        '-typename'.startsWith(lower) &&
-        cmd.args[i + 1] !== undefined
-      ) {
-        typeName = cmd.args[i + 1]
-        break
+      if (lower.startsWith('-t') && '-typename'.startsWith(lower) && cmd.args[i + 1] !== undefined) {
+        typeName = cmd.args[i + 1];
+        break;
       }
     }
     // Positional-0 binds to -TypeName (NetParameterSet default). Named params
@@ -391,41 +353,41 @@ function checkComObject(
     // positional TypeName, so scan past them to find the first non-consumed arg.
     if (typeName === undefined) {
       // New-Object named params that consume a following value argument
-      const VALUE_PARAMS = new Set(['-argumentlist', '-comobject', '-property'])
+      const VALUE_PARAMS = new Set(['-argumentlist', '-comobject', '-property']);
       // Switch params (no value argument)
-      const SWITCH_PARAMS = new Set(['-strict'])
+      const SWITCH_PARAMS = new Set(['-strict']);
       for (let i = 0; i < cmd.args.length; i++) {
-        const a = cmd.args[i]!
+        const a = cmd.args[i]!;
         if (a.startsWith('-')) {
-          const lower = a.toLowerCase()
+          const lower = a.toLowerCase();
           // Skip -TypeName variants (already handled by named-param loop above)
           if (lower.startsWith('-t') && '-typename'.startsWith(lower)) {
-            i++ // skip value
-            continue
+            i++; // skip value
+            continue;
           }
           // Colon-bound form: -Param:Value (single token, no skip needed)
-          if (lower.includes(':')) continue
-          if (SWITCH_PARAMS.has(lower)) continue
+          if (lower.includes(':')) continue;
+          if (SWITCH_PARAMS.has(lower)) continue;
           if (VALUE_PARAMS.has(lower)) {
-            i++ // skip value
-            continue
+            i++; // skip value
+            continue;
           }
           // Unknown param — skip conservatively
-          continue
+          continue;
         }
         // First non-dash arg is the positional TypeName
-        typeName = a
-        break
+        typeName = a;
+        break;
       }
     }
     if (typeName !== undefined && !isClmAllowedType(typeName)) {
       return {
         behavior: 'ask',
         message: `New-Object instantiates .NET type '${typeName}' outside the ConstrainedLanguage allowlist`,
-      }
+      };
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -449,23 +411,18 @@ function checkComObject(
  * others (no -l* params to collide with).
  */
 
-function checkDangerousFilePathExecution(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkDangerousFilePathExecution(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
-    const lower = cmd.name.toLowerCase()
-    const resolved = COMMON_ALIASES[lower]?.toLowerCase() ?? lower
+    const lower = cmd.name.toLowerCase();
+    const resolved = COMMON_ALIASES[lower]?.toLowerCase() ?? lower;
     if (!FILEPATH_EXECUTION_CMDLETS.has(resolved)) {
-      continue
+      continue;
     }
-    if (
-      psExeHasParamAbbreviation(cmd, '-filepath', '-f') ||
-      psExeHasParamAbbreviation(cmd, '-literalpath', '-l')
-    ) {
+    if (psExeHasParamAbbreviation(cmd, '-filepath', '-f') || psExeHasParamAbbreviation(cmd, '-literalpath', '-l')) {
       return {
         behavior: 'ask',
         message: `${cmd.name} -FilePath executes an arbitrary script file`,
-      }
+      };
     }
     // Positional binding: `Start-Job script.ps1` binds position-0 to
     // -FilePath via FilePathParameterSet resolution (ScriptBlock args select
@@ -473,17 +430,17 @@ function checkDangerousFilePathExecution(
     // any non-dash StringConstant is a potential -FilePath. Over-flagging
     // (e.g., `Start-Job -Name foo` where `foo` is StringConstant) is fail-safe.
     for (let i = 0; i < cmd.args.length; i++) {
-      const argType = cmd.elementTypes?.[i + 1]
-      const arg = cmd.args[i]
+      const argType = cmd.elementTypes?.[i + 1];
+      const arg = cmd.args[i];
       if (argType === 'StringConstant' && arg && !arg.startsWith('-')) {
         return {
           behavior: 'ask',
           message: `${cmd.name} with positional string argument binds to -FilePath and executes a script file`,
-        }
+        };
       }
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -496,22 +453,19 @@ function checkDangerousFilePathExecution(
  * misses it (no .Method() syntax). Aliases `%` and `foreach` resolve via
  * COMMON_ALIASES.
  */
-function checkForEachMemberName(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkForEachMemberName(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
-    const lower = cmd.name.toLowerCase()
-    const resolved = COMMON_ALIASES[lower]?.toLowerCase() ?? lower
+    const lower = cmd.name.toLowerCase();
+    const resolved = COMMON_ALIASES[lower]?.toLowerCase() ?? lower;
     if (resolved !== 'foreach-object') {
-      continue
+      continue;
     }
     // ForEach-Object params starting with -m: only -MemberName. -m is unambiguous.
     if (psExeHasParamAbbreviation(cmd, '-membername', '-m')) {
       return {
         behavior: 'ask',
-        message:
-          'ForEach-Object -MemberName invokes methods by string name which cannot be validated',
-      }
+        message: 'ForEach-Object -MemberName invokes methods by string name which cannot be validated',
+      };
     }
     // PS7+: `ForEach-Object Kill` binds a positional string arg to
     // -MemberName via MemberSet parameter-set resolution (ScriptBlock args
@@ -519,18 +473,17 @@ function checkForEachMemberName(
     // `-ErrorAction Stop Kill` still binds Kill positionally. Any non-dash
     // StringConstant is a potential -MemberName; over-flagging is fail-safe.
     for (let i = 0; i < cmd.args.length; i++) {
-      const argType = cmd.elementTypes?.[i + 1]
-      const arg = cmd.args[i]
+      const argType = cmd.elementTypes?.[i + 1];
+      const arg = cmd.args[i];
       if (argType === 'StringConstant' && arg && !arg.startsWith('-')) {
         return {
           behavior: 'ask',
-          message:
-            'ForEach-Object with positional string argument binds to -MemberName and invokes methods by name',
-        }
+          message: 'ForEach-Object with positional string argument binds to -MemberName and invokes methods by name',
+        };
       }
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -547,25 +500,20 @@ function checkForEachMemberName(
  * string or array), flag any Start-Process whose target is a PS
  * executable: the nested invocation is unvalidatable by construction.
  */
-function checkStartProcess(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkStartProcess(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
-    const lower = cmd.name.toLowerCase()
+    const lower = cmd.name.toLowerCase();
     if (lower !== 'start-process' && lower !== 'saps' && lower !== 'start') {
-      continue
+      continue;
     }
     // Vector 1: -Verb RunAs (space or colon syntax).
     // Space syntax: psExeHasParamAbbreviation finds -Verb/-v, then scan args
     // for a bare 'runas' token.
-    if (
-      psExeHasParamAbbreviation(cmd, '-Verb', '-v') &&
-      cmd.args.some(a => a.toLowerCase() === 'runas')
-    ) {
+    if (psExeHasParamAbbreviation(cmd, '-Verb', '-v') && cmd.args.some(a => a.toLowerCase() === 'runas')) {
       return {
         behavior: 'ask',
         message: 'Command requests elevated privileges',
-      }
+      };
     }
     // Colon syntax — two layers:
     // (a) Structural: PR #23554 added children[] for colon-bound param args.
@@ -580,16 +528,16 @@ function checkStartProcess(
     if (cmd.children) {
       for (let i = 0; i < cmd.args.length; i++) {
         // Strip backticks before matching param name (bug #14): -V`erb:RunAs
-        const argClean = cmd.args[i]!.replace(/`/g, '')
-        if (!/^[-\u2013\u2014\u2015/]v[a-z]*:/i.test(argClean)) continue
-        const kids = cmd.children[i]
-        if (!kids) continue
+        const argClean = cmd.args[i]!.replace(/`/g, '');
+        if (!/^[-\u2013\u2014\u2015/]v[a-z]*:/i.test(argClean)) continue;
+        const kids = cmd.children[i];
+        if (!kids) continue;
         for (const child of kids) {
           if (child.text.replace(/['"`\s]/g, '').toLowerCase() === 'runas') {
             return {
               behavior: 'ask',
               message: 'Command requests elevated privileges',
-            }
+            };
           }
         }
       }
@@ -597,16 +545,14 @@ function checkStartProcess(
     if (
       cmd.args.some(a => {
         // Strip backticks before matching (bug #14 / review nit #2)
-        const clean = a.replace(/`/g, '')
-        return /^[-\u2013\u2014\u2015/]v[a-z]*:['"` ]*runas['"` ]*$/i.test(
-          clean,
-        )
+        const clean = a.replace(/`/g, '');
+        return /^[-\u2013\u2014\u2015/]v[a-z]*:['"` ]*runas['"` ]*$/i.test(clean);
       })
     ) {
       return {
         behavior: 'ask',
         message: 'Command requests elevated privileges',
-      }
+      };
     }
     // Vector 2: Start-Process targeting a PowerShell executable.
     // Target is either the first positional arg or the value after -FilePath.
@@ -619,17 +565,16 @@ function checkStartProcess(
     // result is ask not reject, and correctly parsing Start-Process parameter
     // binding is fragile. Strip quotes the parser may have preserved.
     for (const arg of cmd.args) {
-      const stripped = arg.replace(/^['"]|['"]$/g, '')
+      const stripped = arg.replace(/^['"]|['"]$/g, '');
       if (isPowerShellExecutable(stripped)) {
         return {
           behavior: 'ask',
-          message:
-            'Start-Process launches a nested PowerShell process which cannot be validated',
-        }
+          message: 'Start-Process launches a nested PowerShell process which cannot be validated',
+        };
       }
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -649,7 +594,7 @@ const SAFE_SCRIPT_BLOCK_CMDLETS = new Set([
   // getAllCommands recurses so commands inside the block ARE checked, but
   // non-command AST nodes (AssignmentStatementAst etc.) are invisible to it.
   // See powershellPermissions.ts step-5 hasScriptBlocks guard.
-])
+]);
 
 /**
  * Checks for script block injection patterns where script blocks
@@ -660,67 +605,62 @@ const SAFE_SCRIPT_BLOCK_CMDLETS = new Set([
  * Script blocks used with dangerous cmdlets (Invoke-Command, Invoke-Expression,
  * Start-Job, etc.) are flagged.
  */
-function checkScriptBlockInjection(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
-  const security = deriveSecurityFlags(parsed)
+function checkScriptBlockInjection(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
+  const security = deriveSecurityFlags(parsed);
   if (!security.hasScriptBlocks) {
-    return { behavior: 'passthrough' }
+    return { behavior: 'passthrough' };
   }
 
   // Check all commands in the parsed result. If any command is in the
   // dangerous set, flag it. If all commands with script blocks are in
   // the safe set (or the allowlist), allow it.
   for (const cmd of getAllCommands(parsed)) {
-    const lower = cmd.name.toLowerCase()
+    const lower = cmd.name.toLowerCase();
     if (DANGEROUS_SCRIPT_BLOCK_CMDLETS.has(lower)) {
       return {
         behavior: 'ask',
-        message:
-          'Command contains script block with dangerous cmdlet that may execute arbitrary code',
-      }
+        message: 'Command contains script block with dangerous cmdlet that may execute arbitrary code',
+      };
     }
   }
 
   // Check if all commands are either safe script block consumers or don't use script blocks
   const allCommandsSafe = getAllCommands(parsed).every(cmd => {
-    const lower = cmd.name.toLowerCase()
+    const lower = cmd.name.toLowerCase();
     // Safe filtering/output cmdlets
     if (SAFE_SCRIPT_BLOCK_CMDLETS.has(lower)) {
-      return true
+      return true;
     }
     // Resolve aliases
-    const alias = COMMON_ALIASES[lower]
+    const alias = COMMON_ALIASES[lower];
     if (alias && SAFE_SCRIPT_BLOCK_CMDLETS.has(alias.toLowerCase())) {
-      return true
+      return true;
     }
     // Unknown command with script blocks present — flag as potentially dangerous
-    return false
-  })
+    return false;
+  });
 
   if (allCommandsSafe) {
-    return { behavior: 'passthrough' }
+    return { behavior: 'passthrough' };
   }
 
   return {
     behavior: 'ask',
     message: 'Command contains script block that may execute arbitrary code',
-  }
+  };
 }
 
 /**
  * AST-only check: Detects subexpressions $() which can hide command execution.
  */
-function checkSubExpressions(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkSubExpressions(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   if (deriveSecurityFlags(parsed).hasSubExpressions) {
     return {
       behavior: 'ask',
       message: 'Command contains subexpressions $()',
-    }
+    };
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -728,61 +668,53 @@ function checkSubExpressions(
  * expressions like "$env:PATH" or "$(dangerous-command)". These can hide
  * command execution or variable interpolation inside string literals.
  */
-function checkExpandableStrings(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkExpandableStrings(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   if (deriveSecurityFlags(parsed).hasExpandableStrings) {
     return {
       behavior: 'ask',
       message: 'Command contains expandable strings with embedded expressions',
-    }
+    };
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
  * AST-only check: Detects splatting (@variable) which can obscure arguments.
  */
-function checkSplatting(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkSplatting(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   if (deriveSecurityFlags(parsed).hasSplatting) {
     return {
       behavior: 'ask',
       message: 'Command uses splatting (@variable)',
-    }
+    };
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
  * AST-only check: Detects stop-parsing token (--%) which prevents further parsing.
  */
-function checkStopParsing(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkStopParsing(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   if (deriveSecurityFlags(parsed).hasStopParsing) {
     return {
       behavior: 'ask',
       message: 'Command uses stop-parsing token (--%)',
-    }
+    };
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
  * AST-only check: Detects .NET method invocations which can access system APIs.
  */
-function checkMemberInvocations(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkMemberInvocations(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   if (deriveSecurityFlags(parsed).hasMemberInvocations) {
     return {
       behavior: 'ask',
       message: 'Command invokes .NET methods',
-    }
+    };
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -798,18 +730,16 @@ function checkMemberInvocations(
  * [Reflection.Assembly]::Load; CLM gives the precise message. Pure type casts
  * like [int]$x have no member invocation and only hit this check.
  */
-function checkTypeLiterals(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkTypeLiterals(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const t of parsed.typeLiterals ?? []) {
     if (!isClmAllowedType(t)) {
       return {
         behavior: 'ask',
         message: `Command uses .NET type [${t}] outside the ConstrainedLanguage allowlist`,
-      }
+      };
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -819,20 +749,18 @@ function checkTypeLiterals(
  * exec hazard. Always ask — there is no safe variant (even opening .txt may
  * invoke a user-configured handler that accepts arguments).
  */
-function checkInvokeItem(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkInvokeItem(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
-    const lower = cmd.name.toLowerCase()
+    const lower = cmd.name.toLowerCase();
     if (lower === 'invoke-item' || lower === 'ii') {
       return {
         behavior: 'ask',
         message:
           'Invoke-Item opens files with the default handler (ShellExecute). On executable files this runs arbitrary code.',
-      }
+      };
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -846,40 +774,32 @@ const SCHEDULED_TASK_CMDLETS = new Set([
   'new-scheduledtask',
   'new-scheduledtaskaction',
   'set-scheduledtask',
-])
+]);
 
-function checkScheduledTask(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkScheduledTask(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
-    const lower = cmd.name.toLowerCase()
+    const lower = cmd.name.toLowerCase();
     if (SCHEDULED_TASK_CMDLETS.has(lower)) {
       return {
         behavior: 'ask',
         message: `${cmd.name} creates or modifies a scheduled task (persistence primitive)`,
-      }
+      };
     }
     if (lower === 'schtasks' || lower === 'schtasks.exe') {
       if (
         cmd.args.some(a => {
-          const la = a.toLowerCase()
-          return (
-            la === '/create' ||
-            la === '/change' ||
-            la === '-create' ||
-            la === '-change'
-          )
+          const la = a.toLowerCase();
+          return la === '/create' || la === '/change' || la === '-create' || la === '-change';
         })
       ) {
         return {
           behavior: 'ask',
-          message:
-            'schtasks with create/change modifies scheduled tasks (persistence primitive)',
-        }
+          message: 'schtasks with create/change modifies scheduled tasks (persistence primitive)',
+        };
       }
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -903,14 +823,12 @@ const ENV_WRITE_CMDLETS = new Set([
   // 'sc' omitted — collides with sc.exe on PS Core 7+, see COMMON_ALIASES note
   'add-content',
   'ac',
-])
+]);
 
-function checkEnvVarManipulation(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
-  const envVars = getVariablesByScope(parsed, 'env')
+function checkEnvVarManipulation(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
+  const envVars = getVariablesByScope(parsed, 'env');
   if (envVars.length === 0) {
-    return { behavior: 'passthrough' }
+    return { behavior: 'passthrough' };
   }
   // Check if any command is a write cmdlet
   for (const cmd of getAllCommands(parsed)) {
@@ -918,7 +836,7 @@ function checkEnvVarManipulation(
       return {
         behavior: 'ask',
         message: 'Command modifies environment variables',
-      }
+      };
     }
   }
   // Also flag if there are assignments involving env vars
@@ -926,9 +844,9 @@ function checkEnvVarManipulation(
     return {
       behavior: 'ask',
       message: 'Command modifies environment variables',
-    }
+    };
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -943,20 +861,18 @@ function checkEnvVarManipulation(
  * gates these cmdlets.
  */
 
-function checkModuleLoading(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkModuleLoading(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
-    const lower = cmd.name.toLowerCase()
+    const lower = cmd.name.toLowerCase();
     if (MODULE_LOADING_CMDLETS.has(lower)) {
       return {
         behavior: 'ask',
         message:
           'Command loads, installs, or downloads a PowerShell module or script, which can execute arbitrary code',
-      }
+      };
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -977,26 +893,21 @@ const RUNTIME_STATE_CMDLETS = new Set([
   'sv',
   'new-variable',
   'nv',
-])
+]);
 
-function checkRuntimeStateManipulation(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkRuntimeStateManipulation(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
     // Strip module qualifier: `Microsoft.PowerShell.Utility\Set-Alias` → `set-alias`
-    const raw = cmd.name.toLowerCase()
-    const lower = raw.includes('\\')
-      ? raw.slice(raw.lastIndexOf('\\') + 1)
-      : raw
+    const raw = cmd.name.toLowerCase();
+    const lower = raw.includes('\\') ? raw.slice(raw.lastIndexOf('\\') + 1) : raw;
     if (RUNTIME_STATE_CMDLETS.has(lower)) {
       return {
         behavior: 'ask',
-        message:
-          'Command creates or modifies an alias or variable that can affect future command resolution',
-      }
+        message: 'Command creates or modifies an alias or variable that can affect future command resolution',
+      };
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -1007,25 +918,19 @@ function checkRuntimeStateManipulation(
  * gating on Win32_Process specifically would miss -Class $x or other process-
  * spawning WMI classes. Returns ask on any invocation. (security finding #34)
  */
-const WMI_SPAWN_CMDLETS = new Set([
-  'invoke-wmimethod',
-  'iwmi',
-  'invoke-cimmethod',
-])
+const WMI_SPAWN_CMDLETS = new Set(['invoke-wmimethod', 'iwmi', 'invoke-cimmethod']);
 
-function checkWmiProcessSpawn(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkWmiProcessSpawn(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
-    const lower = cmd.name.toLowerCase()
+    const lower = cmd.name.toLowerCase();
     if (WMI_SPAWN_CMDLETS.has(lower)) {
       return {
         behavior: 'ask',
         message: `${cmd.name} can spawn arbitrary processes via WMI/CIM (Win32_Process Create)`,
-      }
+      };
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -1033,38 +938,29 @@ function checkWmiProcessSpawn(
  * -ErrorAction Break enters the interactive debugger on error, causing
  * the session to hang waiting for debugger input that will never come.
  */
-function checkErrorActionBreak(
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+function checkErrorActionBreak(parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   for (const cmd of getAllCommands(parsed)) {
     // Check for -ErrorAction:Break or -ErrorAction Break
     for (let i = 0; i < cmd.args.length; i++) {
-      const arg = cmd.args[i]!
-      const lower = arg.toLowerCase()
+      const arg = cmd.args[i]!;
+      const lower = arg.toLowerCase();
       // Check colon-bound form: -ErrorAction:Break or -ea:Break
-      if (
-        /^-e[a]*:/i.test(arg) &&
-        (lower.includes(':break') || arg.toLowerCase().endsWith(':break'))
-      ) {
+      if (/^-e[a]*:/i.test(arg) && (lower.includes(':break') || arg.toLowerCase().endsWith(':break'))) {
         return {
           behavior: 'ask',
           message: 'Command uses -ErrorAction:Break which enters the interactive debugger and hangs the session',
-        }
+        };
       }
       // Check space-separated form: -ErrorAction Break or -ea Break
-      if (
-        /^-e[a]*$/i.test(arg) &&
-        i + 1 < cmd.args.length &&
-        cmd.args[i + 1]?.toLowerCase() === 'break'
-      ) {
+      if (/^-e[a]*$/i.test(arg) && i + 1 < cmd.args.length && cmd.args[i + 1]?.toLowerCase() === 'break') {
         return {
           behavior: 'ask',
           message: 'Command uses -ErrorAction Break which enters the interactive debugger and hangs the session',
-        }
+        };
       }
     }
   }
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }
 
 /**
@@ -1078,16 +974,13 @@ function checkErrorActionBreak(
  * @param parsed - Parsed AST from PowerShell's native parser (required)
  * @returns Security result indicating whether the command is safe
  */
-export function powershellCommandIsSafe(
-  _command: string,
-  parsed: ParsedPowerShellCommand,
-): PowerShellSecurityResult {
+export function powershellCommandIsSafe(_command: string, parsed: ParsedPowerShellCommand): PowerShellSecurityResult {
   // If the AST parse failed, we cannot determine safety -- ask the user
   if (!parsed.valid) {
     return {
       behavior: 'ask',
       message: 'Could not parse command for security analysis',
-    }
+    };
   }
 
   const validators = [
@@ -1116,15 +1009,15 @@ export function powershellCommandIsSafe(
     checkRuntimeStateManipulation,
     checkWmiProcessSpawn,
     checkErrorActionBreak,
-  ]
+  ];
 
   for (const validator of validators) {
-    const result = validator(parsed)
+    const result = validator(parsed);
     if (result.behavior === 'ask') {
-      return result
+      return result;
     }
   }
 
   // All checks passed
-  return { behavior: 'passthrough' }
+  return { behavior: 'passthrough' };
 }

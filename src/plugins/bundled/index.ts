@@ -17,44 +17,42 @@
 /**
  * Initialize built-in plugins. Called during CLI startup.
  */
-import { existsSync, readFileSync } from 'fs'
-import { dirname, join, resolve } from 'path'
-import { fileURLToPath } from 'url'
-import { registerBuiltinPlugin } from '../builtinPlugins.js'
-import type { HooksSettings } from '../../utils/settings/types.js'
+import { existsSync, readFileSync } from 'fs';
+import { dirname, join, resolve } from 'path';
+import { fileURLToPath } from 'url';
+import type { HooksSettings } from '../../utils/settings/types.js';
+import { registerBuiltinPlugin } from '../builtinPlugins.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const repoRoot = resolve(__dirname, '../../..')
-const upstreamPluginsRoot = resolve(
-  process.env.CLAUDE_CODE_UPSTREAM_PLUGINS_DIR ?? join(repoRoot, 'plugins'),
-)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(__dirname, '../../..');
+const upstreamPluginsRoot = resolve(process.env.CLAUDE_CODE_UPSTREAM_PLUGINS_DIR ?? join(repoRoot, 'plugins'));
 
 function pluginPath(name: string): string {
-  return join(upstreamPluginsRoot, name)
+  return join(upstreamPluginsRoot, name);
 }
 
 function loadHooks(pluginRoot: string): HooksSettings | undefined {
-  const hooksPath = join(pluginRoot, 'hooks/hooks.json')
-  if (!existsSync(hooksPath)) return undefined
+  const hooksPath = join(pluginRoot, 'hooks/hooks.json');
+  if (!existsSync(hooksPath)) return undefined;
 
   const parsed = JSON.parse(readFileSync(hooksPath, 'utf8')) as {
-    hooks?: HooksSettings
-  }
-  return parsed.hooks
+    hooks?: HooksSettings;
+  };
+  return parsed.hooks;
 }
 
 function registerUpstreamPlugin(options: {
-  name: string
-  description: string
-  version?: string
-  commands?: boolean
-  agents?: boolean
-  skills?: boolean
-  hooks?: boolean
-  defaultEnabled?: boolean
+  name: string;
+  description: string;
+  version?: string;
+  commands?: boolean;
+  agents?: boolean;
+  skills?: boolean;
+  hooks?: boolean;
+  defaultEnabled?: boolean;
 }): void {
-  const root = pluginPath(options.name)
-  if (!existsSync(root)) return
+  const root = pluginPath(options.name);
+  if (!existsSync(root)) return;
 
   registerBuiltinPlugin({
     name: options.name,
@@ -66,42 +64,39 @@ function registerUpstreamPlugin(options: {
     skillsPath: options.skills ? join(root, 'skills') : undefined,
     hooks: options.hooks ? loadHooks(root) : undefined,
     defaultEnabled: options.defaultEnabled ?? true,
-  })
+  });
 }
 
 export function initBuiltinPlugins(): void {
   registerUpstreamPlugin({
     name: 'commit-commands',
-    description:
-      'Git workflow commands for committing, pushing, and creating pull requests',
+    description: 'Git workflow commands for committing, pushing, and creating pull requests',
     commands: true,
-  })
+  });
 
   registerUpstreamPlugin({
     name: 'code-review',
     description: 'Pull request code review command from upstream Claude Code',
     commands: true,
-  })
+  });
 
   registerUpstreamPlugin({
     name: 'feature-dev',
-    description:
-      'Feature development workflow with explorer, architect, and reviewer agents',
+    description: 'Feature development workflow with explorer, architect, and reviewer agents',
     commands: true,
     agents: true,
-  })
+  });
 
   registerUpstreamPlugin({
     name: 'frontend-design',
     description: 'Frontend design skill for UI and UX implementation',
     skills: true,
-  })
+  });
 
   registerUpstreamPlugin({
     name: 'security-guidance',
-    description:
-      'Security reminder hook for file editing tools from upstream Claude Code',
+    description: 'Security reminder hook for file editing tools from upstream Claude Code',
     hooks: true,
     defaultEnabled: false,
-  })
+  });
 }

@@ -1,46 +1,44 @@
-import * as React from 'react'
-import { useState } from 'react'
-import { getSlowOperations } from '../bootstrap/state.js'
-import { Text, useInterval } from '../ink.js'
+import type * as React from 'react';
+import { useState } from 'react';
+import { getSlowOperations } from '../bootstrap/state.js';
+import { Text, useInterval } from '../ink.js';
 
 // Show DevBar for dev builds or all ants
 function shouldShowDevBar(): boolean {
-  return (
-    "production" === 'development' || "external" === 'ant'
-  )
+  return 'production' === 'development' || 'external' === 'ant';
 }
 
 export function DevBar(): React.ReactNode {
   const [slowOps, setSlowOps] =
     useState<
       ReadonlyArray<{
-        operation: string
-        durationMs: number
-        timestamp: number
+        operation: string;
+        durationMs: number;
+        timestamp: number;
       }>
-    >(getSlowOperations)
+    >(getSlowOperations);
 
   useInterval(
     () => {
-      setSlowOps(getSlowOperations())
+      setSlowOps(getSlowOperations());
     },
     shouldShowDevBar() ? 500 : null,
-  )
+  );
 
   // Only show when there's something to display
   if (!shouldShowDevBar() || slowOps.length === 0) {
-    return null
+    return null;
   }
 
   // Single-line format so short terminals don't lose rows to dev noise.
   const recentOps = slowOps
     .slice(-3)
     .map(op => `${op.operation} (${Math.round(op.durationMs)}ms)`)
-    .join(' · ')
+    .join(' · ');
 
   return (
     <Text wrap="truncate-end" color="warning">
       [ANT-ONLY] slow sync: {recentOps}
     </Text>
-  )
+  );
 }

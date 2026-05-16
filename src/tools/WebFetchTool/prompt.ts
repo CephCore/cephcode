@@ -1,4 +1,4 @@
-export const WEB_FETCH_TOOL_NAME = 'WebFetch'
+export const WEB_FETCH_TOOL_NAME = 'WebFetch';
 
 export const DESCRIPTION = `
 - Fetches content from a specified URL and processes it using an AI model
@@ -18,7 +18,7 @@ Usage notes:
   - Includes a self-cleaning 15-minute cache for faster responses when repeatedly accessing the same URL
   - When a URL redirects to a different host, the tool will inform you and provide the redirect URL in a special format. You should then make a new WebFetch request with the redirect URL to fetch the content.
   - For GitHub URLs, prefer using the gh CLI via Bash instead (e.g., gh pr view, gh issue view, gh api).
-`
+`;
 
 export function makeSecondaryModelPrompt(
   markdownContent: string,
@@ -31,7 +31,7 @@ export function makeSecondaryModelPrompt(
  - Enforce a strict 125-character maximum for quotes from any source document. Open Source Software is ok as long as we respect the license.
  - Use quotation marks for exact language from articles; any language outside of the quotation should never be word-for-word the same.
  - You are not a lawyer and never comment on the legality of your own prompts and responses.
- - Never produce or reproduce exact song lyrics.`
+ - Never produce or reproduce exact song lyrics.`;
 
   return `
 Web page content:
@@ -42,5 +42,5 @@ ${markdownContent}
 ${prompt}
 
 ${guidelines}
-`
+`;
 }

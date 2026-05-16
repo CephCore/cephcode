@@ -1,12 +1,8 @@
-import { feature } from 'bun:bundle'
-import type { ToolPermissionContext } from '../../Tool.js'
-import { logForDebugging } from '../debug.js'
-import type { PermissionMode } from './PermissionMode.js'
-import {
-  getAutoModeUnavailableReason,
-  isAutoModeGateEnabled,
-  transitionPermissionMode,
-} from './permissionSetup.js'
+import { feature } from 'bun:bundle';
+import type { ToolPermissionContext } from '../../Tool.js';
+import { logForDebugging } from '../debug.js';
+import type { PermissionMode } from './PermissionMode.js';
+import { getAutoModeUnavailableReason, isAutoModeGateEnabled, transitionPermissionMode } from './permissionSetup.js';
 
 // Checks both the cached isAutoModeAvailable (set at startup by
 // verifyAutoModeGateAccess) and the live isAutoModeGateEnabled() — these can
@@ -16,16 +12,16 @@ import {
 // and leave the user stuck at the current mode.
 function canCycleToAuto(ctx: ToolPermissionContext): boolean {
   if (feature('TRANSCRIPT_CLASSIFIER')) {
-    const gateEnabled = isAutoModeGateEnabled()
-    const can = !!ctx.isAutoModeAvailable && gateEnabled
+    const gateEnabled = isAutoModeGateEnabled();
+    const can = !!ctx.isAutoModeAvailable && gateEnabled;
     if (!can) {
       logForDebugging(
         `[auto-mode] canCycleToAuto=false: ctx.isAutoModeAvailable=${ctx.isAutoModeAvailable} isAutoModeGateEnabled=${gateEnabled} reason=${getAutoModeUnavailableReason()}`,
-      )
+      );
     }
-    return can
+    return can;
   }
-  return false
+  return false;
 }
 
 /**
@@ -35,51 +31,35 @@ export function getNextPermissionMode(
   toolPermissionContext: ToolPermissionContext,
   _teamContext?: { leadAgentId: string },
 ): PermissionMode {
+  const autoAvailable = canCycleToAuto(toolPermissionContext);
+
   switch (toolPermissionContext.mode) {
     case 'default':
-      // Ants skip acceptEdits and plan — auto mode replaces them
-      if (process.env.USER_TYPE === 'ant') {
-        if (canCycleToAuto(toolPermissionContext)) {
-          return 'auto'
-        }
-        return 'yoloLite'
-      }
-      return 'ask'
+      if (autoAvailable) return 'auto';
+      if (process.env.USER_TYPE === 'ant') return 'bypassPermissions';
+      return 'ask';
 
     case 'ask':
-      return 'acceptEdits'
+      return 'acceptEdits';
 
     case 'acceptEdits':
-      return 'plan'
+      return 'plan';
 
     case 'plan':
-      if (canCycleToAuto(toolPermissionContext)) {
-        return 'auto'
-      }
-      return 'yoloLite'
+      if (autoAvailable) return 'auto';
+      return 'bypassPermissions';
 
     case 'auto':
-      return 'yoloLite'
-
-    case 'yoloLite':
-      return 'yolo'
-
-    case 'yolo':
-      return 'yoloMax'
-
-    case 'yoloMax':
-      return 'default'
+      return 'bypassPermissions';
 
     case 'bypassPermissions':
-      return 'default'
+      return 'default';
 
     case 'dontAsk':
-      // Not exposed in UI cycle yet, but return default if somehow reached
-      return 'default'
+      return 'default';
 
     default:
-      // Covers any future modes — always fall back to default
-      return 'default'
+      return 'default';
   }
 }
 
@@ -94,13 +74,9 @@ export function cyclePermissionMode(
   toolPermissionContext: ToolPermissionContext,
   teamContext?: { leadAgentId: string },
 ): { nextMode: PermissionMode; context: ToolPermissionContext } {
-  const nextMode = getNextPermissionMode(toolPermissionContext, teamContext)
+  const nextMode = getNextPermissionMode(toolPermissionContext, teamContext);
   return {
     nextMode,
-    context: transitionPermissionMode(
-      toolPermissionContext.mode,
-      nextMode,
-      toolPermissionContext,
-    ),
-  }
+    context: transitionPermissionMode(toolPermissionContext.mode, nextMode, toolPermissionContext),
+  };
 }

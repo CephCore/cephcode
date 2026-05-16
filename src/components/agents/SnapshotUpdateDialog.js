@@ -1,1 +1,3 @@
-export default function SnapshotUpdateDialog() { return null }
+export default function SnapshotUpdateDialog() {
+  return null;
+}

@@ -3,10 +3,10 @@ import {
   CRON_DELETE_TOOL_NAME,
   DEFAULT_MAX_AGE_DAYS,
   isKairosCronEnabled,
-} from '../../tools/ScheduleCronTool/prompt.js'
-import { registerBundledSkill } from '../bundledSkills.js'
+} from '../../tools/ScheduleCronTool/prompt.js';
+import { registerBundledSkill } from '../bundledSkills.js';
 
-const DEFAULT_INTERVAL = '10m'
+const DEFAULT_INTERVAL = '10m';
 
 const USAGE_MESSAGE = `Usage: /loop [interval] <prompt>
 
@@ -20,7 +20,7 @@ Examples:
   /loop 30m check the deploy
   /loop 1h /standup 1
   /loop check the deploy          (defaults to ${DEFAULT_INTERVAL})
-  /loop check the deploy every 20m`
+  /loop check the deploy every 20m`;
 
 function buildPrompt(args: string): string {
   return `# /loop — schedule a recurring prompt
@@ -68,26 +68,25 @@ Supported suffixes: \`s\` (seconds, rounded up to nearest minute, min 1), \`m\` 
 
 ## Input
 
-${args}`
+${args}`;
 }
 
 export function registerLoopSkill(): void {
   registerBundledSkill({
     name: 'loop',
     aliases: ['proactive'], // /proactive is an alias for /loop
-    description:
-      'Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo, defaults to 10m)',
+    description: 'Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo, defaults to 10m)',
     whenToUse:
       'When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g. "check the deploy every 5 minutes", "keep running /babysit-prs"). Do NOT invoke for one-off tasks.',
     argumentHint: '[interval] <prompt>',
     userInvocable: true,
     isEnabled: isKairosCronEnabled,
     async getPromptForCommand(args) {
-      const trimmed = args.trim()
+      const trimmed = args.trim();
       if (!trimmed) {
-        return [{ type: 'text', text: USAGE_MESSAGE }]
+        return [{ type: 'text', text: USAGE_MESSAGE }];
       }
-      return [{ type: 'text', text: buildPrompt(trimmed) }]
+      return [{ type: 'text', text: buildPrompt(trimmed) }];
     },
-  })
+  });
 }

@@ -1,4 +1,4 @@
-export const SESSION_SEARCH_TOOL_NAME = 'SessionSearch'
+export const SESSION_SEARCH_TOOL_NAME = 'SessionSearch';
 
 export function getDescription(): string {
   return `Search past session transcripts using full-text search (FTS5).
@@ -13,5 +13,5 @@ export function getDescription(): string {
 
   This is complementary to the memory system — memory stores curated facts, while
   session search finds raw transcript content.
-`
+`;
 }

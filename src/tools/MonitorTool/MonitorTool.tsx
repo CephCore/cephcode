@@ -11,11 +11,13 @@ import { getTaskOutput } from '../../utils/task/diskOutput.js';
 import { formatTaskOutput } from '../../utils/task/outputFormatting.js';
 import { MONITOR_TOOL_NAME } from './constants.js';
 
-const inputSchema = lazySchema(() => z.strictObject({
-  task_id: z.string().describe('The task ID to monitor'),
-  stream: z.boolean().default(true).describe('Whether to stream events in real-time'),
-  timeout: z.number().min(0).max(600000).default(60000).describe('Max monitoring time in ms')
-}));
+const inputSchema = lazySchema(() =>
+  z.strictObject({
+    task_id: z.string().describe('The task ID to monitor'),
+    stream: z.boolean().default(true).describe('Whether to stream events in real-time'),
+    timeout: z.number().min(0).max(600000).default(60000).describe('Max monitoring time in ms'),
+  }),
+);
 
 type InputSchema = ReturnType<typeof inputSchema>;
 type MonitorToolInput = z.infer<InputSchema>;
@@ -41,7 +43,7 @@ const outputPositions = new Map<string, number>();
 // Get new output since last check
 async function getNewOutput(
   task: TaskState,
-  position: number
+  position: number,
 ): Promise<{ output: string; newPosition: number; isComplete: boolean }> {
   try {
     // All task types write to the same output file path via getTaskOutput()
@@ -51,7 +53,7 @@ async function getNewOutput(
     return {
       output: newContent,
       newPosition: currentOutput.length,
-      isComplete: task.status !== 'running' && task.status !== 'pending'
+      isComplete: task.status !== 'running' && task.status !== 'pending',
     };
   } catch {
     // File not ready yet
@@ -71,7 +73,7 @@ function parseOutputToEvents(output: string, lastPosition: number): MonitorEvent
       events.push({
         type: 'stdout',
         content: line,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
   }
@@ -126,7 +128,7 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
       return {
         result: false,
         message: 'Task ID is required',
-        errorCode: 1
+        errorCode: 1,
       };
     }
 
@@ -137,20 +139,14 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
       return {
         result: false,
         message: `No task found with ID: ${task_id}`,
-        errorCode: 2
+        errorCode: 2,
       };
     }
 
     return { result: true };
   },
 
-  async call(
-    input: MonitorToolInput,
-    toolUseContext,
-    _canUseTool,
-    _parentMessage,
-    onProgress
-  ) {
+  async call(input: MonitorToolInput, toolUseContext, _canUseTool, _parentMessage, onProgress) {
     const { task_id, timeout } = input;
 
     const appState = toolUseContext.getAppState();
@@ -173,8 +169,8 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
           type: 'status',
           status: task.status,
           description: task.description,
-          message: `Monitoring task: ${task.description || task_id}`
-        }
+          message: `Monitoring task: ${task.description || task_id}`,
+        },
       });
     }
 
@@ -193,8 +189,8 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
           events,
           final_output: output,
           exit_code: isLocalShellTask(task) ? task.result?.code : undefined,
-          error: (task as any).error
-        }
+          error: (task as any).error,
+        },
       };
     }
 
@@ -205,12 +201,12 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
         break;
       }
 
-      const currentTask = (toolUseContext.getAppState().tasks?.[task_id] as TaskState | undefined);
+      const currentTask = toolUseContext.getAppState().tasks?.[task_id] as TaskState | undefined;
       if (!currentTask) {
         events.push({
           type: 'error',
           content: 'Task not found',
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
         break;
       }
@@ -223,7 +219,7 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
           events.push(event);
           onProgress({
             toolUseID: `monitor-${task_id}-${Date.now()}`,
-            data: event
+            data: event,
           });
         }
         position = newPosition;
@@ -234,7 +230,7 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
         events.push({
           type: 'complete',
           content: `Task completed with status: ${currentTask.status}`,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
         break;
       }
@@ -245,7 +241,7 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
         events.push({
           type: 'status',
           content: `Status changed to: ${currentTask.status}`,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
       }
 
@@ -257,12 +253,12 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
       events.push({
         type: 'status',
         content: 'Monitoring timed out',
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
 
     // Get final output
-    const currentTask = (toolUseContext.getAppState().tasks?.[task_id] as TaskState | undefined);
+    const currentTask = toolUseContext.getAppState().tasks?.[task_id] as TaskState | undefined;
     let finalOutput = '';
     if (currentTask) {
       const { output } = await getNewOutput(currentTask, position);
@@ -276,8 +272,8 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
         events,
         final_output: finalOutput || undefined,
         exit_code: currentTask && isLocalShellTask(currentTask) ? currentTask.result?.code : undefined,
-        error: (currentTask as any)?.error
-      }
+        error: (currentTask as any)?.error,
+      },
     };
   },
 
@@ -306,7 +302,7 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
     return {
       tool_use_id: toolUseID,
       type: 'tool_result' as const,
-      content: parts.join('\n\n')
+      content: parts.join('\n\n'),
     };
   },
 
@@ -324,11 +320,11 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
 
     return (
       <Box flexDirection="column">
-        {progressData && progressData.type === 'status' && (
-          <Text dimColor>{progressData.content}</Text>
-        )}
+        {progressData && progressData.type === 'status' && <Text dimColor>{progressData.content}</Text>}
         {progressData && progressData.type === 'stdout' && (
-          <Text dimColor>{'>'} {progressData.content.slice(0, 100)}</Text>
+          <Text dimColor>
+            {'>'} {progressData.content.slice(0, 100)}
+          </Text>
         )}
         <Text>
           {'  '}Monitoring task... <Text dimColor>(esc to give additional instructions)</Text>
@@ -338,22 +334,21 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
   },
 
   renderToolResultMessage(content) {
-    const result: MonitorToolOutput = typeof content === 'string'
-      ? JSON.parse(content)
-      : content;
+    const result: MonitorToolOutput = typeof content === 'string' ? JSON.parse(content) : content;
 
     return (
       <Box flexDirection="column">
         <Text>
           Monitored task: <Text bold>{result.task_id}</Text> [{result.status}]
         </Text>
-        {result.events.length > 0 && (
-          <Text dimColor>{result.events.length} events streamed</Text>
-        )}
+        {result.events.length > 0 && <Text dimColor>{result.events.length} events streamed</Text>}
         {result.final_output && (
           <Box flexDirection="column" marginTop={1}>
             <Text dimColor>Final output:</Text>
-            <Text>{result.final_output.slice(0, 500)}{result.final_output.length > 500 ? '...' : ''}</Text>
+            <Text>
+              {result.final_output.slice(0, 500)}
+              {result.final_output.length > 500 ? '...' : ''}
+            </Text>
           </Box>
         )}
       </Box>
@@ -366,7 +361,7 @@ export const MonitorTool: Tool<InputSchema, MonitorToolOutput> = buildTool({
 
   renderToolUseErrorMessage(result) {
     return <Text color="red">Monitor error: {result.message}</Text>;
-  }
+  },
 });
 
 export default MonitorTool;

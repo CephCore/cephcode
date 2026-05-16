@@ -1,4 +1,4 @@
-import type { AgentDefinition } from '../tools/AgentTool/builtInAgents.js'
+import type { AgentDefinition } from '../tools/AgentTool/builtInAgents.js';
 
 /**
  * Stub for coordinator worker agent registration.
@@ -9,5 +9,5 @@ import type { AgentDefinition } from '../tools/AgentTool/builtInAgents.js'
  */
 
 export function getCoordinatorAgents(): AgentDefinition[] {
-  return []
+  return [];
 }

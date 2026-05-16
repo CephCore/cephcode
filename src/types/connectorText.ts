@@ -1,8 +1,8 @@
 export interface ConnectorTextBlock {
-  type: 'connector_text'
-  text: string
+  type: 'connector_text';
+  text: string;
 }
 
 export function isConnectorTextBlock(block: unknown): block is ConnectorTextBlock {
-  return typeof block === 'object' && block !== null && (block as any).type === 'connector_text'
+  return typeof block === 'object' && block !== null && (block as any).type === 'connector_text';
 }

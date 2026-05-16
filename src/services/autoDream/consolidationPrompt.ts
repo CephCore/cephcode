@@ -1,17 +1,9 @@
 // Extracted from dream.ts so auto-dream ships independently of KAIROS
 // feature flags (dream.ts is behind a feature()-gated require).
 
-import {
-  DIR_EXISTS_GUIDANCE,
-  ENTRYPOINT_NAME,
-  MAX_ENTRYPOINT_LINES,
-} from '../../memdir/memdir.js'
+import { DIR_EXISTS_GUIDANCE, ENTRYPOINT_NAME, MAX_ENTRYPOINT_LINES } from '../../memdir/memdir.js';
 
-export function buildConsolidationPrompt(
-  memoryRoot: string,
-  transcriptDir: string,
-  extra: string,
-): string {
+export function buildConsolidationPrompt(memoryRoot: string, transcriptDir: string, extra: string): string {
   return `# Dream: Memory Consolidation
 
 You are performing a dream — a reflective pass over your memory files. Synthesize what you've learned recently into durable, well-organized memories so that future sessions can orient quickly.
@@ -61,5 +53,5 @@ Update \`${ENTRYPOINT_NAME}\` so it stays under ${MAX_ENTRYPOINT_LINES} lines AN
 
 ---
 
-Return a brief summary of what you consolidated, updated, or pruned. If nothing changed (memories are already tight), say so.${extra ? `\n\n## Additional context\n\n${extra}` : ''}`
+Return a brief summary of what you consolidated, updated, or pruned. If nothing changed (memories are already tight), say so.${extra ? `\n\n## Additional context\n\n${extra}` : ''}`;
 }

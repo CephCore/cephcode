@@ -1,4 +1,4 @@
-import type { Command } from '../../commands.js'
+import type { Command } from '../../commands.js';
 
 const providerSelect = {
   type: 'local-jsx',
@@ -6,6 +6,6 @@ const providerSelect = {
   description: 'Show or change the active AI provider and model',
   argumentHint: '[list|get|set <provider> [model]|reset|models <provider>]',
   load: () => import('./provider-select.js'),
-} satisfies Command
+} satisfies Command;
 
-export default providerSelect
+export default providerSelect;

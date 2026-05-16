@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type * as React from 'react';
 import type { LocalJSXCommandContext } from '../../commands.js';
 import { BackgroundTasksDialog } from '../../components/tasks/BackgroundTasksDialog.js';
 import type { LocalJSXCommandOnDone } from '../../types/command.js';

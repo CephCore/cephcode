@@ -1,5 +1,6 @@
-import { context as otelContext, propagation } from '@opentelemetry/api'
-import { isEnvTruthy } from './envUtils.js'
+import { context as otelContext, propagation } from '@opentelemetry/api';
+import { isEnvTruthy } from './envUtils.js';
+import { getSettings_DEPRECATED } from './settings/settings.js';
 
 /**
  * Env vars to strip from subprocess environments when running inside GitHub
@@ -51,7 +52,7 @@ const GHA_SUBPROCESS_SCRUB = [
   'OVERRIDE_GITHUB_TOKEN',
   'DEFAULT_WORKFLOW_TOKEN',
   'SSH_SIGNING_KEY',
-] as const
+] as const;
 
 /**
  * Returns a copy of process.env with sensitive secrets stripped, for use when
@@ -65,16 +66,14 @@ const GHA_SUBPROCESS_SCRUB = [
 // Registered by init.ts after the upstreamproxy module is dynamically imported
 // in CCR sessions. Stays undefined in non-CCR startups so we never pull in the
 // upstreamproxy module graph (upstreamproxy.ts + relay.ts) via a static import.
-let _getUpstreamProxyEnv: (() => Record<string, string>) | undefined
+let _getUpstreamProxyEnv: (() => Record<string, string>) | undefined;
 
 /**
  * Called from init.ts to wire up the proxy env function after the upstreamproxy
  * module has been lazily loaded. Must be called before any subprocess is spawned.
  */
-export function registerUpstreamProxyEnvFn(
-  fn: () => Record<string, string>,
-): void {
-  _getUpstreamProxyEnv = fn
+export function registerUpstreamProxyEnvFn(fn: () => Record<string, string>): void {
+  _getUpstreamProxyEnv = fn;
 }
 
 export function subprocessEnv(): NodeJS.ProcessEnv {
@@ -82,34 +81,51 @@ export function subprocessEnv(): NodeJS.ProcessEnv {
   // in agent subprocesses route through the local relay. Returns {} when the
   // proxy is disabled or not registered (non-CCR), so this is a no-op outside
   // CCR containers.
-  const proxyEnv = _getUpstreamProxyEnv?.() ?? {}
+  const proxyEnv = _getUpstreamProxyEnv?.() ?? {};
 
-  const env = { ...process.env, ...proxyEnv }
+  const env = { ...process.env, ...proxyEnv };
 
   // Always propagate CLAUDE_CODE_SESSION_ID so subprocesses (Bash tool, hooks,
   // MCP stdio servers, LSP servers) can correlate their execution context back
   // to the parent session. Required for telemetry, log correlation, and tool
   // execution tracing.
-  const sessionId = process.env.CLAUDE_CODE_SESSION_ID
+  const sessionId = process.env.CLAUDE_CODE_SESSION_ID;
   if (sessionId) {
-    env.CLAUDE_CODE_SESSION_ID = sessionId
+    env.CLAUDE_CODE_SESSION_ID = sessionId;
   }
 
   // Propagate CLAUDE_EFFORT so subprocess hooks and scripts can adapt their
   // behavior to the current effort level (e.g., skip expensive validation at
   // low effort, run exhaustive checks at high effort).
-  const effortLevel = process.env.CLAUDE_CODE_EFFORT_LEVEL
+  const effortLevel = process.env.CLAUDE_CODE_EFFORT_LEVEL;
   if (effortLevel) {
-    env.CLAUDE_EFFORT = effortLevel
+    env.CLAUDE_EFFORT = effortLevel;
   }
 
-  const otelCarrier: Record<string, string> = {}
-  propagation.inject(otelContext.active(), otelCarrier)
+  // Re-apply NO_COLOR/FORCE_COLOR from merged settings for subprocesses only.
+  // These are stripped from managedEnv's filterSettingsEnv() so they don't
+  // affect Claude Code's own UI, but subprocesses (Bash, MCP, LSP) should
+  // still see them if configured.
+  const mergedSettingsEnv = getSettings_DEPRECATED()?.env;
+  if (mergedSettingsEnv) {
+    for (const key of Object.keys(mergedSettingsEnv)) {
+      const upper = key.toUpperCase();
+      if (upper === 'NO_COLOR' && env[key] === undefined) {
+        env[key] = mergedSettingsEnv[key];
+      }
+      if (upper === 'FORCE_COLOR' && env[key] === undefined) {
+        env[key] = mergedSettingsEnv[key];
+      }
+    }
+  }
+
+  const otelCarrier: Record<string, string> = {};
+  propagation.inject(otelContext.active(), otelCarrier);
   if (otelCarrier.traceparent) {
-    env.TRACEPARENT = otelCarrier.traceparent
+    env.TRACEPARENT = otelCarrier.traceparent;
   }
   if (otelCarrier.tracestate) {
-    env.TRACESTATE = otelCarrier.tracestate
+    env.TRACESTATE = otelCarrier.tracestate;
   }
 
   // Always strip OTEL_* vars so subprocesses don't inherit the CLI's telemetry
@@ -117,19 +133,19 @@ export function subprocessEnv(): NodeJS.ProcessEnv {
   // trying to send spans to the CLI's own OTLP endpoint.
   for (const key of Object.keys(env)) {
     if (key.startsWith('OTEL_')) {
-      delete env[key]
+      delete env[key];
     }
   }
 
   if (!isEnvTruthy(process.env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB)) {
-    return env
+    return env;
   }
 
   for (const k of GHA_SUBPROCESS_SCRUB) {
-    delete env[k]
+    delete env[k];
     // GitHub Actions auto-creates INPUT_<NAME> for `with:` inputs, duplicating
     // secrets like INPUT_ANTHROPIC_API_KEY. No-op for vars that aren't action inputs.
-    delete env[`INPUT_${k}`]
+    delete env[`INPUT_${k}`];
   }
-  return env
+  return env;
 }

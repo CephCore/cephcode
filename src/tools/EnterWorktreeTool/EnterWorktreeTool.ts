@@ -1,27 +1,27 @@
-import { z } from 'zod/v4'
-import { join } from 'path'
-import { getSessionId, setOriginalCwd } from '../../bootstrap/state.js'
-import { clearSystemPromptSections } from '../../constants/systemPromptSections.js'
-import { logEvent } from '../../services/analytics/index.js'
-import type { Tool } from '../../Tool.js'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import { clearMemoryFileCaches } from '../../utils/claudemd.js'
-import { getCwd } from '../../utils/cwd.js'
-import { findCanonicalGitRoot } from '../../utils/git.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import { getPlanSlug, getPlansDirectory } from '../../utils/plans.js'
-import { setCwd } from '../../utils/Shell.js'
-import { saveWorktreeState } from '../../utils/sessionStorage.js'
+import { join } from 'path';
+import { z } from 'zod/v4';
+import { getSessionId, setOriginalCwd } from '../../bootstrap/state.js';
+import { clearSystemPromptSections } from '../../constants/systemPromptSections.js';
+import { logEvent } from '../../services/analytics/index.js';
+import type { Tool } from '../../Tool.js';
+import { buildTool, type ToolDef } from '../../Tool.js';
+import { clearMemoryFileCaches } from '../../utils/claudemd.js';
+import { getCwd } from '../../utils/cwd.js';
+import { findCanonicalGitRoot } from '../../utils/git.js';
+import { lazySchema } from '../../utils/lazySchema.js';
+import { getPlanSlug, getPlansDirectory } from '../../utils/plans.js';
+import { setCwd } from '../../utils/Shell.js';
+import { saveWorktreeState } from '../../utils/sessionStorage.js';
 import {
   createWorktreeForSession,
   getCurrentWorktreeSession,
   restoreWorktreeSession,
   validateWorktreeSlug,
   type WorktreeSession,
-} from '../../utils/worktree.js'
-import { ENTER_WORKTREE_TOOL_NAME } from './constants.js'
-import { getEnterWorktreeToolPrompt } from './prompt.js'
-import { renderToolResultMessage, renderToolUseMessage } from './UI.js'
+} from '../../utils/worktree.js';
+import { ENTER_WORKTREE_TOOL_NAME } from './constants.js';
+import { getEnterWorktreeToolPrompt } from './prompt.js';
+import { renderToolResultMessage, renderToolUseMessage } from './UI.js';
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
@@ -29,9 +29,9 @@ const inputSchema = lazySchema(() =>
       .string()
       .superRefine((s, ctx) => {
         try {
-          validateWorktreeSlug(s)
+          validateWorktreeSlug(s);
         } catch (e) {
-          ctx.addIssue({ code: 'custom', message: (e as Error).message })
+          ctx.addIssue({ code: 'custom', message: (e as Error).message });
         }
       })
       .optional()
@@ -39,8 +39,8 @@ const inputSchema = lazySchema(() =>
         'Optional name for the worktree. Each "/"-separated segment may contain only letters, digits, dots, underscores, and dashes; max 64 chars total. A random name is generated if not provided.',
       ),
   }),
-)
-type InputSchema = ReturnType<typeof inputSchema>
+);
+type InputSchema = ReturnType<typeof inputSchema>;
 
 const outputSchema = lazySchema(() =>
   z.object({
@@ -48,52 +48,50 @@ const outputSchema = lazySchema(() =>
     worktreeBranch: z.string().optional(),
     message: z.string(),
   }),
-)
-type OutputSchema = ReturnType<typeof outputSchema>
-export type Output = z.infer<OutputSchema>
+);
+type OutputSchema = ReturnType<typeof outputSchema>;
+export type Output = z.infer<OutputSchema>;
 
 export const EnterWorktreeTool: Tool<InputSchema, Output> = buildTool({
   name: ENTER_WORKTREE_TOOL_NAME,
   searchHint: 'create an isolated git worktree and switch into it',
   maxResultSizeChars: 100_000,
   async description() {
-    return 'Creates an isolated worktree (via git or configured hooks) and switches the session into it'
+    return 'Creates an isolated worktree (via git or configured hooks) and switches the session into it';
   },
   async prompt() {
-    return getEnterWorktreeToolPrompt()
+    return getEnterWorktreeToolPrompt();
   },
   get inputSchema(): InputSchema {
-    return inputSchema()
+    return inputSchema();
   },
   get outputSchema(): OutputSchema {
-    return outputSchema()
+    return outputSchema();
   },
   userFacingName() {
-    return 'Creating worktree'
+    return 'Creating worktree';
   },
   shouldDefer: true,
   toAutoClassifierInput(input) {
-    return input.name ?? ''
+    return input.name ?? '';
   },
   renderToolUseMessage,
   renderToolResultMessage,
   async call(input) {
     // Validate not already in a worktree created by this session
     if (getCurrentWorktreeSession()) {
-      throw new Error('Already in a worktree session')
+      throw new Error('Already in a worktree session');
     }
 
     // Check if CWD is already inside a pre-existing git worktree (e.g. from a
     // background session that was dispatched into an existing worktree dir).
     // When the .git at CWD is a gitdir: pointer file (not a directory), we're
     // already in a worktree — adopt it rather than trying to create a duplicate.
-    const cwd = getCwd()
-    let cwdIsWorktree = false
+    const cwd = getCwd();
+    let cwdIsWorktree = false;
     try {
-      const gitPtr = await import('fs/promises').then(fs =>
-        fs.readFile(join(cwd, '.git'), 'utf-8'),
-      )
-      cwdIsWorktree = gitPtr.trim().startsWith('gitdir:')
+      const gitPtr = await import('fs/promises').then(fs => fs.readFile(join(cwd, '.git'), 'utf-8'));
+      cwdIsWorktree = gitPtr.trim().startsWith('gitdir:');
     } catch {
       // ENOENT or not readable — not a git worktree
     }
@@ -103,49 +101,47 @@ export const EnterWorktreeTool: Tool<InputSchema, Output> = buildTool({
         worktreePath: cwd,
         worktreeName: 'existing',
         sessionId: getSessionId(),
-      }
-      restoreWorktreeSession(worktreeSession)
-      saveWorktreeState(worktreeSession)
-      clearSystemPromptSections()
-      clearMemoryFileCaches()
-      getPlansDirectory.cache.clear?.()
-      logEvent('tengu_worktree_adopted_existing', {})
+      };
+      restoreWorktreeSession(worktreeSession);
+      saveWorktreeState(worktreeSession);
+      clearSystemPromptSections();
+      clearMemoryFileCaches();
+      getPlansDirectory.cache.clear?.();
+      logEvent('tengu_worktree_adopted_existing', {});
       return {
         data: {
           worktreePath: cwd,
           message: `Adopted existing git worktree at ${cwd}.`,
         },
-      }
+      };
     }
 
     // Resolve to main repo root so worktree creation works from within a worktree
-    const mainRepoRoot = findCanonicalGitRoot(getCwd())
+    const mainRepoRoot = findCanonicalGitRoot(getCwd());
     if (mainRepoRoot && mainRepoRoot !== getCwd()) {
-      process.chdir(mainRepoRoot)
-      setCwd(mainRepoRoot)
+      process.chdir(mainRepoRoot);
+      setCwd(mainRepoRoot);
     }
 
-    const slug = input.name ?? getPlanSlug()
+    const slug = input.name ?? getPlanSlug();
 
-    const worktreeSession = await createWorktreeForSession(getSessionId(), slug)
+    const worktreeSession = await createWorktreeForSession(getSessionId(), slug);
 
-    process.chdir(worktreeSession.worktreePath)
-    setCwd(worktreeSession.worktreePath)
-    setOriginalCwd(getCwd())
-    saveWorktreeState(worktreeSession)
+    process.chdir(worktreeSession.worktreePath);
+    setCwd(worktreeSession.worktreePath);
+    setOriginalCwd(getCwd());
+    saveWorktreeState(worktreeSession);
     // Clear cached system prompt sections so env_info_simple recomputes with worktree context
-    clearSystemPromptSections()
+    clearSystemPromptSections();
     // Clear memoized caches that depend on CWD
-    clearMemoryFileCaches()
-    getPlansDirectory.cache.clear?.()
+    clearMemoryFileCaches();
+    getPlansDirectory.cache.clear?.();
 
     logEvent('tengu_worktree_created', {
       mid_session: true,
-    })
+    });
 
-    const branchInfo = worktreeSession.worktreeBranch
-      ? ` on branch ${worktreeSession.worktreeBranch}`
-      : ''
+    const branchInfo = worktreeSession.worktreeBranch ? ` on branch ${worktreeSession.worktreeBranch}` : '';
 
     return {
       data: {
@@ -153,13 +149,13 @@ export const EnterWorktreeTool: Tool<InputSchema, Output> = buildTool({
         worktreeBranch: worktreeSession.worktreeBranch,
         message: `Created worktree at ${worktreeSession.worktreePath}${branchInfo}. The session is now working in the worktree. Use ExitWorktree to leave mid-session, or exit the session to be prompted.`,
       },
-    }
+    };
   },
   mapToolResultToToolResultBlockParam({ message }, toolUseID) {
     return {
       type: 'tool_result',
       content: message,
       tool_use_id: toolUseID,
-    }
+    };
   },
-} satisfies ToolDef<InputSchema, Output>)
+} satisfies ToolDef<InputSchema, Output>);

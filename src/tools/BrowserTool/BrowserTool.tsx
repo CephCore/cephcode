@@ -2,27 +2,54 @@
  * Browser Tool — Tool Definition (Extended Control)
  */
 
-import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
-import * as React from 'react'
-import { z } from 'zod/v4'
-import { Text } from '../../ink.js'
-import { buildTool } from '../../Tool.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import { handleBrowserAction } from './handler.js'
-import type { BrowserActionInput } from './types.js'
+import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs';
+import * as React from 'react';
+import { z } from 'zod/v4';
+import { Text } from '../../ink.js';
+import { buildTool } from '../../Tool.js';
+import { lazySchema } from '../../utils/lazySchema.js';
+import { handleBrowserAction } from './handler.js';
+import type { BrowserActionInput } from './types.js';
 
-export const BROWSER_TOOL_NAME = 'browser' as const
+export const BROWSER_TOOL_NAME = 'browser' as const;
 
 const ALL_ACTIONS = [
-  'navigate', 'click', 'type', 'fill', 'clear', 'press', 'scroll',
-  'screenshot', 'extract', 'status', 'close',
-  'click_text', 'click_role', 'fill_label',
-  'select', 'check', 'uncheck', 'upload',
-  'go_back', 'go_forward', 'reload',
-  'hover', 'focus', 'wait_for', 'wait_for_url',
-  'frame_click', 'frame_fill', 'handle_dialog',
-  'get_text', 'get_attribute', 'get_value', 'get_links', 'get_inputs', 'evaluate', 'search',
-] as const
+  'navigate',
+  'click',
+  'type',
+  'fill',
+  'clear',
+  'press',
+  'scroll',
+  'screenshot',
+  'extract',
+  'status',
+  'close',
+  'click_text',
+  'click_role',
+  'fill_label',
+  'select',
+  'check',
+  'uncheck',
+  'upload',
+  'go_back',
+  'go_forward',
+  'reload',
+  'hover',
+  'focus',
+  'wait_for',
+  'wait_for_url',
+  'frame_click',
+  'frame_fill',
+  'handle_dialog',
+  'get_text',
+  'get_attribute',
+  'get_value',
+  'get_links',
+  'get_inputs',
+  'evaluate',
+  'search',
+] as const;
 
 const inputSchema = lazySchema(() =>
   z.object({
@@ -44,20 +71,23 @@ const inputSchema = lazySchema(() =>
     dialogAction: z.enum(['accept', 'dismiss']).optional(),
     dialogText: z.string().optional(),
     expression: z.string().optional().describe('JavaScript expression for evaluate'),
-    engine: z.enum(['google', 'bing', 'duckduckgo', 'twitter', 'reddit', 'github']).optional().describe('Search engine to use'),
+    engine: z
+      .enum(['google', 'bing', 'duckduckgo', 'twitter', 'reddit', 'github'])
+      .optional()
+      .describe('Search engine to use'),
     query: z.string().optional().describe('Search query'),
     timeout: z.number().optional(),
     headless: z.boolean().optional().describe('Run the browser headless for automation/testing'),
-  })
-)
+  }),
+);
 
 const outputSchema = lazySchema(() =>
   z.object({
     result: z.string(),
     screenshot: z.string().optional(),
     content: z.string().optional(),
-  })
-)
+  }),
+);
 
 export const BrowserTool = buildTool({
   name: BROWSER_TOOL_NAME,
@@ -65,15 +95,15 @@ export const BrowserTool = buildTool({
   searchHint: 'browse web playwright automation browser form click type',
 
   get inputSchema() {
-    return inputSchema()
+    return inputSchema();
   },
 
   get outputSchema() {
-    return outputSchema()
+    return outputSchema();
   },
 
   async description(): Promise<string> {
-    return 'Control a web browser with 30+ actions: navigate, search (Google/Bing/X/Reddit), click by selector/text/role, fill forms by label, select dropdowns, upload files, handle iframes and dialogs, extract page content, and run JavaScript.'
+    return 'Control a web browser with 30+ actions: navigate, search (Google/Bing/X/Reddit), click by selector/text/role, fill forms by label, select dropdowns, upload files, handle iframes and dialogs, extract page content, and run JavaScript.';
   },
 
   async prompt(): Promise<string> {
@@ -124,18 +154,15 @@ SEARCH SKILL:
   Example: action="search" engine="google" query="best AI tools 2026"
   Example: action="search" engine="twitter" query="claude code release"
 
-SESSION: close (saves cookies for next session)`
+SESSION: close (saves cookies for next session)`;
   },
 
   isEnabled(): boolean {
-    return true
+    return true;
   },
 
-  mapToolResultToToolResultBlockParam(
-    data: any,
-    toolUseID: string,
-  ): ToolResultBlockParam {
-    const content: ToolResultBlockParam['content'] = []
+  mapToolResultToToolResultBlockParam(data: any, toolUseID: string): ToolResultBlockParam {
+    const content: ToolResultBlockParam['content'] = [];
 
     // Add screenshot as image block if present
     if (data.screenshot) {
@@ -146,7 +173,7 @@ SESSION: close (saves cookies for next session)`
           media_type: 'image/jpeg',
           data: data.screenshot,
         },
-      })
+      });
     }
 
     // Add text result
@@ -154,41 +181,41 @@ SESSION: close (saves cookies for next session)`
       content.push({
         type: 'text',
         text: data.result,
-      })
+      });
     }
 
     return {
       tool_use_id: toolUseID,
       type: 'tool_result' as const,
       content: content.length > 0 ? content : data.result || 'Browser action completed',
-    }
+    };
   },
 
   async call(input: any): Promise<{ data: any }> {
-    const result = await handleBrowserAction(input as BrowserActionInput)
+    const result = await handleBrowserAction(input as BrowserActionInput);
     if (result.error) {
-      return { data: { result: `Error: ${result.error}` } }
+      return { data: { result: `Error: ${result.error}` } };
     }
     return {
       data: {
         result: `[${result.title}] ${result.url}`,
         screenshot: result.screenshot,
         content: result.content,
-      }
-    }
+      },
+    };
   },
 
   renderToolUseMessage(input: any): React.ReactNode {
-    const parts = [`🌐 ${input.action}`]
-    if (input.url) parts.push(input.url)
-    if (input.selector) parts.push(input.selector)
-    if (input.text) parts.push(`"${input.text.substring(0, 40)}"`)
-    if (input.label) parts.push(`label="${input.label}"`)
-    if (input.role) parts.push(`role=${input.role}`)
-    if (input.name) parts.push(`name="${input.name}"`)
-    if (input.engine) parts.push(`engine=${input.engine}`)
-    if (input.query) parts.push(`query="${input.query}"`)
-    if (input.headless !== undefined) parts.push(`headless=${input.headless}`)
-    return React.createElement(Text, null, parts.join(' '))
+    const parts = [`🌐 ${input.action}`];
+    if (input.url) parts.push(input.url);
+    if (input.selector) parts.push(input.selector);
+    if (input.text) parts.push(`"${input.text.substring(0, 40)}"`);
+    if (input.label) parts.push(`label="${input.label}"`);
+    if (input.role) parts.push(`role=${input.role}`);
+    if (input.name) parts.push(`name="${input.name}"`);
+    if (input.engine) parts.push(`engine=${input.engine}`);
+    if (input.query) parts.push(`query="${input.query}"`);
+    if (input.headless !== undefined) parts.push(`headless=${input.headless}`);
+    return React.createElement(Text, null, parts.join(' '));
   },
-})
+});

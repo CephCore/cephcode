@@ -1,103 +1,87 @@
-import { getIsNonInteractiveSession } from '../../bootstrap/state.js'
-import type { AppState } from '../../state/AppState.js'
-import type { Message } from '../../types/message.js'
-import { isAgentSwarmsEnabled } from '../../utils/agentSwarmsEnabled.js'
-import { count } from '../../utils/array.js'
-import { isEnvDefinedFalsy, isEnvTruthy } from '../../utils/envUtils.js'
-import { toError } from '../../utils/errors.js'
-import {
-  type CacheSafeParams,
-  createCacheSafeParams,
-  runForkedAgent,
-} from '../../utils/forkedAgent.js'
-import type { REPLHookContext } from '../../utils/hooks/postSamplingHooks.js'
-import { logError } from '../../utils/log.js'
-import {
-  createUserMessage,
-  getLastAssistantMessage,
-} from '../../utils/messages.js'
-import { getInitialSettings } from '../../utils/settings/settings.js'
-import { DEFAULT_OUTPUT_STYLE_NAME } from '../../constants/outputStyles.js'
-import { isTeammate } from '../../utils/teammate.js'
-import { getFeatureValue_CACHED_MAY_BE_STALE } from '../analytics/growthbook.js'
-import {
-  type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-  logEvent,
-} from '../analytics/index.js'
-import { currentLimits } from '../claudeAiLimits.js'
-import { isSpeculationEnabled, startSpeculation } from './speculation.js'
+import { getIsNonInteractiveSession } from '../../bootstrap/state.js';
+import { DEFAULT_OUTPUT_STYLE_NAME } from '../../constants/outputStyles.js';
+import type { AppState } from '../../state/AppState.js';
+import type { Message } from '../../types/message.js';
+import { isAgentSwarmsEnabled } from '../../utils/agentSwarmsEnabled.js';
+import { count } from '../../utils/array.js';
+import { isEnvDefinedFalsy, isEnvTruthy } from '../../utils/envUtils.js';
+import { toError } from '../../utils/errors.js';
+import { type CacheSafeParams, createCacheSafeParams, runForkedAgent } from '../../utils/forkedAgent.js';
+import type { REPLHookContext } from '../../utils/hooks/postSamplingHooks.js';
+import { logError } from '../../utils/log.js';
+import { createUserMessage, getLastAssistantMessage } from '../../utils/messages.js';
+import { getInitialSettings } from '../../utils/settings/settings.js';
+import { isTeammate } from '../../utils/teammate.js';
+import { getFeatureValue_CACHED_MAY_BE_STALE } from '../analytics/growthbook.js';
+import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from '../analytics/index.js';
+import { currentLimits } from '../claudeAiLimits.js';
+import { isSpeculationEnabled, startSpeculation } from './speculation.js';
 
-let currentAbortController: AbortController | null = null
+let currentAbortController: AbortController | null = null;
 
-export type PromptVariant = 'user_intent' | 'stated_intent'
+export type PromptVariant = 'user_intent' | 'stated_intent';
 
 export function getPromptVariant(): PromptVariant {
-  return 'user_intent'
+  return 'user_intent';
 }
 
 export function shouldEnablePromptSuggestion(): boolean {
   // Env var overrides everything (for testing)
-  const envOverride = process.env.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION
+  const envOverride = process.env.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION;
   if (isEnvDefinedFalsy(envOverride)) {
     logEvent('tengu_prompt_suggestion_init', {
       enabled: false,
-      source:
-        'env' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    })
-    return false
+      source: 'env' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    });
+    return false;
   }
   if (isEnvTruthy(envOverride)) {
     logEvent('tengu_prompt_suggestion_init', {
       enabled: true,
-      source:
-        'env' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    })
-    return true
+      source: 'env' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    });
+    return true;
   }
 
   // Keep default in sync with Config.tsx (settings toggle visibility)
   if (!getFeatureValue_CACHED_MAY_BE_STALE('tengu_chomp_inflection', false)) {
     logEvent('tengu_prompt_suggestion_init', {
       enabled: false,
-      source:
-        'growthbook' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    })
-    return false
+      source: 'growthbook' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    });
+    return false;
   }
 
   // Disable in non-interactive mode (print mode, piped input, SDK)
   if (getIsNonInteractiveSession()) {
     logEvent('tengu_prompt_suggestion_init', {
       enabled: false,
-      source:
-        'non_interactive' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    })
-    return false
+      source: 'non_interactive' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    });
+    return false;
   }
 
   // Disable for swarm teammates (only leader should show suggestions)
   if (isAgentSwarmsEnabled() && isTeammate()) {
     logEvent('tengu_prompt_suggestion_init', {
       enabled: false,
-      source:
-        'swarm_teammate' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    })
-    return false
+      source: 'swarm_teammate' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    });
+    return false;
   }
 
-  const enabled = getInitialSettings()?.promptSuggestionEnabled !== false
+  const enabled = getInitialSettings()?.promptSuggestionEnabled !== false;
   logEvent('tengu_prompt_suggestion_init', {
     enabled,
-    source:
-      'setting' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-  })
-  return enabled
+    source: 'setting' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+  });
+  return enabled;
 }
 
 export function abortPromptSuggestion(): void {
   if (currentAbortController) {
-    currentAbortController.abort()
-    currentAbortController = null
+    currentAbortController.abort();
+    currentAbortController = null;
   }
 }
 
@@ -106,22 +90,17 @@ export function abortPromptSuggestion(): void {
  * or null if generation is allowed. Shared by main and pipelined paths.
  */
 export function getSuggestionSuppressReason(appState: AppState): string | null {
-  if (!appState.promptSuggestionEnabled) return 'disabled'
-  if (appState.pendingWorkerRequest || appState.pendingSandboxRequest)
-    return 'pending_permission'
-  if (appState.elicitation.queue.length > 0) return 'elicitation_active'
-  if (appState.toolPermissionContext.mode === 'plan') return 'plan_mode'
+  if (!appState.promptSuggestionEnabled) return 'disabled';
+  if (appState.pendingWorkerRequest || appState.pendingSandboxRequest) return 'pending_permission';
+  if (appState.elicitation.queue.length > 0) return 'elicitation_active';
+  if (appState.toolPermissionContext.mode === 'plan') return 'plan_mode';
   // When a non-default output style (e.g. Explanatory, Learning) is active,
   // the model already gets style-specific instructions in its system prompt.
   // Prompt suggestions would compete with / contradict those instructions.
-  const outputStyle = getInitialSettings()?.outputStyle
-  if (outputStyle && outputStyle !== DEFAULT_OUTPUT_STYLE_NAME) return 'output_style'
-  if (
-    process.env.USER_TYPE === 'external' &&
-    currentLimits.status !== 'allowed'
-  )
-    return 'rate_limit'
-  return null
+  const outputStyle = getInitialSettings()?.outputStyle;
+  if (outputStyle && outputStyle !== DEFAULT_OUTPUT_STYLE_NAME) return 'output_style';
+  if (process.env.USER_TYPE === 'external' && currentLimits.status !== 'allowed') return 'rate_limit';
+  return null;
 }
 
 /**
@@ -135,66 +114,60 @@ export async function tryGenerateSuggestion(
   cacheSafeParams: CacheSafeParams,
   source?: 'cli' | 'sdk',
 ): Promise<{
-  suggestion: string
-  promptId: PromptVariant
-  generationRequestId: string | null
+  suggestion: string;
+  promptId: PromptVariant;
+  generationRequestId: string | null;
 } | null> {
   if (abortController.signal.aborted) {
-    logSuggestionSuppressed('aborted', undefined, undefined, source)
-    return null
+    logSuggestionSuppressed('aborted', undefined, undefined, source);
+    return null;
   }
 
-  const assistantTurnCount = count(messages, m => m.type === 'assistant')
+  const assistantTurnCount = count(messages, m => m.type === 'assistant');
   if (assistantTurnCount < 2) {
-    logSuggestionSuppressed('early_conversation', undefined, undefined, source)
-    return null
+    logSuggestionSuppressed('early_conversation', undefined, undefined, source);
+    return null;
   }
 
-  const lastAssistantMessage = getLastAssistantMessage(messages)
+  const lastAssistantMessage = getLastAssistantMessage(messages);
   if (lastAssistantMessage?.isApiErrorMessage) {
-    logSuggestionSuppressed('last_response_error', undefined, undefined, source)
-    return null
+    logSuggestionSuppressed('last_response_error', undefined, undefined, source);
+    return null;
   }
-  const cacheReason = getParentCacheSuppressReason(lastAssistantMessage)
+  const cacheReason = getParentCacheSuppressReason(lastAssistantMessage);
   if (cacheReason) {
-    logSuggestionSuppressed(cacheReason, undefined, undefined, source)
-    return null
+    logSuggestionSuppressed(cacheReason, undefined, undefined, source);
+    return null;
   }
 
-  const appState = getAppState()
-  const suppressReason = getSuggestionSuppressReason(appState)
+  const appState = getAppState();
+  const suppressReason = getSuggestionSuppressReason(appState);
   if (suppressReason) {
-    logSuggestionSuppressed(suppressReason, undefined, undefined, source)
-    return null
+    logSuggestionSuppressed(suppressReason, undefined, undefined, source);
+    return null;
   }
 
-  const promptId = getPromptVariant()
-  const { suggestion, generationRequestId } = await generateSuggestion(
-    abortController,
-    promptId,
-    cacheSafeParams,
-  )
+  const promptId = getPromptVariant();
+  const { suggestion, generationRequestId } = await generateSuggestion(abortController, promptId, cacheSafeParams);
   if (abortController.signal.aborted) {
-    logSuggestionSuppressed('aborted', undefined, undefined, source)
-    return null
+    logSuggestionSuppressed('aborted', undefined, undefined, source);
+    return null;
   }
   if (!suggestion) {
-    logSuggestionSuppressed('empty', undefined, promptId, source)
-    return null
+    logSuggestionSuppressed('empty', undefined, promptId, source);
+    return null;
   }
-  if (shouldFilterSuggestion(suggestion, promptId, source)) return null
+  if (shouldFilterSuggestion(suggestion, promptId, source)) return null;
 
-  return { suggestion, promptId, generationRequestId }
+  return { suggestion, promptId, generationRequestId };
 }
 
-export async function executePromptSuggestion(
-  context: REPLHookContext,
-): Promise<void> {
-  if (context.querySource !== 'repl_main_thread') return
+export async function executePromptSuggestion(context: REPLHookContext): Promise<void> {
+  if (context.querySource !== 'repl_main_thread') return;
 
-  currentAbortController = new AbortController()
-  const abortController = currentAbortController
-  const cacheSafeParams = createCacheSafeParams(context)
+  currentAbortController = new AbortController();
+  const abortController = currentAbortController;
+  const cacheSafeParams = createCacheSafeParams(context);
 
   try {
     const result = await tryGenerateSuggestion(
@@ -203,8 +176,8 @@ export async function executePromptSuggestion(
       context.toolUseContext.getAppState,
       cacheSafeParams,
       'cli',
-    )
-    if (!result) return
+    );
+    if (!result) return;
 
     context.toolUseContext.setAppState(prev => ({
       ...prev,
@@ -215,50 +188,38 @@ export async function executePromptSuggestion(
         acceptedAt: 0,
         generationRequestId: result.generationRequestId,
       },
-    }))
+    }));
 
     if (isSpeculationEnabled() && result.suggestion) {
-      void startSpeculation(
-        result.suggestion,
-        context,
-        context.toolUseContext.setAppState,
-        false,
-        cacheSafeParams,
-      )
+      void startSpeculation(result.suggestion, context, context.toolUseContext.setAppState, false, cacheSafeParams);
     }
   } catch (error) {
-    if (
-      error instanceof Error &&
-      (error.name === 'AbortError' || error.name === 'APIUserAbortError')
-    ) {
-      logSuggestionSuppressed('aborted', undefined, undefined, 'cli')
-      return
+    if (error instanceof Error && (error.name === 'AbortError' || error.name === 'APIUserAbortError')) {
+      logSuggestionSuppressed('aborted', undefined, undefined, 'cli');
+      return;
     }
-    logError(toError(error))
+    logError(toError(error));
   } finally {
     if (currentAbortController === abortController) {
-      currentAbortController = null
+      currentAbortController = null;
     }
   }
 }
 
-const MAX_PARENT_UNCACHED_TOKENS = 10_000
+const MAX_PARENT_UNCACHED_TOKENS = 10_000;
 
 export function getParentCacheSuppressReason(
   lastAssistantMessage: ReturnType<typeof getLastAssistantMessage>,
 ): string | null {
-  if (!lastAssistantMessage) return null
+  if (!lastAssistantMessage) return null;
 
-  const usage = lastAssistantMessage.message.usage
-  const inputTokens = usage.input_tokens ?? 0
-  const cacheWriteTokens = usage.cache_creation_input_tokens ?? 0
+  const usage = lastAssistantMessage.message.usage;
+  const inputTokens = usage.input_tokens ?? 0;
+  const cacheWriteTokens = usage.cache_creation_input_tokens ?? 0;
   // The fork re-processes the parent's output (never cached) plus its own prompt.
-  const outputTokens = usage.output_tokens ?? 0
+  const outputTokens = usage.output_tokens ?? 0;
 
-  return inputTokens + cacheWriteTokens + outputTokens >
-    MAX_PARENT_UNCACHED_TOKENS
-    ? 'cache_cold'
-    : null
+  return inputTokens + cacheWriteTokens + outputTokens > MAX_PARENT_UNCACHED_TOKENS ? 'cache_cold' : null;
 }
 
 const SUGGESTION_PROMPT = `[SUGGESTION MODE: Suggest what the user might naturally type next into Claude Code.]
@@ -290,26 +251,26 @@ Stay silent if the next step isn't obvious from what the user said.
 
 Format: 2-12 words, match the user's style. Or nothing.
 
-Reply with ONLY the suggestion, no quotes or explanation.`
+Reply with ONLY the suggestion, no quotes or explanation.`;
 
 const SUGGESTION_PROMPTS: Record<PromptVariant, string> = {
   user_intent: SUGGESTION_PROMPT,
   stated_intent: SUGGESTION_PROMPT,
-}
+};
 
 export async function generateSuggestion(
   abortController: AbortController,
   promptId: PromptVariant,
   cacheSafeParams: CacheSafeParams,
 ): Promise<{ suggestion: string | null; generationRequestId: string | null }> {
-  const prompt = SUGGESTION_PROMPTS[promptId]
+  const prompt = SUGGESTION_PROMPTS[promptId];
 
   // Deny tools via callback, NOT by passing tools:[] - that busts cache (0% hit)
   const canUseTool = async () => ({
     behavior: 'deny' as const,
     message: 'No tools needed for suggestion',
     decisionReason: { type: 'other' as const, reason: 'suggestion only' },
-  })
+  });
 
   // DO NOT override any API parameter that differs from the parent request.
   // The fork piggybacks on the main thread's prompt cache by sending identical
@@ -333,28 +294,25 @@ export async function generateSuggestion(
     },
     skipTranscript: true,
     skipCacheWrite: true,
-  })
+  });
 
   // Check ALL messages - model may loop (try tool → denied → text in next message)
   // Also extract the requestId from the first assistant message for RL dataset joins
-  const firstAssistantMsg = result.messages.find(m => m.type === 'assistant')
-  const generationRequestId =
-    firstAssistantMsg?.type === 'assistant'
-      ? (firstAssistantMsg.requestId ?? null)
-      : null
+  const firstAssistantMsg = result.messages.find(m => m.type === 'assistant');
+  const generationRequestId = firstAssistantMsg?.type === 'assistant' ? (firstAssistantMsg.requestId ?? null) : null;
 
   for (const msg of result.messages) {
-    if (msg.type !== 'assistant') continue
-    const textBlock = msg.message.content.find(b => b.type === 'text')
+    if (msg.type !== 'assistant') continue;
+    const textBlock = msg.message.content.find(b => b.type === 'text');
     if (textBlock?.type === 'text') {
-      const suggestion = textBlock.text.trim()
+      const suggestion = textBlock.text.trim();
       if (suggestion) {
-        return { suggestion, generationRequestId }
+        return { suggestion, generationRequestId };
       }
     }
   }
 
-  return { suggestion: null, generationRequestId }
+  return { suggestion: null, generationRequestId };
 }
 
 export function shouldFilterSuggestion(
@@ -363,12 +321,12 @@ export function shouldFilterSuggestion(
   source?: 'cli' | 'sdk',
 ): boolean {
   if (!suggestion) {
-    logSuggestionSuppressed('empty', undefined, promptId, source)
-    return true
+    logSuggestionSuppressed('empty', undefined, promptId, source);
+    return true;
   }
 
-  const lower = suggestion.toLowerCase()
-  const wordCount = suggestion.trim().split(/\s+/).length
+  const lower = suggestion.toLowerCase();
+  const wordCount = suggestion.trim().split(/\s+/).length;
 
   const filters: Array<[string, () => boolean]> = [
     ['done', () => lower === 'done'],
@@ -402,9 +360,9 @@ export function shouldFilterSuggestion(
     [
       'too_few_words',
       () => {
-        if (wordCount >= 2) return false
+        if (wordCount >= 2) return false;
         // Allow slash commands — these are valid user commands
-        if (suggestion.startsWith('/')) return false
+        if (suggestion.startsWith('/')) return false;
         // Allow common single-word inputs that are valid user commands
         const ALLOWED_SINGLE_WORDS = new Set([
           // Affirmatives
@@ -427,8 +385,8 @@ export function shouldFilterSuggestion(
           'quit',
           // Negation
           'no',
-        ])
-        return !ALLOWED_SINGLE_WORDS.has(lower)
+        ]);
+        return !ALLOWED_SINGLE_WORDS.has(lower);
       },
     ],
     ['too_many_words', () => wordCount > 12],
@@ -449,16 +407,16 @@ export function shouldFilterSuggestion(
           suggestion,
         ),
     ],
-  ]
+  ];
 
   for (const [reason, check] of filters) {
     if (check()) {
-      logSuggestionSuppressed(reason, suggestion, promptId, source)
-      return true
+      logSuggestionSuppressed(reason, suggestion, promptId, source);
+      return true;
     }
   }
 
-  return false
+  return false;
 }
 
 /**
@@ -472,21 +430,16 @@ export function logSuggestionOutcome(
   promptId: PromptVariant,
   generationRequestId: string | null,
 ): void {
-  const similarity =
-    Math.round((userInput.length / (suggestion.length || 1)) * 100) / 100
-  const wasAccepted = userInput === suggestion
-  const timeMs = Math.max(0, Date.now() - emittedAt)
+  const similarity = Math.round((userInput.length / (suggestion.length || 1)) * 100) / 100;
+  const wasAccepted = userInput === suggestion;
+  const timeMs = Math.max(0, Date.now() - emittedAt);
 
   logEvent('tengu_prompt_suggestion', {
     source: 'sdk' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    outcome: (wasAccepted
-      ? 'accepted'
-      : 'ignored') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    prompt_id:
-      promptId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    outcome: (wasAccepted ? 'accepted' : 'ignored') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    prompt_id: promptId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     ...(generationRequestId && {
-      generationRequestId:
-        generationRequestId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      generationRequestId: generationRequestId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     }),
     ...(wasAccepted && {
       timeToAcceptMs: timeMs,
@@ -494,12 +447,10 @@ export function logSuggestionOutcome(
     ...(!wasAccepted && { timeToIgnoreMs: timeMs }),
     similarity,
     ...(process.env.USER_TYPE === 'ant' && {
-      suggestion:
-        suggestion as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      userInput:
-        userInput as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      suggestion: suggestion as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      userInput: userInput as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     }),
-  })
+  });
 }
 
 export function logSuggestionSuppressed(
@@ -508,22 +459,17 @@ export function logSuggestionSuppressed(
   promptId?: PromptVariant,
   source?: 'cli' | 'sdk',
 ): void {
-  const resolvedPromptId = promptId ?? getPromptVariant()
+  const resolvedPromptId = promptId ?? getPromptVariant();
   logEvent('tengu_prompt_suggestion', {
     ...(source && {
-      source:
-        source as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      source: source as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     }),
-    outcome:
-      'suppressed' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    reason:
-      reason as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    prompt_id:
-      resolvedPromptId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    outcome: 'suppressed' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    reason: reason as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    prompt_id: resolvedPromptId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     ...(process.env.USER_TYPE === 'ant' &&
       suggestion && {
-        suggestion:
-          suggestion as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        suggestion: suggestion as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       }),
-  })
+  });
 }

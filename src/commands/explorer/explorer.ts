@@ -1,9 +1,9 @@
-import type { LocalCommandCall } from '../../types/command.js'
+import type { LocalCommandCall } from '../../types/command.js';
 
 export const call: LocalCommandCall = async (args, context) => {
   const { getAppState, setAppState } = context;
   const currentMode = getAppState().settings.explorerMode ?? 'none';
-  
+
   let nextMode: 'none' | 'sidebar' | 'fullscreen';
   if (args === 'on' || args === 'sidebar') {
     nextMode = 'sidebar';
@@ -15,15 +15,15 @@ export const call: LocalCommandCall = async (args, context) => {
     // Toggle
     nextMode = currentMode === 'none' ? 'sidebar' : 'none';
   }
-  
+
   setAppState(prev => ({
     ...prev,
     settings: {
       ...prev.settings,
-      explorerMode: nextMode
-    }
+      explorerMode: nextMode,
+    },
   }));
-  
+
   const { updateSettingsForSource } = await import('../../utils/settings/settings.js');
   updateSettingsForSource('userSettings', { explorerMode: nextMode });
 
@@ -31,8 +31,8 @@ export const call: LocalCommandCall = async (args, context) => {
   const { saveGlobalConfig } = await import('../../utils/config.js');
   saveGlobalConfig(prev => ({
     ...prev,
-    explorerMode: nextMode
+    explorerMode: nextMode,
   }));
 
   return { type: 'text', value: `File explorer set to: ${nextMode}` };
-}
+};

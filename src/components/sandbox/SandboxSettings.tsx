@@ -1,49 +1,43 @@
-import React from 'react'
-import { Box, color, Link, Text, useTheme } from '../../ink.js'
-import { useKeybindings } from '../../keybindings/useKeybinding.js'
-import type { CommandResultDisplay } from '../../types/command.js'
-import type { SandboxDependencyCheck } from '../../utils/sandbox/sandbox-adapter.js'
-import { SandboxManager } from '../../utils/sandbox/sandbox-adapter.js'
-import { getSettings_DEPRECATED } from '../../utils/settings/settings.js'
-import { Select } from '../CustomSelect/select.js'
-import { Pane } from '../design-system/Pane.js'
-import { Tab, Tabs, useTabHeaderFocus } from '../design-system/Tabs.js'
-import { SandboxConfigTab } from './SandboxConfigTab.js'
-import { SandboxDependenciesTab } from './SandboxDependenciesTab.js'
-import { SandboxOverridesTab } from './SandboxOverridesTab.js'
+import type React from 'react';
+import { Box, color, Link, Text, useTheme } from '../../ink.js';
+import { useKeybindings } from '../../keybindings/useKeybinding.js';
+import type { CommandResultDisplay } from '../../types/command.js';
+import type { SandboxDependencyCheck } from '../../utils/sandbox/sandbox-adapter.js';
+import { SandboxManager } from '../../utils/sandbox/sandbox-adapter.js';
+import { getSettings_DEPRECATED } from '../../utils/settings/settings.js';
+import { Select } from '../CustomSelect/select.js';
+import { Pane } from '../design-system/Pane.js';
+import { Tab, Tabs, useTabHeaderFocus } from '../design-system/Tabs.js';
+import { SandboxConfigTab } from './SandboxConfigTab.js';
+import { SandboxDependenciesTab } from './SandboxDependenciesTab.js';
+import { SandboxOverridesTab } from './SandboxOverridesTab.js';
 
 type Props = {
-  onComplete: (
-    result?: string,
-    options?: { display?: CommandResultDisplay },
-  ) => void
-  depCheck: SandboxDependencyCheck
-}
+  onComplete: (result?: string, options?: { display?: CommandResultDisplay }) => void;
+  depCheck: SandboxDependencyCheck;
+};
 
-type SandboxMode = 'auto-allow' | 'regular' | 'disabled'
+type SandboxMode = 'auto-allow' | 'regular' | 'disabled';
 
-export function SandboxSettings({
-  onComplete,
-  depCheck,
-}: Props): React.ReactNode {
-  const [theme] = useTheme()
-  const currentEnabled = SandboxManager.isSandboxingEnabled()
-  const currentAutoAllow = SandboxManager.isAutoAllowBashIfSandboxedEnabled()
-  const hasWarnings = depCheck.warnings.length > 0
-  const settings = getSettings_DEPRECATED()
-  const allowAllUnixSockets = settings.sandbox?.network?.allowAllUnixSockets
+export function SandboxSettings({ onComplete, depCheck }: Props): React.ReactNode {
+  const [theme] = useTheme();
+  const currentEnabled = SandboxManager.isSandboxingEnabled();
+  const currentAutoAllow = SandboxManager.isAutoAllowBashIfSandboxedEnabled();
+  const hasWarnings = depCheck.warnings.length > 0;
+  const settings = getSettings_DEPRECATED();
+  const allowAllUnixSockets = settings.sandbox?.network?.allowAllUnixSockets;
   // Show warning if seccomp missing AND user hasn't allowed all unix sockets
-  const showSocketWarning = hasWarnings && !allowAllUnixSockets
+  const showSocketWarning = hasWarnings && !allowAllUnixSockets;
 
   // Determine current mode
   const getCurrentMode = (): SandboxMode => {
-    if (!currentEnabled) return 'disabled'
-    if (currentAutoAllow) return 'auto-allow'
-    return 'regular'
-  }
+    if (!currentEnabled) return 'disabled';
+    if (currentAutoAllow) return 'auto-allow';
+    return 'regular';
+  };
 
-  const currentMode = getCurrentMode()
-  const currentIndicator = color('success', theme)(`(current)`)
+  const currentMode = getCurrentMode();
+  const currentIndicator = color('success', theme)(`(current)`);
 
   const options = [
     {
@@ -61,39 +55,36 @@ export function SandboxSettings({
       value: 'regular',
     },
     {
-      label:
-        currentMode === 'disabled'
-          ? `No Sandbox ${currentIndicator}`
-          : 'No Sandbox',
+      label: currentMode === 'disabled' ? `No Sandbox ${currentIndicator}` : 'No Sandbox',
       value: 'disabled',
     },
-  ]
+  ];
 
   async function handleSelect(value: string) {
-    const mode = value as SandboxMode
+    const mode = value as SandboxMode;
 
     switch (mode) {
       case 'auto-allow':
         await SandboxManager.setSandboxSettings({
           enabled: true,
           autoAllowBashIfSandboxed: true,
-        })
-        onComplete('✓ Sandbox enabled with auto-allow for bash commands')
-        break
+        });
+        onComplete('✓ Sandbox enabled with auto-allow for bash commands');
+        break;
       case 'regular':
         await SandboxManager.setSandboxSettings({
           enabled: true,
           autoAllowBashIfSandboxed: false,
-        })
-        onComplete('✓ Sandbox enabled with regular bash permissions')
-        break
+        });
+        onComplete('✓ Sandbox enabled with regular bash permissions');
+        break;
       case 'disabled':
         await SandboxManager.setSandboxSettings({
           enabled: false,
           autoAllowBashIfSandboxed: false,
-        })
-        onComplete('○ Sandbox disabled')
-        break
+        });
+        onComplete('○ Sandbox disabled');
+        break;
     }
   }
 
@@ -102,7 +93,7 @@ export function SandboxSettings({
       'confirm:no': () => onComplete(undefined, { display: 'skip' }),
     },
     { context: 'Settings' },
-  )
+  );
 
   const modeTab = (
     <Tab key="mode" title="Mode">
@@ -113,21 +104,21 @@ export function SandboxSettings({
         onComplete={onComplete}
       />
     </Tab>
-  )
+  );
 
   const overridesTab = (
     <Tab key="overrides" title="Overrides">
       <SandboxOverridesTab onComplete={onComplete} />
     </Tab>
-  )
+  );
 
   const configTab = (
     <Tab key="config" title="Config">
       <SandboxConfigTab />
     </Tab>
-  )
+  );
 
-  const hasErrors = depCheck.errors.length > 0
+  const hasErrors = depCheck.errors.length > 0;
 
   // If required deps missing, only show Dependencies tab
   // If only optional deps missing, show all tabs
@@ -148,7 +139,7 @@ export function SandboxSettings({
           : []),
         overridesTab,
         configTab,
-      ]
+      ];
 
   return (
     <Pane color="permission">
@@ -156,7 +147,7 @@ export function SandboxSettings({
         {tabs}
       </Tabs>
     </Pane>
-  )
+  );
 }
 
 function SandboxModeTab({
@@ -165,19 +156,17 @@ function SandboxModeTab({
   onSelect,
   onComplete,
 }: {
-  showSocketWarning: boolean
-  options: Array<{ label: string; value: string }>
-  onSelect: (value: string) => void
-  onComplete: Props['onComplete']
+  showSocketWarning: boolean;
+  options: Array<{ label: string; value: string }>;
+  onSelect: (value: string) => void;
+  onComplete: Props['onComplete'];
 }): React.ReactNode {
-  const { headerFocused, focusHeader } = useTabHeaderFocus()
+  const { headerFocused, focusHeader } = useTabHeaderFocus();
   return (
     <Box flexDirection="column" paddingY={1}>
       {showSocketWarning && (
         <Box marginBottom={1}>
-          <Text color="warning">
-            Cannot block unix domain sockets (see Dependencies tab)
-          </Text>
+          <Text color="warning">Cannot block unix domain sockets (see Dependencies tab)</Text>
         </Box>
       )}
       <Box marginBottom={1}>
@@ -195,17 +184,13 @@ function SandboxModeTab({
           <Text bold dimColor>
             Auto-allow mode:
           </Text>{' '}
-          Commands will try to run in the sandbox automatically, and attempts to
-          run outside of the sandbox fallback to regular permissions. Explicit
-          ask/deny rules are always respected.
+          Commands will try to run in the sandbox automatically, and attempts to run outside of the sandbox fallback to
+          regular permissions. Explicit ask/deny rules are always respected.
         </Text>
         <Text dimColor>
-          Learn more:{' '}
-          <Link url="https://code.claude.com/docs/en/sandboxing">
-            code.claude.com/docs/en/sandboxing
-          </Link>
+          Learn more: <Link url="https://code.claude.com/docs/en/sandboxing">code.claude.com/docs/en/sandboxing</Link>
         </Text>
       </Box>
     </Box>
-  )
+  );
 }

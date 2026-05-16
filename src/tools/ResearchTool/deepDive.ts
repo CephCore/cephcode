@@ -1,5 +1,5 @@
-import axios from "axios";
-import { logError } from "../../utils/log.js";
+import axios from 'axios';
+import { logError } from '../../utils/log.js';
 
 // Configuration for deep dive
 const DEEP_DIVE_CONFIG = {
@@ -8,7 +8,7 @@ const DEEP_DIVE_CONFIG = {
   maxContentLength: 10000, // Max characters to extract from each page
   timeout: 15000, // 15 seconds per request
   userAgent:
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 };
 
 export interface DeepDiveResult {
@@ -33,22 +33,22 @@ export interface DeepDiveOptions {
  */
 function extractTextFromHtml(html: string): string {
   // Remove script and style tags
-  let text = html.replace(/<script[^>]*>.*?<\/script>/gis, "");
-  text = text.replace(/<style[^>]*>.*?<\/style>/gis, "");
+  let text = html.replace(/<script[^>]*>.*?<\/script>/gis, '');
+  text = text.replace(/<style[^>]*>.*?<\/style>/gis, '');
 
   // Remove HTML tags
-  text = text.replace(/<[^>]+>/g, " ");
+  text = text.replace(/<[^>]+>/g, ' ');
 
   // Decode HTML entities
-  text = text.replace(/&nbsp;/g, " ");
-  text = text.replace(/&/g, "&");
-  text = text.replace(/</g, "<");
-  text = text.replace(/>/g, ">");
+  text = text.replace(/&nbsp;/g, ' ');
+  text = text.replace(/&/g, '&');
+  text = text.replace(/</g, '<');
+  text = text.replace(/>/g, '>');
   text = text.replace(/"/g, '"');
   text = text.replace(/'/g, "'");
 
   // Remove extra whitespace
-  text = text.replace(/\s+/g, " ").trim();
+  text = text.replace(/\s+/g, ' ').trim();
 
   return text;
 }
@@ -65,23 +65,18 @@ function extractLinksFromHtml(html: string, baseUrl: string): string[] {
     let url = match[1];
 
     // Skip empty links, anchors, javascript, mailto
-    if (
-      !url ||
-      url.startsWith("#") ||
-      url.startsWith("javascript:") ||
-      url.startsWith("mailto:")
-    ) {
+    if (!url || url.startsWith('#') || url.startsWith('javascript:') || url.startsWith('mailto:')) {
       continue;
     }
 
     // Convert relative URLs to absolute
     try {
-      if (!url.startsWith("http")) {
+      if (!url.startsWith('http')) {
         url = new URL(url, baseUrl).toString();
       }
 
       // Only keep http/https links
-      if (url.startsWith("http://") || url.startsWith("https://")) {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
         links.push(url);
       }
     } catch {
@@ -96,39 +91,32 @@ function extractLinksFromHtml(html: string, baseUrl: string): string[] {
 /**
  * Fetch and process a single URL
  */
-async function fetchPageContent(
-  url: string,
-  level: number,
-): Promise<DeepDiveResult> {
+async function fetchPageContent(url: string, level: number): Promise<DeepDiveResult> {
   try {
     const response = await axios.get(url, {
       timeout: DEEP_DIVE_CONFIG.timeout,
       headers: {
-        "User-Agent": DEEP_DIVE_CONFIG.userAgent,
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        'User-Agent': DEEP_DIVE_CONFIG.userAgent,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
       maxRedirects: 5,
     });
 
     // Only process HTML content
-    const contentType = response.headers["content-type"] || "";
-    if (!contentType.includes("text/html")) {
+    const contentType = response.headers['content-type'] || '';
+    if (!contentType.includes('text/html')) {
       return {
         originalUrl: url,
         level,
         title: url,
-        content: "",
-        excerpt: "Non-HTML content",
+        content: '',
+        excerpt: 'Non-HTML content',
         links: [],
       };
     }
 
     const html = response.data as string;
-    const textContent = extractTextFromHtml(html).substring(
-      0,
-      DEEP_DIVE_CONFIG.maxContentLength,
-    );
+    const textContent = extractTextFromHtml(html).substring(0, DEEP_DIVE_CONFIG.maxContentLength);
     const excerpt = textContent.substring(0, 500);
     const links = extractLinksFromHtml(html, url);
 
@@ -150,10 +138,10 @@ async function fetchPageContent(
       originalUrl: url,
       level,
       title: url,
-      content: "",
-      excerpt: `Failed to fetch: ${error instanceof Error ? error.message : "Unknown error"}`,
+      content: '',
+      excerpt: `Failed to fetch: ${error instanceof Error ? error.message : 'Unknown error'}`,
       links: [],
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
@@ -161,14 +149,8 @@ async function fetchPageContent(
 /**
  * Perform deep dive research starting from initial URLs
  */
-export async function performDeepDive(
-  initialUrls: string[],
-  options: DeepDiveOptions = {},
-): Promise<DeepDiveResult[]> {
-  const {
-    maxLevels = DEEP_DIVE_CONFIG.maxLevels,
-    maxLinksPerLevel = DEEP_DIVE_CONFIG.maxLinksPerLevel,
-  } = options;
+export async function performDeepDive(initialUrls: string[], options: DeepDiveOptions = {}): Promise<DeepDiveResult[]> {
+  const { maxLevels = DEEP_DIVE_CONFIG.maxLevels, maxLinksPerLevel = DEEP_DIVE_CONFIG.maxLinksPerLevel } = options;
 
   const results: DeepDiveResult[] = [];
   const visitedUrls = new Set<string>();
@@ -176,16 +158,14 @@ export async function performDeepDive(
 
   for (let level = 1; level <= maxLevels; level++) {
     // Filter out already visited URLs
-    const urlsToFetch = currentLevelUrls
-      .filter((url) => !visitedUrls.has(url))
-      .slice(0, maxLinksPerLevel);
+    const urlsToFetch = currentLevelUrls.filter(url => !visitedUrls.has(url)).slice(0, maxLinksPerLevel);
 
     if (urlsToFetch.length === 0) {
       break;
     }
 
     // Fetch all URLs for this level in parallel
-    const fetchPromises = urlsToFetch.map((url) => {
+    const fetchPromises = urlsToFetch.map(url => {
       visitedUrls.add(url);
       return fetchPageContent(url, level);
     });
@@ -214,16 +194,13 @@ export async function performDeepDive(
 /**
  * Filter deep dive results to only include relevant ones
  */
-export function filterDeepDiveResults(
-  results: DeepDiveResult[],
-  query: string,
-): DeepDiveResult[] {
+export function filterDeepDiveResults(results: DeepDiveResult[], query: string): DeepDiveResult[] {
   const queryTerms = query
     .toLowerCase()
-    .split(" ")
-    .filter((term) => term.length > 2);
+    .split(' ')
+    .filter(term => term.length > 2);
 
-  return results.filter((result) => {
+  return results.filter(result => {
     // Always include level 1 results (original search results)
     if (result.level === 1) return true;
 
@@ -232,9 +209,7 @@ export function filterDeepDiveResults(
     const titleLower = result.title.toLowerCase();
 
     // Check if at least 2 query terms are present in content or title
-    const matchCount = queryTerms.filter(
-      (term) => contentLower.includes(term) || titleLower.includes(term),
-    ).length;
+    const matchCount = queryTerms.filter(term => contentLower.includes(term) || titleLower.includes(term)).length;
 
     return matchCount >= 2;
   });

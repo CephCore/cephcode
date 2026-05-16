@@ -5,6 +5,7 @@ import { Text } from '../../ink.js';
 import { logEvent } from '../../services/analytics/index.js';
 import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js';
 import { useStartupNotification } from './useStartupNotification.js';
+
 const MAX_SHOW_COUNT = 3;
 
 /**
@@ -27,17 +28,25 @@ async function _temp2() {
     return null;
   }
   saveGlobalConfig(_temp);
-  logEvent("tengu_switch_to_subscription_notice_shown", {});
+  logEvent('tengu_switch_to_subscription_notice_shown', {});
   return {
-    key: "switch-to-subscription",
-    jsx: <Text color="suggestion">Use your existing Claude {subscriptionType} plan with Claude Code<Text color="text" dimColor={true}>{" "}· /login to activate</Text></Text>,
-    priority: "low"
+    key: 'switch-to-subscription',
+    jsx: (
+      <Text color="suggestion">
+        Use your existing Claude {subscriptionType} plan with Claude Code
+        <Text color="text" dimColor={true}>
+          {' '}
+          · /login to activate
+        </Text>
+      </Text>
+    ),
+    priority: 'low',
   };
 }
 function _temp(current) {
   return {
     ...current,
-    subscriptionNoticeCount: (current.subscriptionNoticeCount ?? 0) + 1
+    subscriptionNoticeCount: (current.subscriptionNoticeCount ?? 0) + 1,
   };
 }
 async function getExistingClaudeSubscription(): Promise<'Max' | 'Pro' | null> {

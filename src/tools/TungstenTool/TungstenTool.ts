@@ -1,7 +1,7 @@
 export class TungstenTool {
-  static name = 'tungsten'
-  name = 'tungsten'
+  static name = 'tungsten';
+  name = 'tungsten';
   isEnabled() {
-    return false
+    return false;
   }
 }

@@ -1,43 +1,34 @@
-import type Anthropic from '@anthropic-ai/sdk'
-import type { BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages.js'
-import {
-  getLastApiCompletionTimestamp,
-  setLastApiCompletionTimestamp,
-} from '../bootstrap/state.js'
-import { STRUCTURED_OUTPUTS_BETA_HEADER } from '../constants/betas.js'
-import type { QuerySource } from '../constants/querySource.js'
-import {
-  getAttributionHeader,
-  getCLISyspromptPrefix,
-} from '../constants/system.js'
-import { addToTotalSessionCost } from '../cost-tracker.js'
-import { logEvent } from '../services/analytics/index.js'
-import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../services/analytics/metadata.js'
-import {
-  classifyProviderError,
-  getProviderErrorInfo,
-} from '../services/api/errors.js'
-import { getAPIMetadata } from '../services/api/claude.js'
-import { getAnthropicClient } from '../services/api/client.js'
-import { ProviderManager } from '../services/ai/ProviderManager.js'
-import { fromGenericUsage } from '../services/ai/usageTypes.js'
-import { getModelBetas, modelSupportsStructuredOutputs } from './betas.js'
-import { computeFingerprint } from './fingerprint.js'
-import { logError } from './log.js'
-import { normalizeModelStringForAPI } from './model/model.js'
-import { getActiveProviderId, isAnthropicProvider } from './model/providers.js'
+import type Anthropic from '@anthropic-ai/sdk';
+import type { BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages.js';
+import { getLastApiCompletionTimestamp, setLastApiCompletionTimestamp } from '../bootstrap/state.js';
+import { STRUCTURED_OUTPUTS_BETA_HEADER } from '../constants/betas.js';
+import type { QuerySource } from '../constants/querySource.js';
+import { getAttributionHeader, getCLISyspromptPrefix } from '../constants/system.js';
+import { addToTotalSessionCost } from '../cost-tracker.js';
+import { ProviderManager } from '../services/ai/ProviderManager.js';
+import { fromGenericUsage } from '../services/ai/usageTypes.js';
+import { logEvent } from '../services/analytics/index.js';
+import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../services/analytics/metadata.js';
+import { getAPIMetadata } from '../services/api/claude.js';
+import { getAnthropicClient } from '../services/api/client.js';
+import { classifyProviderError, getProviderErrorInfo } from '../services/api/errors.js';
+import { getModelBetas, modelSupportsStructuredOutputs } from './betas.js';
+import { computeFingerprint } from './fingerprint.js';
+import { logError } from './log.js';
+import { normalizeModelStringForAPI } from './model/model.js';
+import { getActiveProviderId, isAnthropicProvider } from './model/providers.js';
 
-type MessageParam = Anthropic.MessageParam
-type TextBlockParam = Anthropic.TextBlockParam
-type Tool = Anthropic.Tool
-type ToolChoice = Anthropic.ToolChoice
-type BetaMessage = Anthropic.Beta.Messages.BetaMessage
-type BetaJSONOutputFormat = Anthropic.Beta.Messages.BetaJSONOutputFormat
-type BetaThinkingConfigParam = Anthropic.Beta.Messages.BetaThinkingConfigParam
+type MessageParam = Anthropic.MessageParam;
+type TextBlockParam = Anthropic.TextBlockParam;
+type Tool = Anthropic.Tool;
+type ToolChoice = Anthropic.ToolChoice;
+type BetaMessage = Anthropic.Beta.Messages.BetaMessage;
+type BetaJSONOutputFormat = Anthropic.Beta.Messages.BetaJSONOutputFormat;
+type BetaThinkingConfigParam = Anthropic.Beta.Messages.BetaThinkingConfigParam;
 
 export type SideQueryOptions = {
   /** Model to use for the query */
-  model: string
+  model: string;
   /**
    * System prompt - string or array of text blocks (will be prefixed with CLI attribution).
    *
@@ -45,46 +36,46 @@ export type SideQueryOptions = {
    * server-side parsing correctly extracts the cc_entrypoint value without including
    * system prompt content.
    */
-  system?: string | TextBlockParam[]
+  system?: string | TextBlockParam[];
   /** Messages to send (supports cache_control on content blocks) */
-  messages: MessageParam[]
+  messages: MessageParam[];
   /** Optional tools (supports both standard Tool[] and BetaToolUnion[] for custom tool types) */
-  tools?: Tool[] | BetaToolUnion[]
+  tools?: Tool[] | BetaToolUnion[];
   /** Optional tool choice (use { type: 'tool', name: 'x' } for forced output) */
-  tool_choice?: ToolChoice
+  tool_choice?: ToolChoice;
   /** Optional JSON output format for structured responses */
-  output_format?: BetaJSONOutputFormat
+  output_format?: BetaJSONOutputFormat;
   /** Max tokens (default: 1024) */
-  max_tokens?: number
+  max_tokens?: number;
   /** Max retries (default: 2) */
-  maxRetries?: number
+  maxRetries?: number;
   /** Abort signal */
-  signal?: AbortSignal
+  signal?: AbortSignal;
   /** Skip CLI system prompt prefix (keeps attribution header for OAuth). For internal classifiers that provide their own prompt. */
-  skipSystemPromptPrefix?: boolean
+  skipSystemPromptPrefix?: boolean;
   /** Temperature override */
-  temperature?: number
+  temperature?: number;
   /** Thinking budget (enables thinking), or `false` to send `{ type: 'disabled' }`. */
-  thinking?: number | false
+  thinking?: number | false;
   /** Stop sequences — generation stops when any of these strings is emitted */
-  stop_sequences?: string[]
+  stop_sequences?: string[];
   /** Attributes this call in tengu_api_success for COGS joining against reporting.sampling_calls. */
-  querySource: QuerySource
-}
+  querySource: QuerySource;
+};
 
 /**
  * Extract text from first user message for fingerprint computation.
  */
 function extractFirstUserMessageText(messages: MessageParam[]): string {
-  const firstUserMessage = messages.find(m => m.role === 'user')
-  if (!firstUserMessage) return ''
+  const firstUserMessage = messages.find(m => m.role === 'user');
+  if (!firstUserMessage) return '';
 
-  const content = firstUserMessage.content
-  if (typeof content === 'string') return content
+  const content = firstUserMessage.content;
+  if (typeof content === 'string') return content;
 
   // Array of content blocks - find first text block
-  const textBlock = content.find(block => block.type === 'text')
-  return textBlock?.type === 'text' ? textBlock.text : ''
+  const textBlock = content.find(block => block.type === 'text');
+  return textBlock?.type === 'text' ? textBlock.text : '';
 }
 
 /**
@@ -128,41 +119,41 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
     temperature,
     thinking,
     stop_sequences,
-  } = opts
+  } = opts;
 
   // ── Multi-provider routing ──────────────────────────────────────────────
   // Non-Anthropic path: skip OAuth fingerprint/attribution headers (Anthropic-
   // specific), use provider's chat API, and track costs via ProviderUsage.
-  const anthropic = isAnthropicProvider()
-  const normalizedModel = normalizeModelStringForAPI(model)
-  const start = Date.now()
+  const anthropic = isAnthropicProvider();
+  const normalizedModel = normalizeModelStringForAPI(model);
+  const start = Date.now();
 
   if (!anthropic) {
-    const providerId = getActiveProviderId()
-    const systemText = systemBlocksText(system, skipSystemPromptPrefix)
+    const providerId = getActiveProviderId();
+    const systemText = systemBlocksText(system, skipSystemPromptPrefix);
 
     try {
-      const providerClient = await ProviderManager.getInstance().createClient(providerId, {
+      const providerClient = (await ProviderManager.getInstance().createClient(providerId, {
         model: normalizedModel,
         maxRetries,
         source: 'side_query',
-      }) as any
+      })) as any;
       const messagesForProvider = [
         ...(systemText ? [{ role: 'system' as const, content: systemText }] : []),
         ...messages.map(m => ({
           role: m.role as 'user' | 'assistant',
           content: typeof m.content === 'string' ? m.content : m.content.map((c: any) => c.text || '').join(''),
         })),
-      ]
+      ];
       const result = await (providerClient.chat?.completions?.create ?? providerClient.beta?.messages?.create)({
         model: normalizedModel,
         max_tokens: max_tokens,
         messages: messagesForProvider,
         ...(temperature !== undefined && { temperature }),
         ...(stop_sequences && { stop: stop_sequences }),
-      })
+      });
 
-      const choice = result.choices?.[0] ?? result.content?.[0] ?? { text: '' }
+      const choice = result.choices?.[0] ?? result.content?.[0] ?? { text: '' };
       const response: BetaMessage = {
         id: result.id ?? 'side-query',
         type: 'message' as any,
@@ -172,22 +163,21 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
           input_tokens: result.usage?.prompt_tokens ?? result.usage?.input_tokens ?? 0,
           output_tokens: result.usage?.completion_tokens ?? result.usage?.output_tokens ?? 0,
         },
-      } as unknown as BetaMessage
+      } as unknown as BetaMessage;
 
       // J2: Track side query costs for non-Anthropic providers
       try {
         addToTotalSessionCost(
           normalizedModel,
-          fromGenericUsage(
-            response.usage.input_tokens,
-            response.usage.output_tokens,
-          ),
+          fromGenericUsage(response.usage.input_tokens, response.usage.output_tokens),
           providerId,
-        )
-      } catch { /* cost tracking is best-effort */ }
+        );
+      } catch {
+        /* cost tracking is best-effort */
+      }
 
       // J1: Log with providerId for multi-provider debugging
-      const now = Date.now()
+      const now = Date.now();
       logEvent('tengu_api_success', {
         querySource: opts.querySource as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         model: normalizedModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -195,17 +185,20 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
         durationMsIncludingRetries: now - start,
-        timeSinceLastApiCallMs: getLastApiCompletionTimestamp() !== null ? now - getLastApiCompletionTimestamp()! : undefined,
-      })
-      setLastApiCompletionTimestamp(now)
-      return response
+        timeSinceLastApiCallMs:
+          getLastApiCompletionTimestamp() !== null ? now - getLastApiCompletionTimestamp()! : undefined,
+      });
+      setLastApiCompletionTimestamp(now);
+      return response;
     } catch (error) {
       // J5: Classify error with provider info for better debugging
-      const classified = classifyProviderError(error)
-      logError(new Error(
-        `SideQuery [${providerId}/${normalizedModel}] ${classified.category}: ${error instanceof Error ? error.message : String(error)}`,
-      ))
-      throw error
+      const classified = classifyProviderError(error);
+      logError(
+        new Error(
+          `SideQuery [${providerId}/${normalizedModel}] ${classified.category}: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+      throw error;
     }
   }
 
@@ -214,33 +207,34 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
     maxRetries,
     model,
     source: 'side_query',
-  })
-  const betas = [...getModelBetas(model)]
-  if (
-    output_format &&
-    modelSupportsStructuredOutputs(model) &&
-    !betas.includes(STRUCTURED_OUTPUTS_BETA_HEADER)
-  ) {
-    betas.push(STRUCTURED_OUTPUTS_BETA_HEADER)
+  });
+  const betas = [...getModelBetas(model)];
+  if (output_format && modelSupportsStructuredOutputs(model) && !betas.includes(STRUCTURED_OUTPUTS_BETA_HEADER)) {
+    betas.push(STRUCTURED_OUTPUTS_BETA_HEADER);
   }
 
-  const messageText = extractFirstUserMessageText(messages)
-  const fingerprint = computeFingerprint(messageText, MACRO.VERSION)
-  const attributionHeader = getAttributionHeader(fingerprint)
+  const messageText = extractFirstUserMessageText(messages);
+  const fingerprint = computeFingerprint(messageText, MACRO.VERSION);
+  const attributionHeader = getAttributionHeader(fingerprint);
 
   const systemBlocks: TextBlockParam[] = [
     attributionHeader ? { type: 'text', text: attributionHeader } : null,
     ...(skipSystemPromptPrefix
       ? []
-      : [{ type: 'text' as const, text: getCLISyspromptPrefix({ isNonInteractive: false, hasAppendSystemPrompt: false }) }]),
+      : [
+          {
+            type: 'text' as const,
+            text: getCLISyspromptPrefix({ isNonInteractive: false, hasAppendSystemPrompt: false }),
+          },
+        ]),
     ...(Array.isArray(system) ? system : system ? [{ type: 'text' as const, text: system }] : []),
-  ].filter((block): block is TextBlockParam => block !== null)
+  ].filter((block): block is TextBlockParam => block !== null);
 
-  let thinkingConfig: BetaThinkingConfigParam | undefined
+  let thinkingConfig: BetaThinkingConfigParam | undefined;
   if (thinking === false) {
-    thinkingConfig = { type: 'disabled' }
+    thinkingConfig = { type: 'disabled' };
   } else if (thinking !== undefined) {
-    thinkingConfig = { type: 'enabled', budget_tokens: Math.min(thinking, max_tokens - 1) }
+    thinkingConfig = { type: 'enabled', budget_tokens: Math.min(thinking, max_tokens - 1) };
   }
 
   const response = await client.beta.messages.create(
@@ -259,11 +253,11 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
       metadata: getAPIMetadata(),
     },
     { signal },
-  )
+  );
 
-  const requestId = (response as { _request_id?: string | null })._request_id ?? undefined
-  const now = Date.now()
-  const lastCompletion = getLastApiCompletionTimestamp()
+  const requestId = (response as { _request_id?: string | null })._request_id ?? undefined;
+  const now = Date.now();
+  const lastCompletion = getLastApiCompletionTimestamp();
   logEvent('tengu_api_success', {
     requestId: requestId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     querySource: opts.querySource as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -274,27 +268,24 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
     uncachedInputTokens: response.usage.cache_creation_input_tokens ?? 0,
     durationMsIncludingRetries: now - start,
     timeSinceLastApiCallMs: lastCompletion !== null ? now - lastCompletion : undefined,
-  })
-  setLastApiCompletionTimestamp(now)
+  });
+  setLastApiCompletionTimestamp(now);
 
-  return response
+  return response;
 }
 
 /** Build system text from blocks for non-Anthropic providers. */
-function systemBlocksText(
-  system: string | TextBlockParam[] | undefined,
-  skipPrefix: boolean | undefined,
-): string {
-  const parts: string[] = []
+function systemBlocksText(system: string | TextBlockParam[] | undefined, skipPrefix: boolean | undefined): string {
+  const parts: string[] = [];
   if (!skipPrefix) {
-    parts.push(getCLISyspromptPrefix({ isNonInteractive: false, hasAppendSystemPrompt: false }))
+    parts.push(getCLISyspromptPrefix({ isNonInteractive: false, hasAppendSystemPrompt: false }));
   }
   if (typeof system === 'string') {
-    parts.push(system)
+    parts.push(system);
   } else if (Array.isArray(system)) {
     for (const block of system) {
-      if (block.type === 'text') parts.push(block.text)
+      if (block.type === 'text') parts.push(block.text);
     }
   }
-  return parts.join('\n')
+  return parts.join('\n');
 }

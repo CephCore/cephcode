@@ -1,39 +1,40 @@
-import React, { useCallback, useLayoutEffect, useRef, useState } from 'react'
-import { useTerminalSize } from '../../hooks/useTerminalSize.js'
-import { useTerminalViewport } from '../../ink/hooks/use-terminal-viewport.js'
-import { Box, type DOMElement, measureElement } from '../../ink.js'
+import type React from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useTerminalSize } from '../../hooks/useTerminalSize.js';
+import { useTerminalViewport } from '../../ink/hooks/use-terminal-viewport.js';
+import { Box, type DOMElement, measureElement } from '../../ink.js';
 
 type Props = {
-  children: React.ReactNode
-  lock?: 'always' | 'offscreen'
-}
+  children: React.ReactNode;
+  lock?: 'always' | 'offscreen';
+};
 
 export function Ratchet({ children, lock = 'always' }: Props): React.ReactNode {
-  const [viewportRef, { isVisible }] = useTerminalViewport()
-  const { rows } = useTerminalSize()
-  const innerRef = useRef<DOMElement | null>(null)
-  const maxHeight = useRef(0)
-  const [minHeight, setMinHeight] = useState(0)
+  const [viewportRef, { isVisible }] = useTerminalViewport();
+  const { rows } = useTerminalSize();
+  const innerRef = useRef<DOMElement | null>(null);
+  const maxHeight = useRef(0);
+  const [minHeight, setMinHeight] = useState(0);
 
   const outerRef = useCallback(
     (el: DOMElement | null) => {
-      viewportRef(el)
+      viewportRef(el);
     },
     [viewportRef],
-  )
+  );
 
-  const engaged = lock === 'always' || !isVisible
+  const engaged = lock === 'always' || !isVisible;
 
   useLayoutEffect(() => {
     if (!innerRef.current) {
-      return
+      return;
     }
-    const { height } = measureElement(innerRef.current)
+    const { height } = measureElement(innerRef.current);
     if (height > maxHeight.current) {
-      maxHeight.current = Math.min(height, rows)
-      setMinHeight(maxHeight.current)
+      maxHeight.current = Math.min(height, rows);
+      setMinHeight(maxHeight.current);
     }
-  })
+  });
 
   return (
     <Box minHeight={engaged ? minHeight : undefined} ref={outerRef}>
@@ -41,5 +42,5 @@ export function Ratchet({ children, lock = 'always' }: Props): React.ReactNode {
         {children}
       </Box>
     </Box>
-  )
+  );
 }

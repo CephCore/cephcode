@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type * as React from 'react';
 import type { z } from 'zod/v4';
 import { MessageResponse } from '../../components/MessageResponse.js';
 import { OutputLine } from '../../components/shell/OutputLine.js';
@@ -16,17 +16,23 @@ export function renderToolUseMessage(input: Partial<z.infer<ReturnType<typeof in
 export function userFacingName(): string {
   return 'readMcpResource';
 }
-export function renderToolResultMessage(output: Output, _progressMessagesForMessage: ProgressMessage<ToolProgressData>[], {
-  verbose
-}: {
-  verbose: boolean;
-}): React.ReactNode {
+export function renderToolResultMessage(
+  output: Output,
+  _progressMessagesForMessage: ProgressMessage<ToolProgressData>[],
+  {
+    verbose,
+  }: {
+    verbose: boolean;
+  },
+): React.ReactNode {
   if (!output || !output.contents || output.contents.length === 0) {
-    return <Box justifyContent="space-between" overflowX="hidden" width="100%">
+    return (
+      <Box justifyContent="space-between" overflowX="hidden" width="100%">
         <MessageResponse height={1}>
           <Text dimColor>(No content)</Text>
         </MessageResponse>
-      </Box>;
+      </Box>
+    );
   }
 
   // Format as JSON for better readability

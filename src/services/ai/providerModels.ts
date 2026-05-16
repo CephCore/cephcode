@@ -1,59 +1,54 @@
-import { ProviderManager } from './ProviderManager.js'
-import {
-  getProviderRegistryEntry,
-  type ProviderModelInfo,
-} from './providerRegistry.js'
-import type { ProviderId } from './providers/ProviderInterface.js'
+import { ProviderManager } from './ProviderManager.js';
+import { getProviderRegistryEntry, type ProviderModelInfo } from './providerRegistry.js';
+import type { ProviderId } from './providers/ProviderInterface.js';
 
 type RemoteModelPayload = {
-  id?: string
-  name?: string
-  supported_parameters?: string[]
-  capabilities?: { tools?: boolean; tool_calling?: boolean }
-}
+  id?: string;
+  name?: string;
+  supported_parameters?: string[];
+  capabilities?: { tools?: boolean; tool_calling?: boolean };
+};
 
-const MODELS_CACHE = new Map<ProviderId, { data: ProviderModelInfo[]; timestamp: number }>()
-const MODELS_CACHE_TTL_MS = 5 * 60 * 1000
+const MODELS_CACHE = new Map<ProviderId, { data: ProviderModelInfo[]; timestamp: number }>();
+const MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 export function clearProviderModelsCache(provider?: ProviderId): void {
   if (provider) {
-    MODELS_CACHE.delete(provider)
-    return
+    MODELS_CACHE.delete(provider);
+    return;
   }
 
-  MODELS_CACHE.clear()
+  MODELS_CACHE.clear();
 }
 
-export async function fetchProviderModels(
-  provider: ProviderId,
-): Promise<ProviderModelInfo[]> {
-  const cached = MODELS_CACHE.get(provider)
+export async function fetchProviderModels(provider: ProviderId): Promise<ProviderModelInfo[]> {
+  const cached = MODELS_CACHE.get(provider);
   if (cached && Date.now() - cached.timestamp < MODELS_CACHE_TTL_MS) {
-    return cached.data
+    return cached.data;
   }
 
-  const info = getProviderRegistryEntry(provider)
-  const providerManager = ProviderManager.getInstance()
-  const apiKey = providerManager.getApiKeyForProvider(provider)
+  const info = getProviderRegistryEntry(provider);
+  const providerManager = ProviderManager.getInstance();
+  const apiKey = providerManager.getApiKeyForProvider(provider);
 
   if (!info.modelsUrl) {
-    return cacheAndReturn(provider, info.models)
+    return cacheAndReturn(provider, info.models);
   }
 
   if (!apiKey && !info.isLocal) {
-    throw new Error(`API key required. Run: /providers key ${provider} <your-api-key>`)
+    throw new Error(`API key required. Run: /providers key ${provider} <your-api-key>`);
   }
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-  }
+  };
 
   if (apiKey) {
     if (provider === 'anthropic') {
-      headers['x-api-key'] = apiKey
-      headers['anthropic-version'] = '2023-06-01'
+      headers['x-api-key'] = apiKey;
+      headers['anthropic-version'] = '2023-06-01';
     } else {
-      headers.Authorization = `Bearer ${apiKey}`
+      headers.Authorization = `Bearer ${apiKey}`;
     }
   }
 
@@ -61,47 +56,44 @@ export async function fetchProviderModels(
     const response = await fetch(info.modelsUrl, {
       headers,
       signal: AbortSignal.timeout(5000), // 5s timeout instead of 30s
-    })
+    });
 
     if (!response.ok) {
-      return cacheAndReturn(provider, getFallbackModels(provider))
+      return cacheAndReturn(provider, getFallbackModels(provider));
     }
 
     const data = (await response.json()) as {
-      data?: RemoteModelPayload[]
-      models?: RemoteModelPayload[]
-    }
+      data?: RemoteModelPayload[];
+      models?: RemoteModelPayload[];
+    };
 
     const models = (data.data ?? data.models ?? [])
       .map(model => toProviderModelInfo(provider, model))
-      .filter((model): model is ProviderModelInfo => Boolean(model))
+      .filter((model): model is ProviderModelInfo => Boolean(model));
 
     if (models.length > 0) {
-      return cacheAndReturn(provider, models)
+      return cacheAndReturn(provider, models);
     }
   } catch (error) {
     // Fall back to registry models below.
   }
 
-  return cacheAndReturn(provider, getFallbackModels(provider))
+  return cacheAndReturn(provider, getFallbackModels(provider));
 }
 
-function cacheAndReturn(
-  provider: ProviderId,
-  data: ProviderModelInfo[],
-): ProviderModelInfo[] {
-  MODELS_CACHE.set(provider, { data, timestamp: Date.now() })
-  return data
+function cacheAndReturn(provider: ProviderId, data: ProviderModelInfo[]): ProviderModelInfo[] {
+  MODELS_CACHE.set(provider, { data, timestamp: Date.now() });
+  return data;
 }
 
 function getFallbackModels(provider: ProviderId): ProviderModelInfo[] {
-  const info = getProviderRegistryEntry(provider)
+  const info = getProviderRegistryEntry(provider);
   if (info.models.length > 0) {
-    return info.models
+    return info.models;
   }
 
   if (!info.defaultModel) {
-    return []
+    return [];
   }
 
   return [
@@ -119,20 +111,17 @@ function getFallbackModels(provider: ProviderId): ProviderModelInfo[] {
       },
       tags: ['default'],
     },
-  ]
+  ];
 }
 
-function toProviderModelInfo(
-  provider: ProviderId,
-  model: RemoteModelPayload,
-): ProviderModelInfo | null {
-  const id = model.id ?? model.name
+function toProviderModelInfo(provider: ProviderId, model: RemoteModelPayload): ProviderModelInfo | null {
+  const id = model.id ?? model.name;
   if (!id) {
-    return null
+    return null;
   }
 
-  const info = getProviderRegistryEntry(provider)
-  const toolCalling = modelSupportsToolCalling(provider, id, model)
+  const info = getProviderRegistryEntry(provider);
+  const toolCalling = modelSupportsToolCalling(provider, id, model);
 
   return {
     id,
@@ -147,47 +136,38 @@ function toProviderModelInfo(
       supportsSystemPrompt: true,
     },
     tags: buildTags(toolCalling, model),
-  }
+  };
 }
 
-function buildTags(
-  toolCalling: boolean,
-  model: RemoteModelPayload,
-): string[] | undefined {
-  const tags: string[] = []
+function buildTags(toolCalling: boolean, model: RemoteModelPayload): string[] | undefined {
+  const tags: string[] = [];
   if (toolCalling) {
-    tags.push('tools')
+    tags.push('tools');
   }
   if (model.name && model.id && model.name !== model.id) {
-    tags.push('api')
+    tags.push('api');
   }
-  return tags.length > 0 ? tags : undefined
+  return tags.length > 0 ? tags : undefined;
 }
 
-function modelSupportsToolCalling(
-  provider: ProviderId,
-  model: string,
-  metadata?: RemoteModelPayload,
-): boolean {
-  const normalized = model.toLowerCase()
+function modelSupportsToolCalling(provider: ProviderId, model: string, metadata?: RemoteModelPayload): boolean {
+  const normalized = model.toLowerCase();
   if (provider === 'kilocode' && normalized === 'tencent/hy3-preview:free') {
-    return false
+    return false;
   }
 
   if (provider === 'anthropic') {
-    return true
+    return true;
   }
 
-  const params = metadata?.supported_parameters
+  const params = metadata?.supported_parameters;
   if (Array.isArray(params)) {
-    return params.includes('tools') || params.includes('tool_choice')
+    return params.includes('tools') || params.includes('tool_choice');
   }
 
   if (metadata?.capabilities) {
-    return Boolean(
-      metadata.capabilities.tools || metadata.capabilities.tool_calling,
-    )
+    return Boolean(metadata.capabilities.tools || metadata.capabilities.tool_calling);
   }
 
-  return getProviderRegistryEntry(provider).capabilities.toolCalling
+  return getProviderRegistryEntry(provider).capabilities.toolCalling;
 }

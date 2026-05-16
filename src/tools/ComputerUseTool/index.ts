@@ -16,26 +16,26 @@
  * Built from scratch by Dek1MillionToken. No @ant/* dependencies.
  */
 
-import type { ProviderId } from '../../services/ai/providers/ProviderInterface.js'
-import type { DisplayConfig, ComputerToolInput, ComputerToolResultBlock, ComputerUseMode } from './types.js'
-import type { ComputerUseToolConfig } from './toolDefinition.js'
-import { getScreenDimensions } from './screenshot.js'
-import { buildDisplayConfig } from './scaling.js'
-import { getComputerUseToolConfig, isComputerUseCapable } from './toolDefinition.js'
-import { handleComputerAction } from './handler.js'
-import { logForDebugging } from '../../utils/debug.js'
+import type { ProviderId } from '../../services/ai/providers/ProviderInterface.js';
+import { logForDebugging } from '../../utils/debug.js';
+import { handleComputerAction } from './handler.js';
+import { buildDisplayConfig } from './scaling.js';
+import { getScreenDimensions } from './screenshot.js';
+import type { ComputerUseToolConfig } from './toolDefinition.js';
+import { getComputerUseToolConfig, isComputerUseCapable } from './toolDefinition.js';
+import type { ComputerToolInput, ComputerToolResultBlock, ComputerUseMode, DisplayConfig } from './types.js';
 
 // ── Public Types ─────────────────────────────────────────────────────────────
 
 export interface ComputerUseSetup {
   /** Whether computer use is enabled */
-  enabled: boolean
+  enabled: boolean;
   /** The mode (anthropic or generic) */
-  mode: ComputerUseMode
+  mode: ComputerUseMode;
   /** Display configuration for coordinate scaling */
-  displayConfig: DisplayConfig
+  displayConfig: DisplayConfig;
   /** Tool config to inject into API calls */
-  toolConfig: ComputerUseToolConfig
+  toolConfig: ComputerUseToolConfig;
 }
 
 // ── Setup ────────────────────────────────────────────────────────────────────
@@ -47,77 +47,67 @@ export interface ComputerUseSetup {
  * @param provider - Active provider ID
  * @returns Setup config, or null if not supported
  */
-export async function setupComputerUse(
-  provider: ProviderId,
-): Promise<ComputerUseSetup | null> {
+export async function setupComputerUse(provider: ProviderId): Promise<ComputerUseSetup | null> {
   // Check platform
   if (process.platform !== 'win32') {
-    logForDebugging('[ComputerUse] Skipped: not Windows')
-    return null
+    logForDebugging('[ComputerUse] Skipped: not Windows');
+    return null;
   }
 
   // Check env var
   if (process.env.ENABLE_COMPUTER_USE !== '1') {
-    return null
+    return null;
   }
 
   // Check provider capability
   if (!isComputerUseCapable(provider)) {
-    logForDebugging(`[ComputerUse] Skipped: provider "${provider}" does not support vision`)
-    return null
+    logForDebugging(`[ComputerUse] Skipped: provider "${provider}" does not support vision`);
+    return null;
   }
 
   // Get screen dimensions
-  const screen = await getScreenDimensions()
-  logForDebugging(`[ComputerUse] Screen: ${screen.width}x${screen.height}`)
+  const screen = await getScreenDimensions();
+  logForDebugging(`[ComputerUse] Screen: ${screen.width}x${screen.height}`);
 
   // Build display config (handles scaling)
-  const displayConfig = buildDisplayConfig(screen.width, screen.height)
+  const displayConfig = buildDisplayConfig(screen.width, screen.height);
   logForDebugging(
     `[ComputerUse] API dimensions: ${displayConfig.apiWidth}x${displayConfig.apiHeight} ` +
       `(scale: ${displayConfig.scaleFactor.toFixed(3)})`,
-  )
+  );
 
   // Get tool config for this provider
-  const toolConfig = getComputerUseToolConfig(
-    provider,
-    displayConfig.apiWidth,
-    displayConfig.apiHeight,
-  )
-  logForDebugging(`[ComputerUse] Mode: ${toolConfig.mode} (provider: ${provider})`)
+  const toolConfig = getComputerUseToolConfig(provider, displayConfig.apiWidth, displayConfig.apiHeight);
+  logForDebugging(`[ComputerUse] Mode: ${toolConfig.mode} (provider: ${provider})`);
 
   return {
     enabled: true,
     mode: toolConfig.mode,
     displayConfig,
     toolConfig,
-  }
+  };
 }
 
 /**
  * Check if computer use is enabled via environment variable.
  */
 export function isComputerUseEnabled(): boolean {
-  return (
-    process.env.ENABLE_COMPUTER_USE === '1' && process.platform === 'win32'
-  )
+  return process.env.ENABLE_COMPUTER_USE === '1' && process.platform === 'win32';
 }
 
 // ── Re-exports ───────────────────────────────────────────────────────────────
 
-export { handleComputerAction } from './handler.js'
-export { captureScreenshot, getScreenDimensions } from './screenshot.js'
-export { buildDisplayConfig, getScaleFactor, scaleToScreen, scaleToApi } from './scaling.js'
-export { getComputerUseToolConfig, isComputerUseCapable } from './toolDefinition.js'
-
+export { handleComputerAction } from './handler.js';
+export { buildDisplayConfig, getScaleFactor, scaleToApi, scaleToScreen } from './scaling.js';
+export { captureScreenshot, getScreenDimensions } from './screenshot.js';
+export type { ComputerUseToolConfig } from './toolDefinition.js';
+export { getComputerUseToolConfig, isComputerUseCapable } from './toolDefinition.js';
 export type {
   ComputerAction,
+  ComputerExecutor,
   ComputerToolInput,
   ComputerToolResultBlock,
   ComputerUseMode,
   DisplayConfig,
   DisplayInfo,
-  ComputerExecutor,
-} from './types.js'
-
-export type { ComputerUseToolConfig } from './toolDefinition.js'
+} from './types.js';

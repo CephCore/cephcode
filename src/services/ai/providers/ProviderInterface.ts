@@ -1,4 +1,4 @@
-import type { ClientOptions } from '@anthropic-ai/sdk'
+import type { ClientOptions } from '@anthropic-ai/sdk';
 
 export type ProviderId =
   | 'anthropic'
@@ -15,24 +15,24 @@ export type ProviderId =
   | 'ollama'
   | 'copilot'
   | 'deepseek'
-  | 'chatgpt_plus'
+  | 'chatgpt_plus';
 
 export interface ProviderInitOptions {
-  apiKey?: string
-  baseUrl?: string
-  model?: string
-  fetchOverride?: ClientOptions['fetch']
-  source?: string
-  maxRetries?: number
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+  fetchOverride?: ClientOptions['fetch'];
+  source?: string;
+  maxRetries?: number;
 }
 
-export type ProviderClient = unknown
+export type ProviderClient = unknown;
 
 export interface ProviderInterface {
-  readonly providerId: ProviderId
-  readonly label: string
-  getProviderId(): ProviderId
-  getProviderLabel(): string
-  getProviderApiKeyEnvVar(): string
-  createClient(options: ProviderInitOptions): Promise<ProviderClient>
+  readonly providerId: ProviderId;
+  readonly label: string;
+  getProviderId(): ProviderId;
+  getProviderLabel(): string;
+  getProviderApiKeyEnvVar(): string;
+  createClient(options: ProviderInitOptions): Promise<ProviderClient>;
 }

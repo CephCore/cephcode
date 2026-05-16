@@ -5,56 +5,85 @@
  */
 
 import {
-  listSessionsCommand,
   attachCommand,
+  bgFlagHandler as createBgSession,
+  listSessionsCommand,
   logsCommand,
   stopCommand,
-  bgFlagHandler as createBgSession,
-} from './sessionManager.js'
+} from './sessionManager.js';
 
 export async function psHandler(args: string[]): Promise<void> {
-  await listSessionsCommand()
+  await listSessionsCommand();
 }
 
 export async function logsHandler(sessionId?: string): Promise<void> {
-  await logsCommand(sessionId)
+  await logsCommand(sessionId);
 }
 
 export async function attachHandler(sessionId?: string): Promise<void> {
-  await attachCommand(sessionId)
+  await attachCommand(sessionId);
 }
 
 export async function killHandler(sessionId?: string): Promise<void> {
-  await stopCommand(sessionId)
+  await stopCommand(sessionId);
 }
 
 export async function handleBgFlag(args: string[]): Promise<void> {
   // Parse --bg flag: prompt comes after the flag
-  const bgIndex = args.findIndex(a => a === '--bg' || a === '--background')
-  let prompt = ''
-  let agent: string | undefined
-  let model: string | undefined
-  let permissionMode: string | undefined
+  const bgIndex = args.findIndex(a => a === '--bg' || a === '--background');
+  let prompt: string | undefined;
+  let agent: string | undefined;
+  let model: string | undefined;
+  let permissionMode: string | undefined;
+  let fallbackModel: string | undefined;
+  let allowDangerouslySkipPermissions: string | undefined;
+  let addDir: string[] = [];
+  let settings: string | undefined;
+  let mcpConfig: string | undefined;
+  let pluginDir: string[] = [];
+  let strictMcpConfig: string | undefined;
 
   // Collect args after --bg as the prompt, checking for other flags
-  const trailing = args.slice(bgIndex + 1)
-  const nonFlagArgs: string[] = []
+  const trailing = args.slice(bgIndex + 1);
+  const nonFlagArgs: string[] = [];
 
   for (let i = 0; i < trailing.length; i++) {
-    const arg = trailing[i]
+    const arg = trailing[i];
     if (arg === '--agent' && trailing[i + 1]) {
-      agent = trailing[++i]
+      agent = trailing[++i];
     } else if (arg === '--model' && trailing[i + 1]) {
-      model = trailing[++i]
+      model = trailing[++i];
     } else if (arg === '--permission-mode' && trailing[i + 1]) {
-      permissionMode = trailing[++i]
+      permissionMode = trailing[++i];
+    } else if (arg === '--fallback-model' && trailing[i + 1]) {
+      fallbackModel = trailing[++i];
+    } else if (arg === '--allow-dangerously-skip-permissions') {
+      allowDangerouslySkipPermissions = 'true';
+    } else if (arg === '--add-dir' && trailing[i + 1]) {
+      addDir.push(trailing[++i]!);
+    } else if (arg === '--settings' && trailing[i + 1]) {
+      settings = trailing[++i];
+    } else if (arg === '--mcp-config' && trailing[i + 1]) {
+      mcpConfig = trailing[++i];
+    } else if (arg === '--plugin-dir' && trailing[i + 1]) {
+      pluginDir.push(trailing[++i]!);
+    } else if (arg === '--strict-mcp-config' && trailing[i + 1]) {
+      strictMcpConfig = trailing[++i];
     } else {
-      nonFlagArgs.push(arg!)
+      nonFlagArgs.push(arg!);
     }
   }
 
-  prompt = nonFlagArgs.join(' ') || '(interactive)'
+  prompt = nonFlagArgs.join(' ') || undefined;
 
-  const id = await createBgSession(prompt, agent, model, permissionMode)
+  const id = await createBgSession(prompt ?? '(interactive)', agent, model, permissionMode, {
+    fallbackModel,
+    allowDangerouslySkipPermissions,
+    addDir: addDir.length > 0 ? addDir : undefined,
+    settings,
+    mcpConfig,
+    pluginDir: pluginDir.length > 0 ? pluginDir : undefined,
+    strictMcpConfig,
+  });
   // createBgSession already prints the formatted output
 }

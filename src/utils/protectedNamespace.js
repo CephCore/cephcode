@@ -1,1 +1,3 @@
-export function protectedNamespace() { return {} }
+export function protectedNamespace() {
+  return {};
+}

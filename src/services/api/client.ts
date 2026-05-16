@@ -6,12 +6,12 @@
  * can use the unified `client.beta.messages.*` interface.
  */
 
-import type { ClientOptions } from '@anthropic-ai/sdk'
-import type { ProviderId } from '../ai/providers/ProviderInterface.js'
-import { ProviderManager } from '../ai/ProviderManager.js'
-import { createAnthropicClient } from './anthropicClient.js'
-import { AnthropicAdapter } from '../ai/adapter/AnthropicAdapter.js'
-import '../ai/adapter/GoogleAdapter.js' // side-effect: registers Google adapter
+import type { ClientOptions } from '@anthropic-ai/sdk';
+import { AnthropicAdapter } from '../ai/adapter/AnthropicAdapter.js';
+import { ProviderManager } from '../ai/ProviderManager.js';
+import type { ProviderId } from '../ai/providers/ProviderInterface.js';
+import { createAnthropicClient } from './anthropicClient.js';
+import '../ai/adapter/GoogleAdapter.js'; // side-effect: registers Google adapter
 
 // ── Unified client interface ─────────────────────────────────────────────────
 
@@ -25,12 +25,9 @@ import '../ai/adapter/GoogleAdapter.js' // side-effect: registers Google adapter
 export interface UnifiedAIProviderClient {
   beta: {
     messages: {
-      create(
-        params: any,
-        options?: any,
-      ): Promise<any> & { withResponse?: () => Promise<any> }
-    }
-  }
+      create(params: any, options?: any): Promise<any> & { withResponse?: () => Promise<any> };
+    };
+  };
 }
 
 // ── Factory functions ────────────────────────────────────────────────────────
@@ -42,13 +39,13 @@ export async function getAnthropicClient({
   fetchOverride,
   source,
 }: {
-  apiKey?: string
-  maxRetries: number
-  model?: string
-  fetchOverride?: ClientOptions['fetch']
-  source?: string
+  apiKey?: string;
+  maxRetries: number;
+  model?: string;
+  fetchOverride?: ClientOptions['fetch'];
+  source?: string;
 }): Promise<Awaited<ReturnType<typeof createAnthropicClient>>> {
-  return createAnthropicClient({ apiKey, maxRetries, model, fetchOverride, source })
+  return createAnthropicClient({ apiKey, maxRetries, model, fetchOverride, source });
 }
 
 /**
@@ -66,19 +63,19 @@ export async function getAIProviderClient({
   fetchOverride,
   source,
 }: {
-  provider?: ProviderId
-  apiKey?: string
-  maxRetries: number
-  model?: string
-  fetchOverride?: ClientOptions['fetch']
-  source?: string
+  provider?: ProviderId;
+  apiKey?: string;
+  maxRetries: number;
+  model?: string;
+  fetchOverride?: ClientOptions['fetch'];
+  source?: string;
 }): Promise<UnifiedAIProviderClient> {
-  const providerManager = ProviderManager.getInstance()
-  const effectiveProvider = provider ?? providerManager.getActiveProviderName()
+  const providerManager = ProviderManager.getInstance();
+  const effectiveProvider = provider ?? providerManager.getActiveProviderName();
 
   // Anthropic: return native client directly (no adapter needed)
   if (effectiveProvider === 'anthropic') {
-    return getAnthropicClient({ apiKey, maxRetries, model, fetchOverride, source })
+    return getAnthropicClient({ apiKey, maxRetries, model, fetchOverride, source });
   }
 
   // Other providers: create SDK client and wrap with adapter
@@ -88,11 +85,11 @@ export async function getAIProviderClient({
     fetchOverride,
     source,
     maxRetries,
-  })
+  });
 
-  return new AnthropicAdapter(rawClient, effectiveProvider) as unknown as UnifiedAIProviderClient
+  return new AnthropicAdapter(rawClient, effectiveProvider) as unknown as UnifiedAIProviderClient;
 }
 
-export const CLIENT_REQUEST_ID_HEADER = 'x-client-request-id'
-export const AGENT_ID_HEADER = 'x-claude-code-agent-id'
-export const PARENT_AGENT_ID_HEADER = 'x-claude-code-parent-agent-id'
+export const CLIENT_REQUEST_ID_HEADER = 'x-client-request-id';
+export const AGENT_ID_HEADER = 'x-claude-code-agent-id';
+export const PARENT_AGENT_ID_HEADER = 'x-claude-code-parent-agent-id';

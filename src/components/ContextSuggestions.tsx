@@ -1,16 +1,16 @@
-import figures from 'figures'
-import * as React from 'react'
-import { Box, Text } from '../ink.js'
-import type { ContextSuggestion } from '../utils/contextSuggestions.js'
-import { formatTokens } from '../utils/format.js'
-import { StatusIcon } from './design-system/StatusIcon.js'
+import figures from 'figures';
+import type * as React from 'react';
+import { Box, Text } from '../ink.js';
+import type { ContextSuggestion } from '../utils/contextSuggestions.js';
+import { formatTokens } from '../utils/format.js';
+import { StatusIcon } from './design-system/StatusIcon.js';
 
 type Props = {
-  suggestions: ContextSuggestion[]
-}
+  suggestions: ContextSuggestion[];
+};
 
 export function ContextSuggestions({ suggestions }: Props): React.ReactNode {
-  if (suggestions.length === 0) return null
+  if (suggestions.length === 0) return null;
 
   return (
     <Box flexDirection="column" marginTop={1}>
@@ -23,8 +23,7 @@ export function ContextSuggestions({ suggestions }: Props): React.ReactNode {
             {suggestion.savingsTokens ? (
               <Text dimColor>
                 {' '}
-                {figures.arrowRight} save ~
-                {formatTokens(suggestion.savingsTokens)}
+                {figures.arrowRight} save ~{formatTokens(suggestion.savingsTokens)}
               </Text>
             ) : null}
           </Box>
@@ -34,5 +33,5 @@ export function ContextSuggestions({ suggestions }: Props): React.ReactNode {
         </Box>
       ))}
     </Box>
-  )
+  );
 }

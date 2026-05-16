@@ -1,31 +1,27 @@
-import type { Command } from '../../commands.js'
-import { queryWithModel } from '../../services/api/claude.js'
-import { getDefaultOpusModel } from '../../utils/model/model.js'
-import {
-  getSessionFilesWithMtime,
-  loadAllLogsFromSessionFile,
-} from '../../utils/sessionStorage.js'
-import { asSystemPrompt } from '../../utils/systemPromptType.js'
-import { logError } from '../../utils/log.js'
-import { toError } from '../../utils/errors.js'
-import { writeFile } from 'fs/promises'
-import { basename, join } from 'path'
-import { getCwd } from '../../utils/cwd.js'
-import { getProjectDir } from '../../utils/sessionStorage.js'
-import { getOriginalCwd } from '../../bootstrap/state.js'
+import { writeFile } from 'fs/promises';
+import { basename, join } from 'path';
+import { getOriginalCwd } from '../../bootstrap/state.js';
+import type { Command } from '../../commands.js';
+import { queryWithModel } from '../../services/api/claude.js';
+import { getCwd } from '../../utils/cwd.js';
+import { toError } from '../../utils/errors.js';
+import { logError } from '../../utils/log.js';
+import { getDefaultOpusModel } from '../../utils/model/model.js';
+import { getProjectDir, getSessionFilesWithMtime, loadAllLogsFromSessionFile } from '../../utils/sessionStorage.js';
+import { asSystemPrompt } from '../../utils/systemPromptType.js';
 
 async function generateTeamOnboardingGuide(signal: AbortSignal): Promise<string> {
-  const projectDir = getProjectDir(getOriginalCwd())
-  const sessionFilesMap = await getSessionFilesWithMtime(projectDir)
+  const projectDir = getProjectDir(getOriginalCwd());
+  const sessionFilesMap = await getSessionFilesWithMtime(projectDir);
   // Take last 10 sessions for context
   const recentSessions = Array.from(sessionFilesMap.values())
     .sort((a, b) => b.mtime - a.mtime)
-    .slice(0, 10)
+    .slice(0, 10);
 
-  const sessionData = []
+  const sessionData = [];
   for (const session of recentSessions) {
     try {
-      const logs = await loadAllLogsFromSessionFile(session.path)
+      const logs = await loadAllLogsFromSessionFile(session.path);
       if (logs.length > 0) {
         sessionData.push({
           sessionId: basename(session.path, '.jsonl'),
@@ -35,10 +31,10 @@ async function generateTeamOnboardingGuide(signal: AbortSignal): Promise<string>
             role: m.type,
             content: typeof m.message.content === 'string' ? m.message.content : 'Complex content',
           })),
-        })
+        });
       }
     } catch (err) {
-      logError(toError(err))
+      logError(toError(err));
     }
   }
 
@@ -48,15 +44,13 @@ This guide should help a new developer understand how Claude is being used in th
 SESSIONS:
 ${JSON.stringify(sessionData, null, 2)}
 
-Output the guide in Markdown format.`
+Output the guide in Markdown format.`;
 
-  const model = getDefaultOpusModel()
+  const model = getDefaultOpusModel();
   const response = await queryWithModel({
     model,
     userPrompt,
-    systemPrompt: asSystemPrompt([
-      'You are an expert technical lead generating onboarding documentation.',
-    ]),
+    systemPrompt: asSystemPrompt(['You are an expert technical lead generating onboarding documentation.']),
     signal,
     options: {
       model,
@@ -66,29 +60,25 @@ Output the guide in Markdown format.`
       mcpTools: [],
       hasAppendSystemPrompt: false,
     },
-  } as any)
+  } as any);
 
-  const guideContent =
-    response.message.content[0].type === 'text'
-      ? response.message.content[0].text
-      : ''
-  const outputPath = join(getCwd(), 'TEAM_ONBOARDING.md')
-  await writeFile(outputPath, guideContent)
-  return outputPath
+  const guideContent = response.message.content[0].type === 'text' ? response.message.content[0].text : '';
+  const outputPath = join(getCwd(), 'TEAM_ONBOARDING.md');
+  await writeFile(outputPath, guideContent);
+  return outputPath;
 }
 
 const teamOnboarding: Command = {
   type: 'prompt',
   name: 'team-onboarding',
-  description:
-    'Generate a teammate ramp-up guide from your local Claude Code usage',
+  description: 'Generate a teammate ramp-up guide from your local Claude Code usage',
   contentLength: 0,
   progressMessage: 'analyzing usage and generating guide',
   source: 'builtin',
   async getPromptForCommand(_args, context) {
-    const path = await generateTeamOnboardingGuide(context.abortController.signal)
-    return [{ type: 'text', text: `Generated team onboarding guide at ${path}` }]
+    const path = await generateTeamOnboardingGuide(context.abortController.signal);
+    return [{ type: 'text', text: `Generated team onboarding guide at ${path}` }];
   },
-}
+};
 
-export default teamOnboarding
+export default teamOnboarding;

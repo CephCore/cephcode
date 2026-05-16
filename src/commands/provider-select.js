@@ -1,14 +1,14 @@
 #!/usr/bin/env bun
 
-import { Command } from '@commander-js/extra-typings'
-import { readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { Command } from '@commander-js/extra-typings';
+import { readFileSync, writeFileSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 
-import { homedir } from 'os'
 const getClaudeConfigHomeDir = () => {
-  return process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude')
-}
-const CONFIG_PATH = join(getClaudeConfigHomeDir(), 'provider.json')
+  return process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude');
+};
+const CONFIG_PATH = join(getClaudeConfigHomeDir(), 'provider.json');
 
 const PROVIDERS = {
   openai: {
@@ -19,7 +19,7 @@ const PROVIDERS = {
     defaultModel: 'gpt-5.4-mini',
     defaultModelVerified: true,
     timeout: 60000,
-    note: 'gpt-5.4 = flagship, gpt-5.4-mini = cost-efficient, gpt-5.4-nano = cheapest'
+    note: 'gpt-5.4 = flagship, gpt-5.4-mini = cost-efficient, gpt-5.4-nano = cheapest',
   },
   anthropic: {
     label: 'Anthropic',
@@ -29,7 +29,7 @@ const PROVIDERS = {
     defaultModel: 'claude-sonnet-4-20250514',
     defaultModelVerified: true,
     timeout: 90000,
-    note: 'claude-opus-4-20250514 = most capable, claude-sonnet-4-20250514 = balanced'
+    note: 'claude-opus-4-20250514 = most capable, claude-sonnet-4-20250514 = balanced',
   },
   gemini: {
     label: 'Google Gemini',
@@ -39,7 +39,7 @@ const PROVIDERS = {
     defaultModel: 'gemini-2.5-flash',
     defaultModelVerified: true,
     timeout: 60000,
-    note: 'gemini-2.5-flash = best price-performance'
+    note: 'gemini-2.5-flash = best price-performance',
   },
   openrouter: {
     label: 'OpenRouter',
@@ -48,7 +48,7 @@ const PROVIDERS = {
     modelsUrl: 'https://openrouter.ai/api/v1/models',
     defaultModel: 'openai/gpt-5.4-mini',
     timeout: 120000,
-    note: 'ใช้ model string แบบ provider/model-name'
+    note: 'ใช้ model string แบบ provider/model-name',
   },
   opencode: {
     label: 'OpenCode',
@@ -75,7 +75,7 @@ const PROVIDERS = {
     modelsUrl: 'https://api.groq.com/openai/v1/models',
     defaultModel: 'llama-3.3-70b-versatile',
     timeout: 60000,
-    note: 'llama-3.1-8b-instant = fast/cheap, llama-3.3-70b-versatile = smarter'
+    note: 'llama-3.1-8b-instant = fast/cheap, llama-3.3-70b-versatile = smarter',
   },
   xai: {
     label: 'xAI',
@@ -84,7 +84,7 @@ const PROVIDERS = {
     modelsUrl: 'https://api.x.ai/v1/models',
     defaultModel: 'grok-4-mini',
     timeout: 60000,
-    note: 'grok-4 = deep reasoning, grok-4-mini = fast'
+    note: 'grok-4 = deep reasoning, grok-4-mini = fast',
   },
   mistral: {
     label: 'Mistral',
@@ -94,7 +94,7 @@ const PROVIDERS = {
     defaultModel: 'mistral-large-latest',
     defaultModelVerified: true,
     timeout: 60000,
-    note: 'mistral-large-latest = flagship'
+    note: 'mistral-large-latest = flagship',
   },
   kilocode: {
     label: 'KiloCode',
@@ -105,7 +105,7 @@ const PROVIDERS = {
     defaultModelVerified: true,
     supportsStreaming: true,
     timeout: 180000,
-    note: 'KiloCode AI Gateway'
+    note: 'KiloCode AI Gateway',
   },
   ollama: {
     label: 'Ollama (Local)',
@@ -116,215 +116,215 @@ const PROVIDERS = {
     defaultModelVerified: true,
     isLocal: true,
     timeout: 300000,
-    note: 'Local Ollama server'
-  }
-}
+    note: 'Local Ollama server',
+  },
+};
 
-const PROVIDER_KEYS = Object.keys(PROVIDERS)
+const PROVIDER_KEYS = Object.keys(PROVIDERS);
 
 function loadConfig() {
   try {
-    return JSON.parse(readFileSync(CONFIG_PATH, 'utf8'))
+    return JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
   } catch {
-    return null
+    return null;
   }
 }
 
 function saveConfig(config) {
-  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2))
-  console.log('✅ Config saved to', CONFIG_PATH)
+  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  console.log('✅ Config saved to', CONFIG_PATH);
 }
 
 async function fetchModels(provider) {
-  const p = PROVIDERS[provider]
-  const config = loadConfig()
-  const apiKey = config?.apiKeys?.[provider] || process.env[p.envKey]
-  
+  const p = PROVIDERS[provider];
+  const config = loadConfig();
+  const apiKey = config?.apiKeys?.[provider] || process.env[p.envKey];
+
   if (!apiKey && !p.isLocal) {
     if (p.defaultModelVerified && p.defaultModel) {
-      console.log(`⚠️  No ${p.envKey} found. Using verified default model ${p.defaultModel}.`)
-      return [p.defaultModel]
+      console.log(`⚠️  No ${p.envKey} found. Using verified default model ${p.defaultModel}.`);
+      return [p.defaultModel];
     }
-    console.log(`⚠️  No ${p.envKey} found and no verified default model is available.`)
-    return []
+    console.log(`⚠️  No ${p.envKey} found and no verified default model is available.`);
+    return [];
   }
-  
+
   try {
-    const url = p.modelsUrl
+    const url = p.modelsUrl;
     const headers = {
-      'Content-Type': 'application/json'
-    }
-    
+      'Content-Type': 'application/json',
+    };
+
     if (apiKey) {
       if (provider === 'anthropic') {
-        headers['x-api-key'] = apiKey
+        headers['x-api-key'] = apiKey;
       } else {
-        headers['Authorization'] = `Bearer ${apiKey}`
+        headers['Authorization'] = `Bearer ${apiKey}`;
       }
     }
-    
-    const res = await fetch(url, { headers, signal: AbortSignal.timeout(30000) })
-    const data = await res.json()
-    
+
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(30000) });
+    const data = await res.json();
+
     if (data.data && Array.isArray(data.data)) {
-      return data.data.map(m => m.id).filter(Boolean)
+      return data.data.map(m => m.id).filter(Boolean);
     } else if (data.models && Array.isArray(data.models)) {
-      return data.models.map(m => m.id || m.name).filter(Boolean)
+      return data.models.map(m => m.id || m.name).filter(Boolean);
     } else if (Array.isArray(data)) {
-      return data.map(m => m.id || m.name || m).filter(Boolean)
+      return data.map(m => m.id || m.name || m).filter(Boolean);
     }
 
     if (p.defaultModelVerified && p.defaultModel) {
-      return [p.defaultModel]
+      return [p.defaultModel];
     }
-    return []
+    return [];
   } catch (e) {
-    console.log(`⚠️  Failed to fetch models: ${e}`)
+    console.log(`⚠️  Failed to fetch models: ${e}`);
     if (p.defaultModelVerified && p.defaultModel) {
-      return [p.defaultModel]
+      return [p.defaultModel];
     }
-    return []
+    return [];
   }
 }
 
 async function promptForModel(provider) {
-  const p = PROVIDERS[provider]
+  const p = PROVIDERS[provider];
   const readline = require('readline').createInterface({
     input: process.stdin,
     output: process.stdout,
-  })
+  });
 
   return new Promise(resolve => {
     readline.question(`\n🔧 Enter a model for ${p.label}: `, answer => {
-      readline.close()
-      resolve(answer.trim())
-    })
-  })
+      readline.close();
+      resolve(answer.trim());
+    });
+  });
 }
 
 async function promptForApiKey(provider) {
-  const p = PROVIDERS[provider]
+  const p = PROVIDERS[provider];
   if (p.isLocal) {
-    return ''
+    return '';
   }
 
-  const config = loadConfig()
-  const hasExistingKey = Boolean(config?.apiKeys?.[provider] || process.env[p.envKey])
+  const config = loadConfig();
+  const hasExistingKey = Boolean(config?.apiKeys?.[provider] || process.env[p.envKey]);
   const readline = require('readline').createInterface({
     input: process.stdin,
     output: process.stdout,
-  })
+  });
 
-  readline.stdoutMuted = false
+  readline.stdoutMuted = false;
   readline._writeToOutput = function _writeToOutput(stringToWrite) {
     if (readline.stdoutMuted && stringToWrite.trim()) {
-      readline.output.write('*'.repeat(stringToWrite.length))
-      return
+      readline.output.write('*'.repeat(stringToWrite.length));
+      return;
     }
-    readline.output.write(stringToWrite)
-  }
+    readline.output.write(stringToWrite);
+  };
 
   const prompt = hasExistingKey
     ? `\n🔑 Enter ${p.envKey} for ${p.label} (leave blank to keep existing): `
-    : `\n🔑 Enter ${p.envKey} for ${p.label}: `
+    : `\n🔑 Enter ${p.envKey} for ${p.label}: `;
 
   return new Promise(resolve => {
-    process.stdout.write(prompt)
-    readline.stdoutMuted = true
+    process.stdout.write(prompt);
+    readline.stdoutMuted = true;
     readline.question('', answer => {
-      readline.close()
-      process.stdout.write('\n')
-      resolve(answer.trim())
-    })
-  })
+      readline.close();
+      process.stdout.write('\n');
+      resolve(answer.trim());
+    });
+  });
 }
 
 function selectFromList(items, display) {
-  console.log('\n📋 Available options:')
+  console.log('\n📋 Available options:');
   items.forEach((item, i) => {
-    console.log(`  ${i + 1}. ${display(item)}`)
-  })
-  
+    console.log(`  ${i + 1}. ${display(item)}`);
+  });
+
   const readline = require('readline').createInterface({
     input: process.stdin,
-    output: process.stdout
-  })
-  
-  return new Promise((resolve) => {
-    readline.question('\n🔢 Select (1-' + items.length + '): ', (answer) => {
-      readline.close()
-      const idx = parseInt(answer) - 1
+    output: process.stdout,
+  });
+
+  return new Promise(resolve => {
+    readline.question('\n🔢 Select (1-' + items.length + '): ', answer => {
+      readline.close();
+      const idx = parseInt(answer) - 1;
       if (idx >= 0 && idx < items.length) {
-        resolve(items[idx])
+        resolve(items[idx]);
       } else {
-        console.log('❌ Invalid selection, using first option')
-        resolve(items[0])
+        console.log('❌ Invalid selection, using first option');
+        resolve(items[0]);
       }
-    })
-  })
+    });
+  });
 }
 
 async function selectProvider() {
-  console.log('\n🚀 Claude Code - Provider & Model Selector\n')
-  
-  console.log('🌐 Available providers:')
+  console.log('\n🚀 Claude Code - Provider & Model Selector\n');
+
+  console.log('🌐 Available providers:');
   PROVIDER_KEYS.forEach((p, i) => {
-    const info = PROVIDERS[p]
-    console.log(`  ${i + 1}. ${info.label} ${info.isLocal ? '(Local)' : ''}`)
-  })
-  
+    const info = PROVIDERS[p];
+    console.log(`  ${i + 1}. ${info.label} ${info.isLocal ? '(Local)' : ''}`);
+  });
+
   const readline = require('readline').createInterface({
     input: process.stdin,
-    output: process.stdout
-  })
-  
-  const provider = await new Promise((resolve) => {
-    readline.question('\n🔧 Select provider (1-' + PROVIDER_KEYS.length + '): ', (answer) => {
-      readline.close()
-      const idx = parseInt(answer) - 1
-      resolve(PROVIDER_KEYS[idx] || PROVIDER_KEYS[0])
-    })
-  })
-  
-  console.log(`\n⏳ Fetching models from ${PROVIDERS[provider].label}...`)
-  const models = await fetchModels(provider)
-  
-  let model
+    output: process.stdout,
+  });
+
+  const provider = await new Promise(resolve => {
+    readline.question('\n🔧 Select provider (1-' + PROVIDER_KEYS.length + '): ', answer => {
+      readline.close();
+      const idx = parseInt(answer) - 1;
+      resolve(PROVIDER_KEYS[idx] || PROVIDER_KEYS[0]);
+    });
+  });
+
+  console.log(`\n⏳ Fetching models from ${PROVIDERS[provider].label}...`);
+  const models = await fetchModels(provider);
+
+  let model;
   if (models.length > 0) {
-    model = await selectFromList(models, (m) => m)
+    model = await selectFromList(models, m => m);
   } else {
-    model = await promptForModel(provider)
+    model = await promptForModel(provider);
     if (!model) {
-      console.log('❌ No model provided. Aborting.')
-      process.exit(1)
+      console.log('❌ No model provided. Aborting.');
+      process.exit(1);
     }
   }
 
-  const apiKey = await promptForApiKey(provider)
-  const currentConfig = loadConfig()
-  const hasExistingKey = Boolean(currentConfig?.apiKeys?.[provider] || process.env[PROVIDERS[provider].envKey])
+  const apiKey = await promptForApiKey(provider);
+  const currentConfig = loadConfig();
+  const hasExistingKey = Boolean(currentConfig?.apiKeys?.[provider] || process.env[PROVIDERS[provider].envKey]);
 
   if (!PROVIDERS[provider].isLocal && !apiKey && !hasExistingKey) {
-    console.log(`❌ No API key provided for ${PROVIDERS[provider].envKey}. Aborting.`)
-    process.exit(1)
+    console.log(`❌ No API key provided for ${PROVIDERS[provider].envKey}. Aborting.`);
+    process.exit(1);
   }
 
   const apiKeys = {
     ...(currentConfig?.apiKeys || {}),
-    ...(apiKey ? { [provider]: apiKey } : {})
-  }
-  
-  const config = { 
-    provider, 
+    ...(apiKey ? { [provider]: apiKey } : {}),
+  };
+
+  const config = {
+    provider,
     model,
     providerConfig: PROVIDERS[provider],
-    apiKeys
-  }
-  
-  return config
+    apiKeys,
+  };
+
+  return config;
 }
 
-const program = new Command()
+const program = new Command();
 
 program
   .name('provider-select')
@@ -334,86 +334,86 @@ program
   .option('-g, --get', 'Show current configuration')
   .option('-r, --reset', 'Reset to default')
   .option('-m, --models <provider>', 'Fetch models for a specific provider')
-  .option('-u, --models-url', 'Show models API URLs for all providers')
+  .option('-u, --models-url', 'Show models API URLs for all providers');
 
-program.action(async (options) => {
+program.action(async options => {
   if (options.list) {
-    console.log('\n📦 Available providers:\n')
+    console.log('\n📦 Available providers:\n');
     for (const [key, info] of Object.entries(PROVIDERS)) {
-      console.log(`🌐 ${info.label}:`)
-      console.log(`   Default: ${info.defaultModel}`)
-      console.log(`   Base:   ${info.baseUrl}`)
-      console.log(`   Note:   ${info.note}`)
-      console.log()
+      console.log(`🌐 ${info.label}:`);
+      console.log(`   Default: ${info.defaultModel}`);
+      console.log(`   Base:   ${info.baseUrl}`);
+      console.log(`   Note:   ${info.note}`);
+      console.log();
     }
-    return
+    return;
   }
-  
+
   if (options.models) {
-    const provider = options.models.toLowerCase()
+    const provider = options.models.toLowerCase();
     if (!PROVIDERS[provider]) {
-      console.log(`❌ Unknown provider: ${provider}`)
-      console.log('Available:', Object.keys(PROVIDERS).join(', '))
-      return
+      console.log(`❌ Unknown provider: ${provider}`);
+      console.log('Available:', Object.keys(PROVIDERS).join(', '));
+      return;
     }
-    console.log(`\n⏳ Fetching models from ${PROVIDERS[provider].label}...`)
-    const models = await fetchModels(provider)
-    console.log(`\n📋 Models from ${PROVIDERS[provider].label} (${models.length}):\n`)
-    models.slice(0, 30).forEach(m => console.log(`   • ${m}`))
+    console.log(`\n⏳ Fetching models from ${PROVIDERS[provider].label}...`);
+    const models = await fetchModels(provider);
+    console.log(`\n📋 Models from ${PROVIDERS[provider].label} (${models.length}):\n`);
+    models.slice(0, 30).forEach(m => console.log(`   • ${m}`));
     if (models.length > 30) {
-      console.log(`   ... and ${models.length - 30} more`)
+      console.log(`   ... and ${models.length - 30} more`);
     }
-    return
+    return;
   }
-  
+
   if (options.modelsUrl) {
-    console.log('\n📡 Models API URLs:\n')
+    console.log('\n📡 Models API URLs:\n');
     for (const [key, info] of Object.entries(PROVIDERS)) {
-      console.log(`🌐 ${info.label}:`)
-      console.log(`   ${info.modelsUrl}`)
-      console.log()
+      console.log(`🌐 ${info.label}:`);
+      console.log(`   ${info.modelsUrl}`);
+      console.log();
     }
-    return
+    return;
   }
-  
+
   if (options.reset) {
     const defaultConfig = {
       provider: 'openai',
       model: 'gpt-4.1-mini',
-      providerConfig: PROVIDERS.openai
-    }
-    saveConfig(defaultConfig)
-    console.log('🔄 Reset to default:', defaultConfig)
-    return
+      providerConfig: PROVIDERS.openai,
+    };
+    saveConfig(defaultConfig);
+    console.log('🔄 Reset to default:', defaultConfig);
+    return;
   }
-  
-  if (options.get) {
-    const config = loadConfig()
-    if (config) {
-      console.log('\n⚙️  Current configuration:\n')
-      console.log(`  Provider: ${config.provider}`)
-      console.log(`  Model:    ${config.model}`)
-      console.log()
-    } else {
-      console.log('\n⚠️  No configuration found. Run with --set to configure.\n')
-    }
-    return
-  }
-  
-  if (options.set) {
-    const config = await selectProvider()
-    saveConfig(config)
-    console.log('\n✅ Configuration updated!\n')
-    console.log(`  Provider: ${config.provider}`)
-    console.log(`  Model:    ${config.model}\n`)
-    return
-  }
-  
-  const config = await selectProvider()
-  saveConfig(config)
-  console.log('\n✅ Configuration saved!\n')
-  console.log(`  Provider: ${config.provider}`)
-  console.log(`  Model:    ${config.model}\n`)
-})
 
-program.parse()
+  if (options.get) {
+    const config = loadConfig();
+    if (config) {
+      console.log('\n⚙️  Current configuration:\n');
+      console.log(`  Provider: ${config.provider}`);
+      console.log(`  Model:    ${config.model}`);
+      console.log();
+    } else {
+      console.log('\n⚠️  No configuration found. Run with --set to configure.\n');
+    }
+    return;
+  }
+
+  if (options.set) {
+    const config = await selectProvider();
+    saveConfig(config);
+    console.log('\n✅ Configuration updated!\n');
+    console.log(`  Provider: ${config.provider}`);
+    console.log(`  Model:    ${config.model}\n`);
+    return;
+  }
+
+  const config = await selectProvider();
+  saveConfig(config);
+  console.log('\n✅ Configuration saved!\n');
+  console.log(`  Provider: ${config.provider}`);
+  console.log(`  Model:    ${config.model}\n`);
+});
+
+program.parse();

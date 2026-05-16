@@ -1,126 +1,127 @@
-import { execFileNoThrow } from './execFileNoThrow.js'
-import { whichSync } from './which.js'
-import { getPlatform } from './platform.js'
-import { logForDiagnosticsNoPII } from './diagLogs.js'
+import { logForDiagnosticsNoPII } from './diagLogs.js';
+import { execFileNoThrow } from './execFileNoThrow.js';
+import { getPlatform } from './platform.js';
+import { whichSync } from './which.js';
 
 export interface Capabilities {
-  git: { available: boolean; path?: string }
-  tmux: boolean
-  bun: { available: boolean; version?: string }
-  node: { available: boolean; version?: string; path?: string }
-  browser: { available: boolean; type?: string }
-  network: { available: boolean }
+  git: { available: boolean; path?: string };
+  tmux: boolean;
+  bun: { available: boolean; version?: string };
+  node: { available: boolean; version?: string; path?: string };
+  browser: { available: boolean; type?: string };
+  network: { available: boolean };
   os: {
-    platform: string
-    isWindows: boolean
-    isMacOS: boolean
-    isLinux: boolean
-    arch: string
-    version?: string
-  }
+    platform: string;
+    isWindows: boolean;
+    isMacOS: boolean;
+    isLinux: boolean;
+    arch: string;
+    version?: string;
+  };
   shell: {
-    bash: boolean
-    zsh: boolean
-    powershell: boolean
-    cmd: boolean
-  }
+    bash: boolean;
+    zsh: boolean;
+    powershell: boolean;
+    cmd: boolean;
+  };
 }
 
 function exeExists(name: string): boolean {
   try {
-    return Boolean(whichSync(name))
+    return Boolean(whichSync(name));
   } catch {
-    return false
+    return false;
   }
 }
 
 export async function detectCapabilities(): Promise<Capabilities> {
-  const startTime = Date.now()
-  logForDiagnosticsNoPII('info', 'capability_detection_started')
+  const startTime = Date.now();
+  logForDiagnosticsNoPII('info', 'capability_detection_started');
 
-  const platform = getPlatform()
-  const arch = process.arch
+  const platform = getPlatform();
+  const arch = process.arch;
 
   // Detect git
-  const gitPath = exeExists('git') ? whichSync('git')! : undefined
+  const gitPath = exeExists('git') ? whichSync('git')! : undefined;
   const git: Capabilities['git'] = {
     available: Boolean(gitPath),
     ...(gitPath && { path: gitPath }),
-  }
+  };
 
   // Detect tmux
-  const tmux = exeExists('tmux')
+  const tmux = exeExists('tmux');
 
   // Detect bun
-  let bun: Capabilities['bun'] = { available: false }
+  let bun: Capabilities['bun'] = { available: false };
   if (exeExists('bun')) {
-    bun = { available: true }
+    bun = { available: true };
     try {
-      const { stdout } = await execFileNoThrow('bun', ['--version'])
-      bun.version = stdout.trim()
+      const { stdout } = await execFileNoThrow('bun', ['--version']);
+      bun.version = stdout.trim();
     } catch {
       // Version check failed but bun binary exists
     }
   }
 
   // Detect node
-  let node: Capabilities['node'] = {
+  const node: Capabilities['node'] = {
     available: true,
     version: process.versions?.node,
-  }
+  };
   try {
-    const nodePath = whichSync('node')
-    if (nodePath) node.path = nodePath
+    const nodePath = whichSync('node');
+    if (nodePath) node.path = nodePath;
   } catch {
     // node process exists but no CLI in PATH (unlikely)
-    node.path = undefined
+    node.path = undefined;
   }
 
   // Detect browser
-  let browser: Capabilities['browser'] = { available: false }
-  const browserCandidates = platform === 'windows'
-    ? ['chrome', 'chromium', 'msedge', 'google-chrome']
-    : ['google-chrome', 'chromium', 'chromium-browser', 'firefox', 'safari']
+  let browser: Capabilities['browser'] = { available: false };
+  const browserCandidates =
+    platform === 'windows'
+      ? ['chrome', 'chromium', 'msedge', 'google-chrome']
+      : ['google-chrome', 'chromium', 'chromium-browser', 'firefox', 'safari'];
 
   for (const b of browserCandidates) {
     if (exeExists(b)) {
-      browser = { available: true, type: b }
-      break
+      browser = { available: true, type: b };
+      break;
     }
   }
 
   // On macOS, browsers are typically via `open` not direct CLI, so if platform
   // is macos and no browser CLI found, assume browser is available via system
   if (!browser.available && platform === 'macos') {
-    browser = { available: true, type: 'macos_system' }
+    browser = { available: true, type: 'macos_system' };
   }
 
   // Detect network availability
-  let network: Capabilities['network'] = { available: false }
+  let network: Capabilities['network'] = { available: false };
   try {
     if (platform === 'windows') {
-      const result = await execFileNoThrow('powershell', [
-        '-Command',
-        'Test-Connection -ComputerName 8.8.8.8 -Count 1 -Quiet',
-      ], { timeout: 3000 })
+      const result = await execFileNoThrow(
+        'powershell',
+        ['-Command', 'Test-Connection -ComputerName 8.8.8.8 -Count 1 -Quiet'],
+        { timeout: 3000 },
+      );
       // result.stdout is "True\r\n" or "False\r\n"
-      const hasNetwork = result.stdout.trim() === 'True'
-      network = { available: hasNetwork }
+      const hasNetwork = result.stdout.trim() === 'True';
+      network = { available: hasNetwork };
     } else {
-      const result = await execFileNoThrow('curl', [
-        '-s', '-o', '/dev/null',
-        '-w', '%{http_code}',
-        'https://www.google.com',
-        '-m', '3',
-      ], { timeout: 3000 })
-      network = { available: result.code === 0 && result.stdout?.includes('200') }
+      const result = await execFileNoThrow(
+        'curl',
+        ['-s', '-o', '/dev/null', '-w', '%{http_code}', 'https://www.google.com', '-m', '3'],
+        { timeout: 3000 },
+      );
+      network = { available: result.code === 0 && result.stdout?.includes('200') };
     }
   } catch {
     try {
-      const result2 = await execFileNoThrow('nslookup', ['8.8.8.8'], { timeout: 2000 })
-      network = { available: result2.code === 0 }
+      const result2 = await execFileNoThrow('nslookup', ['8.8.8.8'], { timeout: 2000 });
+      network = { available: result2.code === 0 };
     } catch {
-      network = { available: false }
+      network = { available: false };
     }
   }
 
@@ -130,7 +131,7 @@ export async function detectCapabilities(): Promise<Capabilities> {
     zsh: exeExists('zsh'),
     powershell: exeExists('powershell'),
     cmd: platform === 'windows' ? exeExists('cmd') : false,
-  }
+  };
 
   logForDiagnosticsNoPII('info', 'capability_detection_completed', {
     duration_ms: Date.now() - startTime,
@@ -140,7 +141,7 @@ export async function detectCapabilities(): Promise<Capabilities> {
     node_available: node.available,
     browser_available: browser.available,
     network_available: network.available,
-  })
+  });
 
   return {
     git,
@@ -158,71 +159,75 @@ export async function detectCapabilities(): Promise<Capabilities> {
       version: platform === 'windows' ? process.getSystemVersion?.() : undefined,
     },
     shell,
-  }
+  };
 }
 
 export function formatCapabilitiesAsContext(capabilities: Capabilities): string {
-  const lines: string[] = []
-  lines.push('=== System Capabilities ===')
-  lines.push('This machine has the following capabilities available:')
+  const lines: string[] = [];
+  lines.push('=== System Capabilities ===');
+  lines.push('This machine has the following capabilities available:');
 
   // Git
-  const gitInfo = capabilities.git
+  const gitInfo = capabilities.git;
   if (typeof gitInfo === 'object' && gitInfo.available) {
-    lines.push(`  ✓ git available${gitInfo.path ? ` (${gitInfo.path})` : ''}`)
+    lines.push(`  ✓ git available${gitInfo.path ? ` (${gitInfo.path})` : ''}`);
   } else {
-    lines.push(`  ✗ git not available`)
+    lines.push(`  ✗ git not available`);
   }
 
   // tmux
-  lines.push(`  ${capabilities.tmux ? '✓' : '✗'} tmux ${capabilities.tmux ? '' : '(not available)'}`)
+  lines.push(`  ${capabilities.tmux ? '✓' : '✗'} tmux ${capabilities.tmux ? '' : '(not available)'}`);
 
   // bun
-  const bunInfo = capabilities.bun
+  const bunInfo = capabilities.bun;
   if (typeof bunInfo === 'object' && bunInfo.available) {
-    lines.push(`  ✓ bun available${bunInfo.version ? ` (${bunInfo.version})` : ''}`)
+    lines.push(`  ✓ bun available${bunInfo.version ? ` (${bunInfo.version})` : ''}`);
   } else {
-    lines.push(`  ✗ bun not available`)
+    lines.push(`  ✗ bun not available`);
   }
 
   // node
-  const nodeInfo = capabilities.node
+  const nodeInfo = capabilities.node;
   if (typeof nodeInfo === 'object' && nodeInfo.available) {
-    lines.push(`  ✓ node available${nodeInfo.version ? ` (${nodeInfo.version})` : ''}`)
+    lines.push(`  ✓ node available${nodeInfo.version ? ` (${nodeInfo.version})` : ''}`);
   } else {
-    lines.push(`  ✗ node not available`)
+    lines.push(`  ✗ node not available`);
   }
 
   // browser
-  const browserInfo = capabilities.browser
+  const browserInfo = capabilities.browser;
   if (typeof browserInfo === 'object' && browserInfo.available) {
-    lines.push(`  ✓ browser available${browserInfo.type ? ` (${browserInfo.type})` : ''}`)
+    lines.push(`  ✓ browser available${browserInfo.type ? ` (${browserInfo.type})` : ''}`);
   } else {
-    lines.push(`  ✗ browser not available`)
+    lines.push(`  ✗ browser not available`);
   }
 
   // network
-  const networkInfo = capabilities.network
+  const networkInfo = capabilities.network;
   if (typeof networkInfo === 'object' && networkInfo.available) {
-    lines.push(`  ✓ network connectivity available`)
+    lines.push(`  ✓ network connectivity available`);
   } else {
-    lines.push(`  ✗ network connectivity unavailable`)
+    lines.push(`  ✗ network connectivity unavailable`);
   }
 
   // OS info
-  lines.push('')
-  lines.push(`  OS: ${capabilities.os.platform} (${capabilities.os.arch})${capabilities.os.version ? ` ${capabilities.os.version}` : ''}`)
-  lines.push(`  ${capabilities.os.isWindows ? 'Windows' : capabilities.os.isMacOS ? 'macOS' : 'Linux'} ${capabilities.os.isLinux && capabilities.os.platform === 'wsl' ? '(WSL)' : ''}`)
+  lines.push('');
+  lines.push(
+    `  OS: ${capabilities.os.platform} (${capabilities.os.arch})${capabilities.os.version ? ` ${capabilities.os.version}` : ''}`,
+  );
+  lines.push(
+    `  ${capabilities.os.isWindows ? 'Windows' : capabilities.os.isMacOS ? 'macOS' : 'Linux'} ${capabilities.os.isLinux && capabilities.os.platform === 'wsl' ? '(WSL)' : ''}`,
+  );
 
   // Shells
-  lines.push('')
-  lines.push('Available shells:')
-  lines.push(`  ${capabilities.shell.bash ? '✓' : ' '} bash`)
-  lines.push(`  ${capabilities.shell.zsh ? '✓' : ' '} zsh`)
+  lines.push('');
+  lines.push('Available shells:');
+  lines.push(`  ${capabilities.shell.bash ? '✓' : ' '} bash`);
+  lines.push(`  ${capabilities.shell.zsh ? '✓' : ' '} zsh`);
   if (capabilities.os.isWindows) {
-    lines.push(`  ${capabilities.shell.powershell ? '✓' : ' '} powershell`)
-    lines.push(`  ${capabilities.shell.cmd ? '✓' : ' '} cmd`)
+    lines.push(`  ${capabilities.shell.powershell ? '✓' : ' '} powershell`);
+    lines.push(`  ${capabilities.shell.cmd ? '✓' : ' '} cmd`);
   }
 
-  return lines.join('\n')
+  return lines.join('\n');
 }

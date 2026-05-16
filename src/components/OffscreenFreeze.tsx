@@ -1,7 +1,9 @@
-import React, { useContext, useRef } from 'react';
+import type React from 'react';
+import { useContext, useRef } from 'react';
 import { useTerminalViewport } from '../ink/hooks/use-terminal-viewport.js';
 import { Box } from '../ink.js';
 import { InVirtualListContext } from './messageActions.js';
+
 type Props = {
   children: React.ReactNode;
 };
@@ -20,23 +22,20 @@ type Props = {
  * The cache is one slot deep: the first re-render after scrolling back into view
  * picks up the live children. Content still updates normally while visible.
  */
-export function OffscreenFreeze({
-  children
-}: Props): React.ReactNode {
+export function OffscreenFreeze({ children }: Props): React.ReactNode {
   // React Compiler: reading cached.current in the return is the entire
   // freeze mechanism — memoizing this component would defeat it. Opt out.
   'use no memo';
 
   const inVirtualList = useContext(InVirtualListContext);
-  const [ref, {
-    isVisible
-  }] = useTerminalViewport();
+  const [ref, { isVisible }] = useTerminalViewport();
   const cached = useRef(children);
   // H26: When children type changes mid-session (e.g., tool result reclassified
   // as collapsed group), update cache immediately regardless of visibility to
   // prevent React reconciliation crash from stale element type refs.
   if (cached.current !== children) {
-    const oldType = typeof cached.current === 'object' && cached.current !== null ? (cached.current as any)?.type : undefined;
+    const oldType =
+      typeof cached.current === 'object' && cached.current !== null ? (cached.current as any)?.type : undefined;
     const newType = typeof children === 'object' && children !== null ? (children as any)?.type : undefined;
     if (oldType !== newType) {
       cached.current = children;

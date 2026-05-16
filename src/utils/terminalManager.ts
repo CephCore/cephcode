@@ -1,6 +1,6 @@
-import { spawn, spawn as spawnChild, type ChildProcessWithoutNullStreams } from 'child_process';
-import { Writable } from 'stream';
+import { type ChildProcessWithoutNullStreams, spawn, spawn as spawnChild } from 'child_process';
 import { EventEmitter } from 'events';
+import { Writable } from 'stream';
 
 export type SessionOptions = {
   shell?: string;
@@ -24,7 +24,7 @@ export type ExecResult = {
   timedOut: boolean;
 };
 
-const COMPLETION_MARKER = '__TERMINAL_COMPLETE__'
+const COMPLETION_MARKER = '__TERMINAL_COMPLETE__';
 const COMPLETION_REGEX = /__TERMINAL_COMPLETE__:(\d+):([^:]+):/;
 
 function generateMarker(exitCode: number, cwd: string): string {
@@ -47,19 +47,18 @@ export class InteractiveSession extends EventEmitter {
   }
 
   start(): void {
-    const shellArgs = process.platform === 'win32' 
-      ? ['/c', 'echo Starting session...']
-      : ['-c', 'echo Starting session...'];
+    const shellArgs =
+      process.platform === 'win32' ? ['/c', 'echo Starting session...'] : ['-c', 'echo Starting session...'];
 
     this.process = spawn(this.shell, shellArgs, {
       cwd: this.cwd,
       env: process.env as Record<string, string>,
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
 
-    this.process.stdout?.on('data', (data) => this.handleData(data.toString()));
-    this.process.stderr?.on('data', (data) => this.handleData(data.toString()));
-    this.process.on('exit', (code) => this.emit('exit', code));
+    this.process.stdout?.on('data', data => this.handleData(data.toString()));
+    this.process.stderr?.on('data', data => this.handleData(data.toString()));
+    this.process.on('exit', code => this.emit('exit', code));
   }
 
   write(data: string): void {
@@ -110,36 +109,37 @@ class TerminalManager {
   async exec(options: ExecOptions): Promise<ExecResult> {
     const { command, timeout = 30000, maxLines = 200, cwd = process.cwd() } = options;
 
-    const wrappedCommand = process.platform === 'win32'
-      ? `(${command}) && echo ${generateMarker(0, cwd)}`
-      : `${command} && echo '${generateMarker(0, cwd)}'`;
+    const wrappedCommand =
+      process.platform === 'win32'
+        ? `(${command}) && echo ${generateMarker(0, cwd)}`
+        : `${command} && echo '${generateMarker(0, cwd)}'`;
 
     return new Promise((resolve, reject) => {
       const child = spawn(
         process.platform === 'win32' ? 'cmd.exe' : '/bin/bash',
         process.platform === 'win32' ? ['/c', wrappedCommand] : ['-c', wrappedCommand],
-        { cwd, stdio: ['pipe', 'pipe', 'pipe'] }
+        { cwd, stdio: ['pipe', 'pipe', 'pipe'] },
       );
 
       let output = '';
       let timedOut = false;
       let exitCode = 0;
-      let finalCwd = cwd;
+      const finalCwd = cwd;
 
       const timeoutHandle = setTimeout(() => {
         timedOut = true;
         child.kill();
       }, timeout);
 
-      child.stdout?.on('data', (data) => {
+      child.stdout?.on('data', data => {
         output += data.toString();
       });
 
-      child.stderr?.on('data', (data) => {
+      child.stderr?.on('data', data => {
         output += data.toString();
       });
 
-      child.on('close', (code) => {
+      child.on('close', code => {
         clearTimeout(timeoutHandle);
         exitCode = code || 0;
 
@@ -151,11 +151,11 @@ class TerminalManager {
           output: trimmedOutput,
           exitCode,
           cwd: finalCwd,
-          timedOut
+          timedOut,
         });
       });
 
-      child.on('error', (err) => {
+      child.on('error', err => {
         clearTimeout(timeoutHandle);
         reject(err);
       });
@@ -225,7 +225,11 @@ export async function execTerminal(options: ExecOptions): Promise<ExecResult> {
   return terminalManager.exec(options);
 }
 
-export async function waitTerminal(sessionId: string, pattern: string, timeout?: number): Promise<{ matched: boolean; output: string }> {
+export async function waitTerminal(
+  sessionId: string,
+  pattern: string,
+  timeout?: number,
+): Promise<{ matched: boolean; output: string }> {
   return terminalManager.wait(sessionId, pattern, timeout);
 }
 

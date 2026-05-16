@@ -1,10 +1,10 @@
-import { c as _c } from "react/compiler-runtime";
-import * as React from 'react';
-import { useState, useEffect } from 'react';
+import type * as React from 'react';
+import { useEffect, useState } from 'react';
+import { c as _c } from 'react/compiler-runtime';
+import { readScrollSpeedBase } from '../../components/ScrollKeybindingHandler.js';
 import { Box, Text, useInput } from '../../ink.js';
 import type { ToolUseContext } from '../../Tool.js';
 import type { LocalJSXCommandOnDone } from '../../types/command.js';
-import { readScrollSpeedBase } from '../../components/ScrollKeybindingHandler.js';
 
 const MIN_SPEED = 1;
 const MAX_SPEED = 20;
@@ -62,13 +62,13 @@ function ScrollSpeedSelector({
     <Box flexDirection="column" gap={1} padding={1}>
       <Text bold>Scroll Speed</Text>
       <Box>
-        <Text>  </Text>
+        <Text> </Text>
         <Text color="green">{'█'.repeat(filled)}</Text>
         <Text dimColor>{'░'.repeat(empty)}</Text>
-        <Text>  {label}</Text>
+        <Text> {label}</Text>
       </Box>
       <Box>
-        <Text dimColor>  ◄► adjust  •  Enter confirm  •  Esc cancel</Text>
+        <Text dimColor> ◄► adjust • Enter confirm • Esc cancel</Text>
       </Box>
     </Box>
   );
@@ -99,7 +99,9 @@ export async function call(
 
     const n = parseInt(trimmed, 10);
     if (Number.isNaN(n) || n < MIN_SPEED || n > MAX_SPEED) {
-      onDone(`Invalid speed. Usage: /scroll-speed <${MIN_SPEED}-${MAX_SPEED}> (or "default" to reset)`, { display: 'system' });
+      onDone(`Invalid speed. Usage: /scroll-speed <${MIN_SPEED}-${MAX_SPEED}> (or "default" to reset)`, {
+        display: 'system',
+      });
       return null;
     }
 

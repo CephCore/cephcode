@@ -82,11 +82,7 @@ declare module 'node-pty' {
    * @param options - The options.
    * @returns The interactive PTY.
    */
-  export function spawn(
-    file: string,
-    args: string[],
-    options?: Partial<SpawnOptions>,
-  ): IPty;
+  export function spawn(file: string, args: string[], options?: Partial<SpawnOptions>): IPty;
 
   /**
    * Gets the terminal environment.
@@ -100,7 +96,5 @@ declare module 'node-pty' {
    * @platformwin32 - The default shell on Windows.
    * @returns The default shell.
    */
-  export function getDefaultShell(
-    platform?: 'posix' | 'win32' | 'darwin',
-  ): string;
+  export function getDefaultShell(platform?: 'posix' | 'win32' | 'darwin'): string;
 }

@@ -1,10 +1,13 @@
 import axios from 'axios';
 import { readFile, stat } from 'fs/promises';
-import * as React from 'react';
+import type * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { getLastAPIRequest } from 'src/bootstrap/state.js';
 import { logEventTo1P } from 'src/services/analytics/firstPartyEventLogger.js';
-import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from 'src/services/analytics/index.js';
+import {
+  type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+  logEvent,
+} from 'src/services/analytics/index.js';
 import { getLastAssistantMessage, normalizeMessagesForAPI } from 'src/utils/messages.js';
 import type { CommandResultDisplay } from '../commands.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -21,7 +24,12 @@ import { type GitRepoState, getGitState, getIsGit } from '../utils/git.js';
 import { getAuthHeaders, getUserAgent } from '../utils/http.js';
 import { getInMemoryErrors, logError } from '../utils/log.js';
 import { isEssentialTrafficOnly } from '../utils/privacyLevel.js';
-import { extractTeammateTranscriptsFromTasks, getTranscriptPath, loadAllSubagentTranscriptsFromDisk, MAX_TRANSCRIPT_READ_BYTES } from '../utils/sessionStorage.js';
+import {
+  extractTeammateTranscriptsFromTasks,
+  getTranscriptPath,
+  loadAllSubagentTranscriptsFromDisk,
+  MAX_TRANSCRIPT_READ_BYTES,
+} from '../utils/sessionStorage.js';
 import { jsonStringify } from '../utils/slowOperations.js';
 import { asSystemPrompt } from '../utils/systemPromptType.js';
 import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js';
@@ -32,14 +40,20 @@ import TextInput from './TextInput.js';
 
 // This value was determined experimentally by testing the URL length limit
 const GITHUB_URL_LIMIT = 7250;
-const GITHUB_ISSUES_REPO_URL = "external" === 'ant' ? 'https://github.com/anthropics/claude-cli-internal/issues' : 'https://github.com/JonusNattapong/ClaudeCode/issues';
+const GITHUB_ISSUES_REPO_URL =
+  'external' === 'ant'
+    ? 'https://github.com/anthropics/claude-cli-internal/issues'
+    : 'https://github.com/JonusNattapong/ClaudeCode/issues';
 type Props = {
   abortSignal: AbortSignal;
   messages: Message[];
   initialDescription?: string;
-  onDone(result: string, options?: {
-    display?: CommandResultDisplay;
-  }): void;
+  onDone(
+    result: string,
+    options?: {
+      display?: CommandResultDisplay;
+    },
+  ): void;
   backgroundTasks?: {
     [taskId: string]: {
       type: string;
@@ -76,8 +90,10 @@ export function redactSensitiveInfo(text: string): string {
   redacted = redacted.replace(/"(sk-ant[^\s"']{24,})"/g, '"[REDACTED_API_KEY]"');
   // Then handle the cases without quotes - more general pattern
   redacted = redacted.replace(
-  // eslint-disable-next-line custom-rules/no-lookbehind-regex -- .replace(re, string) on /bug path: no-match returns same string (Object.is)
-  /(?<![A-Za-z0-9"'])(sk-ant-?[A-Za-z0-9_-]{10,})(?![A-Za-z0-9"'])/g, '[REDACTED_API_KEY]');
+    // eslint-disable-next-line custom-rules/no-lookbehind-regex -- .replace(re, string) on /bug path: no-match returns same string (Object.is)
+    /(?<![A-Za-z0-9"'])(sk-ant-?[A-Za-z0-9_-]{10,})(?![A-Za-z0-9"'])/g,
+    '[REDACTED_API_KEY]',
+  );
 
   // AWS keys - AWSXXXX format - add the pattern we need for the test
   redacted = redacted.replace(/AWS key: "(AWS[A-Z0-9]{20,})"/g, 'AWS key: "[REDACTED_AWS_KEY]"');
@@ -87,19 +103,26 @@ export function redactSensitiveInfo(text: string): string {
 
   // Google Cloud keys
   redacted = redacted.replace(
-  // eslint-disable-next-line custom-rules/no-lookbehind-regex -- same as above
-  /(?<![A-Za-z0-9])(AIza[A-Za-z0-9_-]{35})(?![A-Za-z0-9])/g, '[REDACTED_GCP_KEY]');
+    // eslint-disable-next-line custom-rules/no-lookbehind-regex -- same as above
+    /(?<![A-Za-z0-9])(AIza[A-Za-z0-9_-]{35})(?![A-Za-z0-9])/g,
+    '[REDACTED_GCP_KEY]',
+  );
 
   // Vertex AI service account keys
   redacted = redacted.replace(
-  // eslint-disable-next-line custom-rules/no-lookbehind-regex -- same as above
-  /(?<![A-Za-z0-9])([a-z0-9-]+@[a-z0-9-]+\.iam\.gserviceaccount\.com)(?![A-Za-z0-9])/g, '[REDACTED_GCP_SERVICE_ACCOUNT]');
+    // eslint-disable-next-line custom-rules/no-lookbehind-regex -- same as above
+    /(?<![A-Za-z0-9])([a-z0-9-]+@[a-z0-9-]+\.iam\.gserviceaccount\.com)(?![A-Za-z0-9])/g,
+    '[REDACTED_GCP_SERVICE_ACCOUNT]',
+  );
 
   // Generic API keys in headers
   redacted = redacted.replace(/(["']?x-api-key["']?\s*[:=]\s*["']?)[^"',\s)}\]]+/gi, '$1[REDACTED_API_KEY]');
 
   // Authorization headers and Bearer tokens
-  redacted = redacted.replace(/(["']?authorization["']?\s*[:=]\s*["']?(bearer\s+)?)[^"',\s)}\]]+/gi, '$1[REDACTED_TOKEN]');
+  redacted = redacted.replace(
+    /(["']?authorization["']?\s*[:=]\s*["']?(bearer\s+)?)[^"',\s)}\]]+/gi,
+    '$1[REDACTED_TOKEN]',
+  );
 
   // AWS environment variables
   redacted = redacted.replace(/(AWS[_-][A-Za-z0-9_]+\s*[=:]\s*)["']?[^"',\s)}\]]+["']?/gi, '$1[REDACTED_AWS_VALUE]');
@@ -108,7 +131,10 @@ export function redactSensitiveInfo(text: string): string {
   redacted = redacted.replace(/(GOOGLE[_-][A-Za-z0-9_]+\s*[=:]\s*)["']?[^"',\s)}\]]+["']?/gi, '$1[REDACTED_GCP_VALUE]');
 
   // Environment variables with keys
-  redacted = redacted.replace(/((API[-_]?KEY|TOKEN|SECRET|PASSWORD)\s*[=:]\s*)["']?[^"',\s)}\]]+["']?/gi, '$1[REDACTED]');
+  redacted = redacted.replace(
+    /((API[-_]?KEY|TOKEN|SECRET|PASSWORD)\s*[=:]\s*)["']?[^"',\s)}\]]+["']?/gi,
+    '$1[REDACTED]',
+  );
   return redacted;
 }
 
@@ -121,30 +147,30 @@ export function redactSensitiveInfo(text: string): string {
  */
 export function redactSensitiveJSON(jsonText: string): string {
   try {
-    const parsed = JSON.parse(jsonText)
-    const redacted = redactJSONValues(parsed)
-    return JSON.stringify(redacted)
+    const parsed = JSON.parse(jsonText);
+    const redacted = redactJSONValues(parsed);
+    return JSON.stringify(redacted);
   } catch {
     // Not valid JSON — fall back to regex-based redaction
-    return redactSensitiveInfo(jsonText)
+    return redactSensitiveInfo(jsonText);
   }
 }
 
 function redactJSONValues(value: unknown): unknown {
   if (typeof value === 'string') {
-    return redactSensitiveInfo(value)
+    return redactSensitiveInfo(value);
   }
   if (Array.isArray(value)) {
-    return value.map(redactJSONValues)
+    return value.map(redactJSONValues);
   }
   if (value !== null && typeof value === 'object') {
-    const result: Record<string, unknown> = {}
+    const result: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(value)) {
-      result[key] = redactJSONValues(val)
+      result[key] = redactJSONValues(val);
     }
-    return result
+    return result;
   }
-  return value
+  return value;
 }
 
 // Get sanitized error logs with sensitive information redacted
@@ -156,7 +182,7 @@ function getSanitizedErrorLogs(): Array<{
   return getInMemoryErrors().map(errorInfo => {
     // Create a copy of the error info to avoid modifying the original
     const errorCopy = {
-      ...errorInfo
+      ...errorInfo,
     } as {
       error?: string;
       timestamp?: string;
@@ -172,12 +198,10 @@ function getSanitizedErrorLogs(): Array<{
 async function loadRawTranscriptJsonl(): Promise<string | null> {
   try {
     const transcriptPath = getTranscriptPath();
-    const {
-      size
-    } = await stat(transcriptPath);
+    const { size } = await stat(transcriptPath);
     if (size > MAX_TRANSCRIPT_READ_BYTES) {
       logForDebugging(`Skipping raw transcript read: file too large (${size} bytes)`, {
-        level: 'warn'
+        level: 'warn',
       });
       return null;
     }
@@ -191,7 +215,7 @@ export function Feedback({
   messages,
   initialDescription,
   onDone,
-  backgroundTasks = {}
+  backgroundTasks = {},
 }: Props): React.ReactNode {
   const [step, setStep] = useState<Step>('userInput');
   const [cursorOffset, setCursorOffset] = useState(0);
@@ -203,7 +227,7 @@ export function Feedback({
     gitState: GitRepoState | null;
   }>({
     isGit: false,
-    gitState: null
+    gitState: null,
   });
   const [title, setTitle] = useState<string | null>(null);
   const textInputColumns = useTerminalSize().columns - 4;
@@ -216,7 +240,7 @@ export function Feedback({
       }
       setEnvInfo({
         isGit,
-        gitState
+        gitState,
       });
     }
     void loadEnvInfo();
@@ -232,11 +256,14 @@ export function Feedback({
     // Extract last assistant message ID from messages array
     const lastAssistantMessage = getLastAssistantMessage(messages);
     const lastAssistantMessageId = lastAssistantMessage?.requestId ?? null;
-    const [diskTranscripts, rawTranscriptJsonl] = await Promise.all([loadAllSubagentTranscriptsFromDisk(), loadRawTranscriptJsonl()]);
+    const [diskTranscripts, rawTranscriptJsonl] = await Promise.all([
+      loadAllSubagentTranscriptsFromDisk(),
+      loadRawTranscriptJsonl(),
+    ]);
     const teammateTranscripts = extractTeammateTranscriptsFromTasks(backgroundTasks);
     const subagentTranscripts = {
       ...diskTranscripts,
-      ...teammateTranscripts
+      ...teammateTranscripts,
     };
     const reportData = {
       latestAssistantMessageId: lastAssistantMessageId,
@@ -251,25 +278,29 @@ export function Feedback({
       errors: sanitizedErrors,
       lastApiRequest: getLastAPIRequest(),
       ...(Object.keys(subagentTranscripts).length > 0 && {
-        subagentTranscripts
+        subagentTranscripts,
       }),
       ...(rawTranscriptJsonl && {
-        rawTranscriptJsonl
-      })
+        rawTranscriptJsonl,
+      }),
     };
-    const [result, t] = await Promise.all([submitFeedback(reportData, abortSignal), generateTitle(description, abortSignal)]);
+    const [result, t] = await Promise.all([
+      submitFeedback(reportData, abortSignal),
+      generateTitle(description, abortSignal),
+    ]);
     setTitle(t);
     if (result.success) {
       if (result.feedbackId) {
         setFeedbackId(result.feedbackId);
         logEvent('tengu_bug_report_submitted', {
           feedback_id: result.feedbackId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          last_assistant_message_id: lastAssistantMessageId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
+          last_assistant_message_id:
+            lastAssistantMessageId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         });
         // 1P-only: freeform text approved for BQ. Join on feedback_id.
         logEventTo1P('tengu_bug_report_description', {
           feedback_id: result.feedbackId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          description: redactSensitiveInfo(description) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
+          description: redactSensitiveInfo(description) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         });
       }
       setStep('done');
@@ -290,17 +321,17 @@ export function Feedback({
     if (step === 'done') {
       if (error) {
         onDone('Error submitting feedback / bug report', {
-          display: 'system'
+          display: 'system',
         });
       } else {
         onDone('Feedback / bug report submitted', {
-          display: 'system'
+          display: 'system',
         });
       }
       return;
     }
     onDone('Feedback / bug report cancelled', {
-      display: 'system'
+      display: 'system',
     });
   }, [step, error, onDone]);
 
@@ -308,7 +339,7 @@ export function Feedback({
   // This allows typing 'n' in the text field while still supporting Escape to cancel.
   useKeybinding('confirm:no', handleCancel, {
     context: 'Settings',
-    isActive: step === 'userInput'
+    isActive: step === 'userInput',
   });
   useInput((input, key) => {
     // Allow any key press to close the dialog when done or when there's an error
@@ -320,11 +351,11 @@ export function Feedback({
       }
       if (error) {
         onDone('Error submitting feedback / bug report', {
-          display: 'system'
+          display: 'system',
         });
       } else {
         onDone('Feedback / bug report submitted', {
-          display: 'system'
+          display: 'system',
         });
       }
       return;
@@ -334,7 +365,7 @@ export function Feedback({
     // (don't close on any keypress - they can still press Esc to cancel)
     if (error && step !== 'userInput') {
       onDone('Error submitting feedback / bug report', {
-        display: 'system'
+        display: 'system',
       });
       return;
     }
@@ -342,38 +373,65 @@ export function Feedback({
       void submitReport();
     }
   });
-  return <Dialog title="Submit Feedback / Bug Report" onCancel={handleCancel} isCancelActive={step !== 'userInput'} inputGuide={exitState => exitState.pending ? <Text>Press {exitState.keyName} again to exit</Text> : step === 'userInput' ? <Byline>
+  return (
+    <Dialog
+      title="Submit Feedback / Bug Report"
+      onCancel={handleCancel}
+      isCancelActive={step !== 'userInput'}
+      inputGuide={exitState =>
+        exitState.pending ? (
+          <Text>Press {exitState.keyName} again to exit</Text>
+        ) : step === 'userInput' ? (
+          <Byline>
             <KeyboardShortcutHint shortcut="Enter" action="continue" />
             <ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="cancel" />
-          </Byline> : step === 'consent' ? <Byline>
+          </Byline>
+        ) : step === 'consent' ? (
+          <Byline>
             <KeyboardShortcutHint shortcut="Enter" action="submit" />
             <ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="cancel" />
-          </Byline> : null}>
-      {step === 'userInput' && <Box flexDirection="column" gap={1}>
+          </Byline>
+        ) : null
+      }
+    >
+      {step === 'userInput' && (
+        <Box flexDirection="column" gap={1}>
           <Text>Describe the issue below:</Text>
-          <TextInput value={description} onChange={value => {
-        setDescription(value);
-        // Clear error when user starts editing to allow retry
-        if (error) {
-          setError(null);
-        }
-      }} columns={textInputColumns} onSubmit={() => setStep('consent')} onExitMessage={() => onDone('Feedback cancelled', {
-        display: 'system'
-      })} cursorOffset={cursorOffset} onChangeCursorOffset={setCursorOffset} showCursor />
-          {error && <Box flexDirection="column" gap={1}>
+          <TextInput
+            value={description}
+            onChange={value => {
+              setDescription(value);
+              // Clear error when user starts editing to allow retry
+              if (error) {
+                setError(null);
+              }
+            }}
+            columns={textInputColumns}
+            onSubmit={() => setStep('consent')}
+            onExitMessage={() =>
+              onDone('Feedback cancelled', {
+                display: 'system',
+              })
+            }
+            cursorOffset={cursorOffset}
+            onChangeCursorOffset={setCursorOffset}
+            showCursor
+          />
+          {error && (
+            <Box flexDirection="column" gap={1}>
               <Text color="error">{error}</Text>
-              <Text dimColor>
-                Edit and press Enter to retry, or Esc to cancel
-              </Text>
-            </Box>}
-        </Box>}
+              <Text dimColor>Edit and press Enter to retry, or Esc to cancel</Text>
+            </Box>
+          )}
+        </Box>
+      )}
 
-      {step === 'consent' && <Box flexDirection="column">
+      {step === 'consent' && (
+        <Box flexDirection="column">
           <Text>This report will include:</Text>
           <Box marginLeft={2} flexDirection="column">
             <Text>
-              - Your feedback / bug description:{' '}
-              <Text dimColor>{description}</Text>
+              - Your feedback / bug description: <Text dimColor>{description}</Text>
             </Text>
             <Text>
               - Environment info:{' '}
@@ -381,7 +439,8 @@ export function Feedback({
                 {env.platform}, {env.terminal}, v{MACRO.VERSION}
               </Text>
             </Text>
-            {envInfo.gitState && <Text>
+            {envInfo.gitState && (
+              <Text>
                 - Git repo metadata:{' '}
                 <Text dimColor>
                   {envInfo.gitState.branchName}
@@ -390,14 +449,14 @@ export function Feedback({
                   {!envInfo.gitState.isHeadOnRemote && ', not synced'}
                   {!envInfo.gitState.isClean && ', has local changes'}
                 </Text>
-              </Text>}
+              </Text>
+            )}
             <Text>- Current session transcript</Text>
           </Box>
           <Box marginTop={1}>
             <Text wrap="wrap" dimColor>
-              We will use your feedback to debug related issues or to improve{' '}
-              Claude Code&apos;s functionality (eg. to reduce the risk of bugs
-              occurring in the future).
+              We will use your feedback to debug related issues or to improve Claude Code&apos;s functionality (eg. to
+              reduce the risk of bugs occurring in the future).
             </Text>
           </Box>
           <Box marginTop={1}>
@@ -405,33 +464,48 @@ export function Feedback({
               Press <Text bold>Enter</Text> to confirm and submit.
             </Text>
           </Box>
-        </Box>}
+        </Box>
+      )}
 
-      {step === 'submitting' && <Box flexDirection="row" gap={1}>
+      {step === 'submitting' && (
+        <Box flexDirection="row" gap={1}>
           <Text>Submitting report…</Text>
-        </Box>}
+        </Box>
+      )}
 
-      {step === 'done' && <Box flexDirection="column">
+      {step === 'done' && (
+        <Box flexDirection="column">
           {error ? <Text color="error">{error}</Text> : <Text color="success">Thank you for your report!</Text>}
           {feedbackId && <Text dimColor>Feedback ID: {feedbackId}</Text>}
           <Box marginTop={1}>
             <Text>Press </Text>
             <Text bold>Enter </Text>
-            <Text>
-              to open your browser and draft a GitHub issue, or any other key to
-              close.
-            </Text>
+            <Text>to open your browser and draft a GitHub issue, or any other key to close.</Text>
           </Box>
-        </Box>}
-    </Dialog>;
+        </Box>
+      )}
+    </Dialog>
+  );
 }
-export function createGitHubIssueUrl(feedbackId: string, title: string, description: string, errors: Array<{
-  error?: string;
-  timestamp?: string;
-}>): string {
+export function createGitHubIssueUrl(
+  feedbackId: string,
+  title: string,
+  description: string,
+  errors: Array<{
+    error?: string;
+    timestamp?: string;
+  }>,
+): string {
   const sanitizedTitle = redactSensitiveInfo(title);
   const sanitizedDescription = redactSensitiveInfo(description);
-  const bodyPrefix = `**Bug Description**\n${sanitizedDescription}\n\n` + `**Environment Info**\n` + `- Platform: ${env.platform}\n` + `- Terminal: ${env.terminal}\n` + `- Version: ${MACRO.VERSION || 'unknown'}\n` + `- Feedback ID: ${feedbackId}\n` + `\n**Errors**\n\`\`\`json\n`;
+  const bodyPrefix =
+    `**Bug Description**\n${sanitizedDescription}\n\n` +
+    `**Environment Info**\n` +
+    `- Platform: ${env.platform}\n` +
+    `- Terminal: ${env.terminal}\n` +
+    `- Version: ${MACRO.VERSION || 'unknown'}\n` +
+    `- Feedback ID: ${feedbackId}\n` +
+    `\n**Errors**\n\`\`\`json\n`;
   const errorSuffix = `\n\`\`\`\n`;
   const errorsJson = jsonStringify(errors);
   const baseUrl = `${GITHUB_ISSUES_REPO_URL}/new?title=${encodeURIComponent(sanitizedTitle)}&labels=user-reported,bug&body=`;
@@ -442,7 +516,8 @@ export function createGitHubIssueUrl(feedbackId: string, title: string, descript
   const encodedErrors = encodeURIComponent(errorsJson);
 
   // Calculate space available for errors
-  const spaceForErrors = GITHUB_URL_LIMIT - baseUrl.length - encodedPrefix.length - encodedSuffix.length - encodedNote.length;
+  const spaceForErrors =
+    GITHUB_URL_LIMIT - baseUrl.length - encodedPrefix.length - encodedSuffix.length - encodedNote.length;
 
   // If description alone exceeds limit, truncate everything
   if (spaceForErrors <= 0) {
@@ -482,7 +557,20 @@ export function createGitHubIssueUrl(feedbackId: string, title: string, descript
 async function generateTitle(description: string, abortSignal: AbortSignal): Promise<string> {
   try {
     const response = await queryHaiku({
-      systemPrompt: asSystemPrompt(['Generate a concise, technical issue title (max 80 chars) for a public GitHub issue based on this bug report for Claude Code.', 'Claude Code is an agentic coding CLI based on the Anthropic API.', 'The title should:', '- Include the type of issue [Bug] or [Feature Request] as the first thing in the title', '- Be concise, specific and descriptive of the actual problem', '- Use technical terminology appropriate for a software issue', '- For error messages, extract the key error (e.g., "Missing Tool Result Block" rather than the full message)', '- Be direct and clear for developers to understand the problem', '- If you cannot determine a clear issue, use "Bug Report: [brief description]"', '- Any LLM API errors are from the Anthropic API, not from any other model provider', 'Your response will be directly used as the title of the Github issue, and as such should not contain any other commentary or explaination', 'Examples of good titles include: "[Bug] Auto-Compact triggers to soon", "[Bug] Anthropic API Error: Missing Tool Result Block", "[Bug] Error: Invalid Model Name for Opus"']),
+      systemPrompt: asSystemPrompt([
+        'Generate a concise, technical issue title (max 80 chars) for a public GitHub issue based on this bug report for Claude Code.',
+        'Claude Code is an agentic coding CLI based on the Anthropic API.',
+        'The title should:',
+        '- Include the type of issue [Bug] or [Feature Request] as the first thing in the title',
+        '- Be concise, specific and descriptive of the actual problem',
+        '- Use technical terminology appropriate for a software issue',
+        '- For error messages, extract the key error (e.g., "Missing Tool Result Block" rather than the full message)',
+        '- Be direct and clear for developers to understand the problem',
+        '- If you cannot determine a clear issue, use "Bug Report: [brief description]"',
+        '- Any LLM API errors are from the Anthropic API, not from any other model provider',
+        'Your response will be directly used as the title of the Github issue, and as such should not contain any other commentary or explaination',
+        'Examples of good titles include: "[Bug] Auto-Compact triggers to soon", "[Bug] Anthropic API Error: Missing Tool Result Block", "[Bug] Error: Invalid Model Name for Opus"',
+      ]),
       userPrompt: description,
       signal: abortSignal,
       options: {
@@ -491,8 +579,8 @@ async function generateTitle(description: string, abortSignal: AbortSignal): Pro
         isNonInteractiveSession: false,
         agents: [],
         querySource: 'feedback',
-        mcpTools: []
-      }
+        mcpTools: [],
+      },
     });
     const title = response.message.content[0]?.type === 'text' ? response.message.content[0].text : 'Bug Report';
 
@@ -550,14 +638,17 @@ function sanitizeAndLogError(err: unknown): void {
     logError(new Error(errorString));
   }
 }
-async function submitFeedback(data: FeedbackData, signal?: AbortSignal): Promise<{
+async function submitFeedback(
+  data: FeedbackData,
+  signal?: AbortSignal,
+): Promise<{
   success: boolean;
   feedbackId?: string;
   isZdrOrg?: boolean;
 }> {
   if (isEssentialTrafficOnly()) {
     return {
-      success: false
+      success: false,
     };
   }
   try {
@@ -567,60 +658,67 @@ async function submitFeedback(data: FeedbackData, signal?: AbortSignal): Promise
     const authResult = getAuthHeaders();
     if (authResult.error) {
       return {
-        success: false
+        success: false,
       };
     }
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'User-Agent': getUserAgent(),
-      ...authResult.headers
+      ...authResult.headers,
     };
-    const response = await axios.post('https://api.anthropic.com/api/claude_cli_feedback', {
-      content: redactSensitiveJSON(jsonStringify(data))
-    }, {
-      headers,
-      timeout: 30000,
-      // 30 second timeout to prevent hanging
-      signal
-    });
+    const response = await axios.post(
+      'https://api.anthropic.com/api/claude_cli_feedback',
+      {
+        content: redactSensitiveJSON(jsonStringify(data)),
+      },
+      {
+        headers,
+        timeout: 30000,
+        // 30 second timeout to prevent hanging
+        signal,
+      },
+    );
     if (response.status === 200) {
       const result = response.data;
       if (result?.feedback_id) {
         return {
           success: true,
-          feedbackId: result.feedback_id
+          feedbackId: result.feedback_id,
         };
       }
       sanitizeAndLogError(new Error('Failed to submit feedback: request did not return feedback_id'));
       return {
-        success: false
+        success: false,
       };
     }
     sanitizeAndLogError(new Error('Failed to submit feedback:' + response.status));
     return {
-      success: false
+      success: false,
     };
   } catch (err) {
     // Handle cancellation/abort - don't log as error
     if (axios.isCancel(err)) {
       return {
-        success: false
+        success: false,
       };
     }
     if (axios.isAxiosError(err) && err.response?.status === 403) {
       const errorData = err.response.data;
-      if (errorData?.error?.type === 'permission_error' && errorData?.error?.message?.includes('Custom data retention settings')) {
+      if (
+        errorData?.error?.type === 'permission_error' &&
+        errorData?.error?.message?.includes('Custom data retention settings')
+      ) {
         sanitizeAndLogError(new Error('Cannot submit feedback because custom data retention settings are enabled'));
         return {
           success: false,
-          isZdrOrg: true
+          isZdrOrg: true,
         };
       }
     }
     // Use our safe error logging function to avoid leaking API keys
     sanitizeAndLogError(err);
     return {
-      success: false
+      success: false,
     };
   }
 }

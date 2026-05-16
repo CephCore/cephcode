@@ -1,4 +1,4 @@
-import type { Command } from '../../commands.js'
+import type { Command } from '../../commands.js';
 
 const capabilities = {
   type: 'local-jsx' as const,
@@ -7,6 +7,6 @@ const capabilities = {
   description: 'Show available system capabilities (git, tmux, browser, network, shells, etc.)',
   isEnabled: () => true,
   load: () => import('./capabilities.js'),
-} satisfies Command
+} satisfies Command;
 
-export default capabilities
+export default capabilities;

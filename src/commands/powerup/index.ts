@@ -1,10 +1,10 @@
-import type { Command } from '../../commands.js'
+import type { Command } from '../../commands.js';
 
 const powerup = {
   type: 'local-jsx',
   name: 'powerup',
   description: 'Interactive lessons teaching Claude Code features with animated demos',
   load: () => import('./powerup.js'),
-} satisfies Command
+} satisfies Command;
 
-export default powerup
+export default powerup;

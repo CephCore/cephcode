@@ -1,1 +1,1 @@
-export const MONITOR_TOOL_NAME = 'Monitor'
+export const MONITOR_TOOL_NAME = 'Monitor';

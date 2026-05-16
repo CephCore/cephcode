@@ -4,6 +4,7 @@ import { checkHasTrustDialogAccepted } from '../config.js';
 import { logForDebugging } from '../debug.js';
 import { clearMarketplacesCache, registerSeedMarketplaces } from './marketplaceManager.js';
 import { clearPluginCache } from './pluginLoader.js';
+
 type SetAppState = (f: (prevState: AppState) => AppState) => void;
 
 /**
@@ -53,8 +54,8 @@ export async function performStartupChecks(setAppState: SetAppState): Promise<vo
           ...prev,
           plugins: {
             ...prev.plugins,
-            needsRefresh: true
-          }
+            needsRefresh: true,
+          },
         };
       });
     }

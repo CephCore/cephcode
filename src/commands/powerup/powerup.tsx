@@ -1,15 +1,15 @@
-import * as React from 'react'
-import type { LocalJSXCommandContext } from '../../commands.js'
-import { WizardProvider, WizardDialogLayout, WizardNavigationFooter } from '../../components/wizard/index.js'
-import type { LocalJSXCommandOnDone } from '../../types/command.js'
-import { Box, Text } from '../../ink.js'
+import type * as React from 'react';
+import type { LocalJSXCommandContext } from '../../commands.js';
+import { WizardDialogLayout, WizardNavigationFooter, WizardProvider } from '../../components/wizard/index.js';
+import { Box, Text } from '../../ink.js';
+import type { LocalJSXCommandOnDone } from '../../types/command.js';
 
 type Lesson = {
-  id: string
-  title: string
-  description: string
-  content: React.ReactNode
-}
+  id: string;
+  title: string;
+  description: string;
+  content: React.ReactNode;
+};
 
 const lessons: Lesson[] = [
   {
@@ -29,7 +29,7 @@ const lessons: Lesson[] = [
           <Text>• Claude will analyze the referenced content in context</Text>
         </Box>
       </Box>
-    )
+    ),
   },
   {
     id: 'shift-tab-modes',
@@ -48,7 +48,7 @@ const lessons: Lesson[] = [
           <Text>• Ask Mode: Claude only provides recommendations</Text>
         </Box>
       </Box>
-    )
+    ),
   },
   {
     id: 'rewind',
@@ -67,7 +67,7 @@ const lessons: Lesson[] = [
           <Text>• Works with file edits, tool uses, and more</Text>
         </Box>
       </Box>
-    )
+    ),
   },
   {
     id: 'background-tasks',
@@ -86,7 +86,7 @@ const lessons: Lesson[] = [
           <Text>• Perfect for long-running operations</Text>
         </Box>
       </Box>
-    )
+    ),
   },
   {
     id: 'claude-md',
@@ -105,7 +105,7 @@ const lessons: Lesson[] = [
           <Text>• Use /memory for persistent memory across sessions</Text>
         </Box>
       </Box>
-    )
+    ),
   },
   {
     id: 'mcp-tools',
@@ -124,7 +124,7 @@ const lessons: Lesson[] = [
           <Text>• Tools appear automatically in Claude Code</Text>
         </Box>
       </Box>
-    )
+    ),
   },
   {
     id: 'skills-hooks',
@@ -143,7 +143,7 @@ const lessons: Lesson[] = [
           <Text>• Create skills in .claude/skills/ directory</Text>
         </Box>
       </Box>
-    )
+    ),
   },
   {
     id: 'subagents',
@@ -162,7 +162,7 @@ const lessons: Lesson[] = [
           <Text>• Use @ mentions to coordinate between agents</Text>
         </Box>
       </Box>
-    )
+    ),
   },
   {
     id: 'teleport',
@@ -181,7 +181,7 @@ const lessons: Lesson[] = [
           <Text>• Resume work from anywhere with the same context</Text>
         </Box>
       </Box>
-    )
+    ),
   },
   {
     id: 'effort',
@@ -203,9 +203,9 @@ const lessons: Lesson[] = [
           <Text>• Use "ultrathink" for the deepest reasoning</Text>
         </Box>
       </Box>
-    )
-  }
-]
+    ),
+  },
+];
 
 function PowerupDialog({ onDone }: { onDone: LocalJSXCommandOnDone }) {
   const steps = lessons.map(l => () => (
@@ -213,7 +213,7 @@ function PowerupDialog({ onDone }: { onDone: LocalJSXCommandOnDone }) {
       {l.content}
       <WizardNavigationFooter />
     </WizardDialogLayout>
-  ))
+  ));
 
   return (
     <WizardProvider
@@ -222,9 +222,9 @@ function PowerupDialog({ onDone }: { onDone: LocalJSXCommandOnDone }) {
       onComplete={() => onDone(undefined, { display: 'skip' })}
       onCancel={() => onDone(undefined, { display: 'skip' })}
     />
-  )
+  );
 }
 
 export async function call(onDone: LocalJSXCommandOnDone, _context: LocalJSXCommandContext): Promise<React.ReactNode> {
-  return <PowerupDialog onDone={onDone} />
+  return <PowerupDialog onDone={onDone} />;
 }

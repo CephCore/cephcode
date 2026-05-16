@@ -5,34 +5,22 @@
  * Indexes project files for quick reference during development.
  */
 
-import { z } from 'zod/v4'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import { CodeIndex, getCodeIndex, resetCodeIndex } from '../../utils/codeIndex/index.js'
-import { getCwd } from '../../utils/cwd.js'
-import type { ValidationResult } from '../../Tool.js'
+import { z } from 'zod/v4';
+import type { ValidationResult } from '../../Tool.js';
+import { buildTool, type ToolDef } from '../../Tool.js';
+import { CodeIndex, getCodeIndex, resetCodeIndex } from '../../utils/codeIndex/index.js';
+import { getCwd } from '../../utils/cwd.js';
+import { lazySchema } from '../../utils/lazySchema.js';
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
-    action: z
-      .enum(['search', 'index', 'stats', 'clear', 'save', 'load', 'update'])
-      .describe('Action to perform'),
-    query: z
-      .string()
-      .optional()
-      .describe('Search query (for search action)'),
-    limit: z
-      .number()
-      .optional()
-      .default(5)
-      .describe('Maximum results to return'),
-    path: z
-      .string()
-      .optional()
-      .describe('Path to index (for index/save/load actions, defaults to current directory)'),
+    action: z.enum(['search', 'index', 'stats', 'clear', 'save', 'load', 'update']).describe('Action to perform'),
+    query: z.string().optional().describe('Search query (for search action)'),
+    limit: z.number().optional().default(5).describe('Maximum results to return'),
+    path: z.string().optional().describe('Path to index (for index/save/load actions, defaults to current directory)'),
   }),
-)
-type InputSchema = ReturnType<typeof inputSchema>
+);
+type InputSchema = ReturnType<typeof inputSchema>;
 
 const outputSchema = lazySchema(() =>
   z.object({
@@ -61,8 +49,8 @@ const outputSchema = lazySchema(() =>
     cleared: z.boolean().optional().describe('Whether index was cleared'),
     error: z.string().optional().describe('Error message if any'),
   }),
-)
-type OutputSchema = ReturnType<typeof outputSchema>
+);
+type OutputSchema = ReturnType<typeof outputSchema>;
 
 export const CodeIndexTool = buildTool({
   name: 'CodeIndex',
@@ -70,37 +58,37 @@ export const CodeIndexTool = buildTool({
   searchHint: 'search code in the project index',
   maxResultSizeChars: 50_000,
   userFacingName() {
-    return ''
+    return '';
   },
   get inputSchema(): InputSchema {
-    return inputSchema()
+    return inputSchema();
   },
   get outputSchema(): OutputSchema {
-    return outputSchema()
+    return outputSchema();
   },
   isEnabled() {
-    return feature('CODE_INDEX') ? true : false
+    return feature('CODE_INDEX') ? true : false;
   },
   isConcurrencySafe() {
-    return true
+    return true;
   },
   isReadOnly() {
-    return true
+    return true;
   },
   async validateInput({ action, query }, _context): Promise<ValidationResult> {
     if (action === 'search' && (!query || query.length < 2)) {
       return {
         result: false,
         error: 'Query must be at least 2 characters for search',
-      }
+      };
     }
-    return { result: true }
+    return { result: true };
   },
   async description() {
-    return 'Search and index project code using fuzzy matching. Use "index" to build the index, "search" to query it.'
+    return 'Search and index project code using fuzzy matching. Use "index" to build the index, "search" to query it.';
   },
   async prompt() {
-    return 'This tool provides fast code search using fuzzy matching. Index the project once with action=index, then search multiple times with action=search.'
+    return 'This tool provides fast code search using fuzzy matching. Index the project once with action=index, then search multiple times with action=search.';
   },
   mapToolResultToToolResultBlockParam(output, toolUseID) {
     if (output.error) {
@@ -109,76 +97,78 @@ export const CodeIndexTool = buildTool({
         type: 'tool_result',
         content: `Error: ${output.error}`,
         is_error: true,
-      }
+      };
     }
 
-    const lines: string[] = [`[CodeIndex] action=${output.action}`]
+    const lines: string[] = [`[CodeIndex] action=${output.action}`];
 
     if (output.results && output.results.length > 0) {
-      lines.push(`Found ${output.results.length} results:`)
+      lines.push(`Found ${output.results.length} results:`);
       for (const r of output.results) {
-        lines.push(`\n[${r.filePath}:${r.lineRange}] (score: ${(r.score * 100).toFixed(0)}%)`)
-        lines.push(r.content.slice(0, 200) + (r.content.length > 200 ? '...' : ''))
+        lines.push(`\n[${r.filePath}:${r.lineRange}] (score: ${(r.score * 100).toFixed(0)}%)`);
+        lines.push(r.content.slice(0, 200) + (r.content.length > 200 ? '...' : ''));
       }
     } else if (output.stats) {
-      lines.push(`Index: ${output.stats.totalChunks} chunks, ${output.stats.indexedFiles} files`)
+      lines.push(`Index: ${output.stats.totalChunks} chunks, ${output.stats.indexedFiles} files`);
       const langs = Object.entries(output.stats.languageBreakdown)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
         .map(([lang, count]) => `${lang}:${count}`)
-        .join(', ')
-      if (langs) lines.push(`Languages: ${langs}`)
+        .join(', ');
+      if (langs) lines.push(`Languages: ${langs}`);
     } else if (output.indexed !== undefined) {
-      lines.push(`Indexed ${output.indexed} code chunks`)
+      lines.push(`Indexed ${output.indexed} code chunks`);
     } else if (output.cleared) {
-      lines.push('Index cleared')
+      lines.push('Index cleared');
     }
 
     return {
       tool_use_id: toolUseID,
       type: 'tool_result',
       content: lines.join('\n'),
-    }
+    };
   },
   renderToolUseMessage({ input }) {
-    const action = input.action
-    const query = input.query || ''
-    return `[CodeIndex] ${action}${query ? ` "${query}"` : ''}`
+    const action = input.action;
+    const query = input.query || '';
+    return `[CodeIndex] ${action}${query ? ` "${query}"` : ''}`;
   },
   renderToolResultMessage({ output }) {
-    if (output.error) return `Error: ${output.error}`
+    if (output.error) return `Error: ${output.error}`;
     if (output.results && output.results.length > 0) {
-      return `[CodeIndex] ${output.results.length} results`
+      return `[CodeIndex] ${output.results.length} results`;
     }
     if (output.stats) {
-      return `[CodeIndex] ${output.stats.totalChunks} chunks indexed`
+      return `[CodeIndex] ${output.stats.totalChunks} chunks indexed`;
     }
     if (output.indexed !== undefined) {
-      return `[CodeIndex] indexed ${output.indexed} chunks`
+      return `[CodeIndex] indexed ${output.indexed} chunks`;
     }
-    return `[CodeIndex] done`
+    return `[CodeIndex] done`;
   },
   async call({ action, query, limit = 5, path }, context) {
-    const targetPath = path || getCwd()
-    const index = getCodeIndex({}, targetPath)
+    const targetPath = path || getCwd();
+    const index = getCodeIndex({}, targetPath);
 
     try {
       switch (action) {
         case 'index': {
-          const files = await index.discoverFiles(targetPath)
+          const files = await index.discoverFiles(targetPath);
 
           // Index files in chunks to avoid blocking
-          let indexed = 0
+          let indexed = 0;
           for (const file of files) {
             try {
-              const content = Bun.file(file).text()
-              indexed += index.indexFile(file, content)
+              const content = Bun.file(file).text();
+              indexed += index.indexFile(file, content);
 
               // Yield periodically to avoid blocking
               if (indexed % 100 === 0) {
-                await new Promise(resolve => setTimeout(resolve, 0))
+                await new Promise(resolve => setTimeout(resolve, 0));
               }
-            } catch { /* skip */ }
+            } catch {
+              /* skip */
+            }
           }
 
           return {
@@ -186,22 +176,22 @@ export const CodeIndexTool = buildTool({
               action: 'index',
               indexed,
             },
-          }
+          };
         }
 
         case 'save': {
-          const saved = index.save(targetPath)
+          const saved = index.save(targetPath);
           return {
             data: {
               action: 'save',
               saved,
               path: targetPath,
             },
-          }
+          };
         }
 
         case 'load': {
-          const loaded = index.load(targetPath)
+          const loaded = index.load(targetPath);
           return {
             data: {
               action: 'load',
@@ -209,7 +199,7 @@ export const CodeIndexTool = buildTool({
               path: targetPath,
               indexed: index.isIndexed,
             },
-          }
+          };
         }
 
         case 'update': {
@@ -219,18 +209,18 @@ export const CodeIndexTool = buildTool({
                 action: 'update',
                 error: 'No existing index. Use action=index first.',
               },
-            }
+            };
           }
-          const updated = await index.updateIndex(targetPath)
+          const updated = await index.updateIndex(targetPath);
           // Save after update
-          index.save(targetPath)
+          index.save(targetPath);
           return {
             data: {
               action: 'update',
               updated,
               totalChunks: index.size,
             },
-          }
+          };
         }
 
         case 'search': {
@@ -240,10 +230,10 @@ export const CodeIndexTool = buildTool({
                 action: 'search',
                 error: 'Index not built. Use action=index first.',
               },
-            }
+            };
           }
 
-          const results = index.search(query!, limit)
+          const results = index.search(query!, limit);
           return {
             data: {
               action: 'search',
@@ -254,7 +244,7 @@ export const CodeIndexTool = buildTool({
                 lineRange: `${r.chunk.startLine}-${r.chunk.endLine}`,
               })),
             },
-          }
+          };
         }
 
         case 'stats': {
@@ -263,17 +253,17 @@ export const CodeIndexTool = buildTool({
               action: 'stats',
               stats: index.getStats(),
             },
-          }
+          };
         }
 
         case 'clear': {
-          resetCodeIndex()
+          resetCodeIndex();
           return {
             data: {
               action: 'clear',
               cleared: true,
             },
-          }
+          };
         }
 
         default:
@@ -282,7 +272,7 @@ export const CodeIndexTool = buildTool({
               action,
               error: `Unknown action: ${action}`,
             },
-          }
+          };
       }
     } catch (error) {
       return {
@@ -290,7 +280,7 @@ export const CodeIndexTool = buildTool({
           action,
           error: error instanceof Error ? error.message : String(error),
         },
-      }
+      };
     }
   },
-} satisfies ToolDef<InputSchema, OutputSchema>)
+} satisfies ToolDef<InputSchema, OutputSchema>);

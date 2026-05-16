@@ -1,62 +1,52 @@
 import type {
   BetaContentBlock,
   BetaWebSearchTool20250305,
-} from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
-import { getAPIProvider } from 'src/utils/model/providers.js'
-import { isAnthropicProvider } from 'src/utils/model/providers.js'
-import type { PermissionResult } from 'src/utils/permissions/PermissionResult.js'
-import { z } from 'zod/v4'
-import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js'
-import { queryModelWithStreaming } from '../../services/api/claude.js'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import { logError } from '../../utils/log.js'
-import { createUserMessage } from '../../utils/messages.js'
-import { getMainLoopModel, getSmallFastModel } from '../../utils/model/model.js'
-import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
-import { asSystemPrompt } from '../../utils/systemPromptType.js'
-import {
-  isProviderConfigured,
-  searchWithProvider,
-} from '../../services/search/index.js'
-import { getWebSearchPrompt, WEB_SEARCH_TOOL_NAME } from './prompt.js'
+} from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs';
+import { getAPIProvider, isAnthropicProvider } from 'src/utils/model/providers.js';
+import type { PermissionResult } from 'src/utils/permissions/PermissionResult.js';
+import { z } from 'zod/v4';
+import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js';
+import { queryModelWithStreaming } from '../../services/api/claude.js';
+import { isProviderConfigured, searchWithProvider } from '../../services/search/index.js';
+import { buildTool, type ToolDef } from '../../Tool.js';
+import { lazySchema } from '../../utils/lazySchema.js';
+import { logError } from '../../utils/log.js';
+import { createUserMessage } from '../../utils/messages.js';
+import { getMainLoopModel, getSmallFastModel } from '../../utils/model/model.js';
+import { jsonParse, jsonStringify } from '../../utils/slowOperations.js';
+import { asSystemPrompt } from '../../utils/systemPromptType.js';
+import { getWebSearchPrompt, WEB_SEARCH_TOOL_NAME } from './prompt.js';
 import {
   getToolUseSummary,
   renderToolResultMessage,
   renderToolUseMessage,
   renderToolUseProgressMessage,
-} from './UI.js'
+} from './UI.js';
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
     query: z.string().min(2).describe('The search query to use'),
-    allowed_domains: z
-      .array(z.string())
-      .optional()
-      .describe('Only include search results from these domains'),
-    blocked_domains: z
-      .array(z.string())
-      .optional()
-      .describe('Never include search results from these domains'),
+    allowed_domains: z.array(z.string()).optional().describe('Only include search results from these domains'),
+    blocked_domains: z.array(z.string()).optional().describe('Never include search results from these domains'),
   }),
-)
-type InputSchema = ReturnType<typeof inputSchema>
+);
+type InputSchema = ReturnType<typeof inputSchema>;
 
-type Input = z.infer<InputSchema>
+type Input = z.infer<InputSchema>;
 
 const searchResultSchema = lazySchema(() => {
   const searchHitSchema = z.object({
     title: z.string().describe('The title of the search result'),
     url: z.string().describe('The URL of the search result'),
-  })
+  });
 
   return z.object({
     tool_use_id: z.string().describe('ID of the tool use'),
     content: z.array(searchHitSchema).describe('Array of search hits'),
-  })
-})
+  });
+});
 
-export type SearchResult = z.infer<ReturnType<typeof searchResultSchema>>
+export type SearchResult = z.infer<ReturnType<typeof searchResultSchema>>;
 
 const outputSchema = lazySchema(() =>
   z.object({
@@ -64,29 +54,27 @@ const outputSchema = lazySchema(() =>
     results: z
       .array(z.union([searchResultSchema(), z.string()]))
       .describe('Search results and/or text commentary from the model'),
-    durationSeconds: z
-      .number()
-      .describe('Time taken to complete the search operation'),
+    durationSeconds: z.number().describe('Time taken to complete the search operation'),
   }),
-)
-type OutputSchema = ReturnType<typeof outputSchema>
+);
+type OutputSchema = ReturnType<typeof outputSchema>;
 
-export type Output = z.infer<OutputSchema>
+export type Output = z.infer<OutputSchema>;
 
 // Re-export WebSearchProgress from centralized types to break import cycles
-export type { WebSearchProgress } from '../../types/tools.js'
+export type { WebSearchProgress } from '../../types/tools.js';
 
-import type { WebSearchProgress } from '../../types/tools.js'
+import type { WebSearchProgress } from '../../types/tools.js';
 
 /**
  * Select the best available direct search provider.
  * Priority: tavily > brave > serper > duckduckgo (always available, free)
  */
 function selectBestDirectProvider(): string {
-  if (isProviderConfigured('tavily')) return 'tavily'
-  if (isProviderConfigured('brave')) return 'brave'
-  if (isProviderConfigured('serper')) return 'serper'
-  return 'duckduckgo'
+  if (isProviderConfigured('tavily')) return 'tavily';
+  if (isProviderConfigured('brave')) return 'brave';
+  if (isProviderConfigured('serper')) return 'serper';
+  return 'duckduckgo';
 }
 
 /**
@@ -96,7 +84,7 @@ function selectBestDirectProvider(): string {
 function hasWebSearchResults(contentBlocks: BetaContentBlock[]): boolean {
   return contentBlocks.some(
     block => block.type === 'web_search_tool_result' && Array.isArray(block.content) && block.content.length > 0,
-  )
+  );
 }
 
 function makeToolSchema(input: Input): BetaWebSearchTool20250305 {
@@ -106,14 +94,10 @@ function makeToolSchema(input: Input): BetaWebSearchTool20250305 {
     allowed_domains: input.allowed_domains,
     blocked_domains: input.blocked_domains,
     max_uses: 8, // Hardcoded to 8 searches maximum
-  }
+  };
 }
 
-function makeOutputFromSearchResponse(
-  result: BetaContentBlock[],
-  query: string,
-  durationSeconds: number,
-): Output {
+function makeOutputFromSearchResponse(result: BetaContentBlock[], query: string, durationSeconds: number): Output {
   // The result is a sequence of these blocks:
   // - text to start -- always?
   // [
@@ -122,57 +106,57 @@ function makeOutputFromSearchResponse(
   //    - text and citation blocks intermingled
   //  ]+  (this block repeated for each search)
 
-  const results: (SearchResult | string)[] = []
-  let textAcc = ''
-  let inText = true
+  const results: (SearchResult | string)[] = [];
+  let textAcc = '';
+  let inText = true;
 
   for (const block of result) {
     if (block.type === 'server_tool_use') {
       if (inText) {
-        inText = false
+        inText = false;
         if (textAcc.trim().length > 0) {
-          results.push(textAcc.trim())
+          results.push(textAcc.trim());
         }
-        textAcc = ''
+        textAcc = '';
       }
-      continue
+      continue;
     }
 
     if (block.type === 'web_search_tool_result') {
       // Handle error case - content is a WebSearchToolResultError
       if (!Array.isArray(block.content)) {
-        const errorMessage = `Web search error: ${block.content.error_code}`
-        logError(new Error(errorMessage))
-        results.push(errorMessage)
-        continue
+        const errorMessage = `Web search error: ${block.content.error_code}`;
+        logError(new Error(errorMessage));
+        results.push(errorMessage);
+        continue;
       }
       // Success case - add results to our collection
-      const hits = block.content.map(r => ({ title: r.title, url: r.url }))
+      const hits = block.content.map(r => ({ title: r.title, url: r.url }));
       results.push({
         tool_use_id: block.tool_use_id,
         content: hits,
-      })
+      });
     }
 
     if (block.type === 'text') {
       if (inText) {
-        textAcc += block.text
+        textAcc += block.text;
       } else {
-        inText = true
-        textAcc = block.text
+        inText = true;
+        textAcc = block.text;
       }
     }
   }
 
   if (textAcc.length) {
-    results.push(textAcc.trim())
+    results.push(textAcc.trim());
   }
 
   return {
     query,
     results,
     durationSeconds,
-  }
+  };
 }
 
 /**
@@ -180,21 +164,17 @@ function makeOutputFromSearchResponse(
  * Skips the Anthropic server-side web_search model call and goes
  * straight to Tavily/Brave/Serper/DuckDuckGo.
  */
-async function directSearchFallback(
-  query: string,
-  startTime: number,
-  onProgress?: any,
-): Promise<{ data: Output }> {
-  const fallbackProvider = selectBestDirectProvider()
+async function directSearchFallback(query: string, startTime: number, onProgress?: any): Promise<{ data: Output }> {
+  const fallbackProvider = selectBestDirectProvider();
 
   if (onProgress) {
     onProgress({
       toolUseID: 'search-direct',
       data: { type: 'query_update', query: `[${fallbackProvider}] ${query}` },
-    })
+    });
   }
 
-  const response = await searchWithProvider(fallbackProvider, query, { num: 10 })
+  const response = await searchWithProvider(fallbackProvider, query, { num: 10 });
 
   if (onProgress) {
     onProgress({
@@ -204,11 +184,11 @@ async function directSearchFallback(
         resultCount: response.results.length,
         query: `[${fallbackProvider}] ${query}`,
       },
-    })
+    });
   }
 
-  const durationSeconds = (performance.now() - startTime) / 1000
-  const results: (SearchResult | string)[] = []
+  const durationSeconds = (performance.now() - startTime) / 1000;
+  const results: (SearchResult | string)[] = [];
 
   if (response.results.length > 0) {
     results.push({
@@ -217,7 +197,7 @@ async function directSearchFallback(
         title: r.title,
         url: r.url,
       })),
-    })
+    });
   }
 
   return {
@@ -226,7 +206,7 @@ async function directSearchFallback(
       results,
       durationSeconds,
     },
-  }
+  };
 }
 
 export const WebSearchTool = buildTool({
@@ -235,54 +215,52 @@ export const WebSearchTool = buildTool({
   maxResultSizeChars: 100_000,
   shouldDefer: true,
   async description(input) {
-    return `Claude wants to search the web for: ${input.query}`
+    return `Claude wants to search the web for: ${input.query}`;
   },
   userFacingName() {
-    return 'Web Search'
+    return 'Web Search';
   },
   getToolUseSummary,
   getActivityDescription(input) {
-    const summary = getToolUseSummary(input)
-    return summary ? `Searching for ${summary}` : 'Searching the web'
+    const summary = getToolUseSummary(input);
+    return summary ? `Searching for ${summary}` : 'Searching the web';
   },
   isEnabled() {
-    const provider = getAPIProvider()
+    const provider = getAPIProvider();
 
     // Anthropic providers use the native server-side web_search tool
     if (provider === 'firstParty' || provider === 'foundry') {
-      return true
+      return true;
     }
 
     // Vertex AI with Claude 4.0+ models supports web_search
     if (provider === 'vertex') {
-      const model = getMainLoopModel()
+      const model = getMainLoopModel();
       const supportsWebSearch =
-        model.includes('claude-opus-4') ||
-        model.includes('claude-sonnet-4') ||
-        model.includes('claude-haiku-4')
-      return supportsWebSearch
+        model.includes('claude-opus-4') || model.includes('claude-sonnet-4') || model.includes('claude-haiku-4');
+      return supportsWebSearch;
     }
 
     // For all other providers (OpenAI, Google, OpenRouter, Ollama,
     // DeepSeek, etc.), the tool is enabled but will fall back to direct
     // search providers (Tavily/Brave/Serper/DuckDuckGo) when the
     // Anthropic server-side web_search returns no results.
-    return true
+    return true;
   },
   get inputSchema(): InputSchema {
-    return inputSchema()
+    return inputSchema();
   },
   get outputSchema(): OutputSchema {
-    return outputSchema()
+    return outputSchema();
   },
   isConcurrencySafe() {
-    return true
+    return true;
   },
   isReadOnly() {
-    return true
+    return true;
   },
   toAutoClassifierInput(input) {
-    return input.query
+    return input.query;
   },
   async checkPermissions(_input): Promise<PermissionResult> {
     return {
@@ -296,10 +274,10 @@ export const WebSearchTool = buildTool({
           destination: 'localSettings',
         },
       ],
-    }
+    };
   },
   async prompt() {
-    return getWebSearchPrompt()
+    return getWebSearchPrompt();
   },
   renderToolUseMessage,
   renderToolUseProgressMessage,
@@ -308,30 +286,29 @@ export const WebSearchTool = buildTool({
     // renderToolResultMessage shows only "Did N searches in Xs" chrome —
     // the results[] content never appears on screen. Heuristic would index
     // string entries in results[] (phantom match). Nothing to search.
-    return ''
+    return '';
   },
   async validateInput(input) {
-    const { query, allowed_domains, blocked_domains } = input
+    const { query, allowed_domains, blocked_domains } = input;
     if (!query.length) {
       return {
         result: false,
         message: 'Error: Missing query',
         errorCode: 1,
-      }
+      };
     }
     if (allowed_domains?.length && blocked_domains?.length) {
       return {
         result: false,
-        message:
-          'Error: Cannot specify both allowed_domains and blocked_domains in the same request',
+        message: 'Error: Cannot specify both allowed_domains and blocked_domains in the same request',
         errorCode: 2,
-      }
+      };
     }
-    return { result: true }
+    return { result: true };
   },
   async call(input, context, _canUseTool, _parentMessage, onProgress) {
-    const startTime = performance.now()
-    const { query } = input
+    const startTime = performance.now();
+    const { query } = input;
 
     // For non-Anthropic providers (OpenAI, Google, OpenRouter, DeepSeek,
     // OpenCode, KiloCode, Ollama, etc.), the Anthropic server-side
@@ -339,28 +316,21 @@ export const WebSearchTool = buildTool({
     // direct-search fallback instead of making an expensive model API
     // call that will inevitably fail or hang.
     if (!isAnthropicProvider()) {
-      return directSearchFallback(query, startTime, onProgress)
+      return directSearchFallback(query, startTime, onProgress);
     }
 
     const userMessage = createUserMessage({
       content: 'Perform a web search for the query: ' + query,
-    })
-    const toolSchema = makeToolSchema(input)
+    });
+    const toolSchema = makeToolSchema(input);
 
-    const useHaiku = getFeatureValue_CACHED_MAY_BE_STALE(
-      'tengu_plum_vx3',
-      false,
-    )
+    const useHaiku = getFeatureValue_CACHED_MAY_BE_STALE('tengu_plum_vx3', false);
 
-    const appState = context.getAppState()
+    const appState = context.getAppState();
     const queryStream = queryModelWithStreaming({
       messages: [userMessage],
-      systemPrompt: asSystemPrompt([
-        'You are an assistant for performing a web search tool use',
-      ]),
-      thinkingConfig: useHaiku
-        ? { type: 'disabled' as const }
-        : context.options.thinkingConfig,
+      systemPrompt: asSystemPrompt(['You are an assistant for performing a web search tool use']),
+      thinkingConfig: useHaiku ? { type: 'disabled' as const } : context.options.thinkingConfig,
       tools: [],
       signal: context.abortController.signal,
       options: {
@@ -377,125 +347,110 @@ export const WebSearchTool = buildTool({
         parentAgentId: context.parentAgentId,
         effortValue: appState.effortValue,
       },
-    })
+    });
 
-    const allContentBlocks: BetaContentBlock[] = []
-    let currentToolUseId = null
-    let currentToolUseJson = ''
-    let progressCounter = 0
-    const toolUseQueries = new Map() // Map of tool_use_id to query
-    let streamError: Error | null = null
+    const allContentBlocks: BetaContentBlock[] = [];
+    let currentToolUseId = null;
+    let currentToolUseJson = '';
+    let progressCounter = 0;
+    const toolUseQueries = new Map(); // Map of tool_use_id to query
+    let streamError: Error | null = null;
 
     try {
       for await (const event of queryStream) {
-      if (event.type === 'assistant') {
-        allContentBlocks.push(...event.message.content)
-        continue
-      }
-
-      // Track tool use ID when server_tool_use starts
-      if (
-        event.type === 'stream_event' &&
-        event.event?.type === 'content_block_start'
-      ) {
-        const contentBlock = event.event.content_block
-        if (contentBlock && contentBlock.type === 'server_tool_use') {
-          currentToolUseId = contentBlock.id
-          currentToolUseJson = ''
-          // Note: The ServerToolUseBlock doesn't contain input.query
-          // The actual query comes through input_json_delta events
-          continue
+        if (event.type === 'assistant') {
+          allContentBlocks.push(...event.message.content);
+          continue;
         }
-      }
 
-      // Accumulate JSON for current tool use
-      if (
-        currentToolUseId &&
-        event.type === 'stream_event' &&
-        event.event?.type === 'content_block_delta'
-      ) {
-        const delta = event.event.delta
-        if (delta?.type === 'input_json_delta' && delta.partial_json) {
-          currentToolUseJson += delta.partial_json
+        // Track tool use ID when server_tool_use starts
+        if (event.type === 'stream_event' && event.event?.type === 'content_block_start') {
+          const contentBlock = event.event.content_block;
+          if (contentBlock && contentBlock.type === 'server_tool_use') {
+            currentToolUseId = contentBlock.id;
+            currentToolUseJson = '';
+            // Note: The ServerToolUseBlock doesn't contain input.query
+            // The actual query comes through input_json_delta events
+            continue;
+          }
+        }
 
-          // Try to extract query from partial JSON for progress updates
-          try {
-            // Look for a complete query field
-            const queryMatch = currentToolUseJson.match(
-              /"query"\s*:\s*"((?:[^"\\]|\\.)*)"/,
-            )
-            if (queryMatch && queryMatch[1]) {
-              // The regex properly handles escaped characters
-              const query = jsonParse('"' + queryMatch[1] + '"')
+        // Accumulate JSON for current tool use
+        if (currentToolUseId && event.type === 'stream_event' && event.event?.type === 'content_block_delta') {
+          const delta = event.event.delta;
+          if (delta?.type === 'input_json_delta' && delta.partial_json) {
+            currentToolUseJson += delta.partial_json;
 
-              if (
-                !toolUseQueries.has(currentToolUseId) ||
-                toolUseQueries.get(currentToolUseId) !== query
-              ) {
-                toolUseQueries.set(currentToolUseId, query)
-                progressCounter++
-                if (onProgress) {
-                  onProgress({
-                    toolUseID: `search-progress-${progressCounter}`,
-                    data: {
-                      type: 'query_update',
-                      query,
-                    },
-                  })
+            // Try to extract query from partial JSON for progress updates
+            try {
+              // Look for a complete query field
+              const queryMatch = currentToolUseJson.match(/"query"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+              if (queryMatch && queryMatch[1]) {
+                // The regex properly handles escaped characters
+                const query = jsonParse('"' + queryMatch[1] + '"');
+
+                if (!toolUseQueries.has(currentToolUseId) || toolUseQueries.get(currentToolUseId) !== query) {
+                  toolUseQueries.set(currentToolUseId, query);
+                  progressCounter++;
+                  if (onProgress) {
+                    onProgress({
+                      toolUseID: `search-progress-${progressCounter}`,
+                      data: {
+                        type: 'query_update',
+                        query,
+                      },
+                    });
+                  }
                 }
               }
+            } catch {
+              // Ignore parsing errors for partial JSON
             }
-          } catch {
-            // Ignore parsing errors for partial JSON
           }
         }
-      }
 
-      // Yield progress when search results come in
-      if (
-        event.type === 'stream_event' &&
-        event.event?.type === 'content_block_start'
-      ) {
-        const contentBlock = event.event.content_block
-        if (contentBlock && contentBlock.type === 'web_search_tool_result') {
-          // Get the actual query that was used for this search
-          const toolUseId = contentBlock.tool_use_id
-          const actualQuery = toolUseQueries.get(toolUseId) || query
-          const content = contentBlock.content
+        // Yield progress when search results come in
+        if (event.type === 'stream_event' && event.event?.type === 'content_block_start') {
+          const contentBlock = event.event.content_block;
+          if (contentBlock && contentBlock.type === 'web_search_tool_result') {
+            // Get the actual query that was used for this search
+            const toolUseId = contentBlock.tool_use_id;
+            const actualQuery = toolUseQueries.get(toolUseId) || query;
+            const content = contentBlock.content;
 
-          progressCounter++
-          if (onProgress) {
-            onProgress({
-              toolUseID: toolUseId || `search-progress-${progressCounter}`,
-              data: {
-                type: 'search_results_received',
-                resultCount: Array.isArray(content) ? content.length : 0,
-                query: actualQuery,
-              },
-            })
+            progressCounter++;
+            if (onProgress) {
+              onProgress({
+                toolUseID: toolUseId || `search-progress-${progressCounter}`,
+                data: {
+                  type: 'search_results_received',
+                  resultCount: Array.isArray(content) ? content.length : 0,
+                  query: actualQuery,
+                },
+              });
+            }
           }
-        }
         }
       }
     } catch (err) {
       // If the Anthropic streaming call fails entirely (e.g., provider
       // doesn't support the model), capture the error and let the
       // fallback below handle it.
-      streamError = err instanceof Error ? err : new Error(String(err))
-      logError(streamError)
+      streamError = err instanceof Error ? err : new Error(String(err));
+      logError(streamError);
     }
 
     // Process the final result
-    const endTime = performance.now()
-    const durationSeconds = (endTime - startTime) / 1000
+    const endTime = performance.now();
+    const durationSeconds = (endTime - startTime) / 1000;
 
     // If the Anthropic server-side web_search returned 0 results (e.g.,
     // non-Anthropic provider, model doesn't support the tool, or search
     // returned nothing), fall back to direct search providers.
-    const useFallback = streamError !== null || !hasWebSearchResults(allContentBlocks)
+    const useFallback = streamError !== null || !hasWebSearchResults(allContentBlocks);
     if (useFallback) {
       try {
-        const fallbackProvider = selectBestDirectProvider()
+        const fallbackProvider = selectBestDirectProvider();
 
         // Report progress so the UI doesn't look stuck
         if (onProgress) {
@@ -505,17 +460,16 @@ export const WebSearchTool = buildTool({
               type: 'query_update',
               query: `[${fallbackProvider}] ${query}`,
             },
-          })
+          });
         }
 
-        const fallbackStart = performance.now()
+        const fallbackStart = performance.now();
         const response = await searchWithProvider(fallbackProvider, query, {
           num: 10,
-        })
-        const fallbackDuration =
-          (performance.now() - fallbackStart) / 1000 + durationSeconds
+        });
+        const fallbackDuration = (performance.now() - fallbackStart) / 1000 + durationSeconds;
 
-        progressCounter++
+        progressCounter++;
         if (onProgress) {
           onProgress({
             toolUseID: `search-progress-${progressCounter}`,
@@ -524,7 +478,7 @@ export const WebSearchTool = buildTool({
               resultCount: response.results.length,
               query: `[${fallbackProvider}] ${query}`,
             },
-          })
+          });
         }
 
         if (response.results.length > 0) {
@@ -533,7 +487,7 @@ export const WebSearchTool = buildTool({
               .filter(b => b.type === 'text')
               .map(b => (b as any).text?.trim?.())
               .filter(Boolean) as string[]),
-          ]
+          ];
 
           // Build a search result from the direct provider response
           results.push({
@@ -542,64 +496,58 @@ export const WebSearchTool = buildTool({
               title: r.title,
               url: r.url,
             })),
-          })
+          });
 
           const data: Output = {
             query,
             results,
             durationSeconds: fallbackDuration,
-          }
-          return { data }
+          };
+          return { data };
         }
       } catch (err) {
         // Log but continue — fall back to the original (empty) result below.
         logError(
-          new Error(
-            `WebSearch direct-search fallback failed: ${err instanceof Error ? err.message : String(err)}`,
-          ),
-        )
+          new Error(`WebSearch direct-search fallback failed: ${err instanceof Error ? err.message : String(err)}`),
+        );
       }
     }
 
-    const data = makeOutputFromSearchResponse(
-      allContentBlocks,
-      query,
-      durationSeconds,
-    )
-    return { data }
+    const data = makeOutputFromSearchResponse(allContentBlocks, query, durationSeconds);
+    return { data };
   },
   mapToolResultToToolResultBlockParam(output, toolUseID) {
-    const { query, results } = output
+    const { query, results } = output;
 
-    let formattedOutput = `Web search results for query: "${query}"\n\n`
+    let formattedOutput = `Web search results for query: "${query}"\n\n`;
 
     // Process the results array - it can contain both string summaries and search result objects.
     // Guard against null/undefined entries that can appear after JSON round-tripping
     // (e.g., from compaction or transcript deserialization).
-    ;(results ?? []).forEach(result => {
+    (results ?? []).forEach(result => {
       if (result == null) {
-        return
+        return;
       }
       if (typeof result === 'string') {
         // Text summary
-        formattedOutput += result + '\n\n'
+        formattedOutput += result + '\n\n';
       } else {
         // Search result with links
         if (result.content?.length > 0) {
-          formattedOutput += `Links: ${jsonStringify(result.content)}\n\n`
+          formattedOutput += `Links: ${jsonStringify(result.content)}\n\n`;
         } else {
-          formattedOutput += 'No links found.\n\n'
+          formattedOutput += 'No links found.\n\n';
         }
       }
-    })
+    });
 
     formattedOutput +=
-      '\nREMINDER: You MUST include the sources above in your response to the user using markdown hyperlinks.'
+      '\nREMINDER: You MUST include the sources above in your response to the user using markdown hyperlinks.';
 
     return {
       tool_use_id: toolUseID,
       type: 'tool_result',
       content: formattedOutput.trim(),
-    }
+    };
   },
-} satisfies ToolDef<InputSchema, Output, WebSearchProgress>)
+} satisfies ToolDef<InputSchema, Output, WebSearchProgress>);

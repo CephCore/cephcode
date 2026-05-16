@@ -1,1 +1,1 @@
-export const REQUEST_SHUTDOWN_TOOL_NAME = 'RequestShutdown'
+export const REQUEST_SHUTDOWN_TOOL_NAME = 'RequestShutdown';

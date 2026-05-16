@@ -18,7 +18,7 @@ export type SpawnOptions = {
 };
 
 const PROMPT_PATTERNS = [
-  { pattern: /^\s*[Yy]es?[Nn]o?\s*[\?\):]/, answer: 'y' },
+  { pattern: /^\s*[Yy]es?[Nn]o?\s*[?):]/, answer: 'y' },
   { pattern: /^\s*\[Yy]\/\[Nn\]/, answer: 'y' },
   { pattern: /^\s*\(Y\/N\)/, answer: 'y' },
   { pattern: /Continue\?/, answer: 'y' },
@@ -43,12 +43,7 @@ const PROMPT_PATTERNS = [
   { pattern: /Press.*return/, answer: '\r' },
 ];
 
-const PASSWORD_PATTERNS = [
-  /password:/i,
-  /Password:/i,
-  /passphrase:/i,
-  /Passphrase:/i,
-];
+const PASSWORD_PATTERNS = [/password:/i, /Password:/i, /passphrase:/i, /Passphrase:/i];
 
 function isPasswordPrompt(data: string): boolean {
   return PASSWORD_PATTERNS.some(pattern => pattern.test(data));
@@ -102,7 +97,7 @@ export async function spawnInteractiveCommand(
       },
 
       onData: (callback: (data: string) => void) => {
-        shell.onData((data) => {
+        shell.onData(data => {
           dataBuffer += data;
           callback(data);
         });
@@ -118,7 +113,7 @@ export async function spawnInteractiveCommand(
       },
     };
 
-    shell.onData((data) => {
+    shell.onData(data => {
       dataBuffer += data;
 
       if (isPasswordPrompt(data)) {
@@ -171,11 +166,11 @@ export async function runInteractiveCommand(
       cols: 80,
       rows: 24,
       cwd: options.cwd || process.cwd(),
-      env: { ...options.env || process.env, TERM: 'xterm-256color' },
+      env: { ...(options.env || process.env), TERM: 'xterm-256color' },
       handleFlowControl: true,
     });
 
-    shell.onData((data) => {
+    shell.onData(data => {
       output += data;
 
       if (options.autoAnswer !== false) {

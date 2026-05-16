@@ -1,6 +1,6 @@
-import { FILE_WRITE_TOOL_NAME } from '../FileWriteTool/prompt.js'
-import { FILE_READ_TOOL_NAME } from '../FileReadTool/prompt.js'
-import { JSON_PATH_TOOL_NAME } from './toolName.js'
+import { FILE_READ_TOOL_NAME } from '../FileReadTool/prompt.js';
+import { FILE_WRITE_TOOL_NAME } from '../FileWriteTool/prompt.js';
+import { JSON_PATH_TOOL_NAME } from './toolName.js';
 
 export const PROMPT = `A tool for querying, validating, formatting, and minifying JSON data. Use this tool when you need to extract specific values from JSON, validate JSON structure, or transform JSON for storage/transmission.
 
@@ -57,6 +57,6 @@ Converts string to object for further processing
 - Use ${FILE_WRITE_TOOL_NAME} to save processed JSON to files
 - Supports nested key paths (dot notation) and array indices
 - Query results can return multiple matches as arrays
-`
+`;
 
-export const DESCRIPTION = 'Query, validate, format, and minify JSON data'
+export const DESCRIPTION = 'Query, validate, format, and minify JSON data';

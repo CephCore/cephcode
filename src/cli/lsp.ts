@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { LuluLSPServer } from '../server/lsp.js'
+import { LuluLSPServer } from '../server/lsp.js';
 
 // Run LSP server over stdio
-new LuluLSPServer().start()
+new LuluLSPServer().start();

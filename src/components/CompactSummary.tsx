@@ -1,21 +1,21 @@
-import * as React from 'react'
-import { BLACK_CIRCLE } from '../constants/figures.js'
-import { Box, Text } from '../ink.js'
-import type { Screen } from '../screens/REPL.js'
-import type { NormalizedUserMessage } from '../types/message.js'
-import { getUserMessageText } from '../utils/messages.js'
-import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js'
-import { MessageResponse } from './MessageResponse.js'
+import type * as React from 'react';
+import { BLACK_CIRCLE } from '../constants/figures.js';
+import { Box, Text } from '../ink.js';
+import type { Screen } from '../screens/REPL.js';
+import type { NormalizedUserMessage } from '../types/message.js';
+import { getUserMessageText } from '../utils/messages.js';
+import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js';
+import { MessageResponse } from './MessageResponse.js';
 
 type Props = {
-  message: NormalizedUserMessage
-  screen: Screen
-}
+  message: NormalizedUserMessage;
+  screen: Screen;
+};
 
 export function CompactSummary({ message, screen }: Props): React.ReactNode {
-  const isTranscriptMode = screen === 'transcript'
-  const textContent = getUserMessageText(message) || ''
-  const metadata = message.summarizeMetadata
+  const isTranscriptMode = screen === 'transcript';
+  const textContent = getUserMessageText(message) || '';
+  const metadata = message.summarizeMetadata;
 
   // "Summarize from here" with metadata
   if (metadata) {
@@ -32,9 +32,7 @@ export function CompactSummary({ message, screen }: Props): React.ReactNode {
                 <Box flexDirection="column">
                   <Text dimColor>
                     Summarized {metadata.messagesSummarized} messages{' '}
-                    {metadata.direction === 'up_to'
-                      ? 'up to this point'
-                      : 'from this point'}
+                    {metadata.direction === 'up_to' ? 'up to this point' : 'from this point'}
                   </Text>
                   {metadata.userContext && (
                     <Text dimColor>
@@ -63,7 +61,7 @@ export function CompactSummary({ message, screen }: Props): React.ReactNode {
           </Box>
         </Box>
       </Box>
-    )
+    );
   }
 
   // Default compact summary (auto-compact)
@@ -97,5 +95,5 @@ export function CompactSummary({ message, screen }: Props): React.ReactNode {
         </MessageResponse>
       )}
     </Box>
-  )
+  );
 }

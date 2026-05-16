@@ -1,4 +1,4 @@
-import type { Command } from '../../commands.js'
+import type { Command } from '../../commands.js';
 
 const skill = {
   type: 'local-jsx',
@@ -6,6 +6,6 @@ const skill = {
   description: 'List available skills or show skill details',
   argumentHint: '[name]',
   load: () => import('./skill.js'),
-} satisfies Command
+} satisfies Command;
 
-export default skill
+export default skill;

@@ -34,42 +34,41 @@ export type ComputerAction =
   | 'zoom'
   // Window management
   | 'list_windows'
-  | 'focus_window'
+  | 'focus_window';
 
 // ── Tool Input ──────────────────────────────────────────────────────────────
 
 /** Input shape that Claude sends when requesting a computer action */
 export interface ComputerToolInput {
   /** The action to perform */
-  action: ComputerAction
+  action: ComputerAction;
 
   /** [x, y] screen coordinates for click/move actions */
-  coordinate?: [number, number]
+  coordinate?: [number, number];
 
   /** Text to type (for "type" action) */
-  text?: string
+  text?: string;
 
   /** Key or key combination to press, e.g. "ctrl+s", "enter" (for "key" action) */
-  key?: string
+  key?: string;
 
   /** Duration in seconds (for "hold_key" action) */
-  duration?: number
+  duration?: number;
 
   /** Scroll direction (for "scroll" action) */
-  scroll_direction?: 'up' | 'down' | 'left' | 'right'
+  scroll_direction?: 'up' | 'down' | 'left' | 'right';
 
   /** Number of scroll clicks (for "scroll" action) */
-  scroll_amount?: number
+  scroll_amount?: number;
 
   /** Starting coordinate for drag (for "left_click_drag" action) */
-  start_coordinate?: [number, number]
+  start_coordinate?: [number, number];
 
   /** Region to zoom into [x1, y1, x2, y2] (for "zoom" action) */
-  region?: [number, number, number, number]
+  region?: [number, number, number, number];
 
   /** Window title or ID for "focus_window" action */
-  window_query?: string
-
+  window_query?: string;
 }
 
 // ── Tool Result ─────────────────────────────────────────────────────────────
@@ -77,41 +76,41 @@ export interface ComputerToolInput {
 /** A single content block in the tool result */
 export type ComputerToolResultBlock =
   | {
-      type: 'image'
+      type: 'image';
       source: {
-        type: 'base64'
-        media_type: 'image/jpeg' | 'image/png'
-        data: string
-      }
+        type: 'base64';
+        media_type: 'image/jpeg' | 'image/png';
+        data: string;
+      };
     }
   | {
-      type: 'text'
-      text: string
-    }
+      type: 'text';
+      text: string;
+    };
 
 // ── Display ─────────────────────────────────────────────────────────────────
 
 /** Information about a display/monitor */
 export interface DisplayInfo {
-  id: number
-  width: number
-  height: number
-  scaleFactor: number
-  isPrimary: boolean
+  id: number;
+  width: number;
+  height: number;
+  scaleFactor: number;
+  isPrimary: boolean;
 }
 
 /** Display configuration used for coordinate scaling */
 export interface DisplayConfig {
   /** Physical screen width in pixels */
-  screenWidth: number
+  screenWidth: number;
   /** Physical screen height in pixels */
-  screenHeight: number
+  screenHeight: number;
   /** Scale factor for coordinate transformation */
-  scaleFactor: number
+  scaleFactor: number;
   /** Scaled width sent to API (max 1568px long edge) */
-  apiWidth: number
+  apiWidth: number;
   /** Scaled height sent to API */
-  apiHeight: number
+  apiHeight: number;
 }
 
 // ── Executor Interface ──────────────────────────────────────────────────────
@@ -119,49 +118,49 @@ export interface DisplayConfig {
 /** The executor interface — platform-specific implementations */
 export interface ComputerExecutor {
   /** Capture a screenshot → base64 JPEG */
-  screenshot(): Promise<{ base64: string; width: number; height: number }>
+  screenshot(): Promise<{ base64: string; width: number; height: number }>;
 
   /** Click at coordinates */
-  click(x: number, y: number, button?: 'left' | 'right' | 'middle', count?: number): Promise<void>
+  click(x: number, y: number, button?: 'left' | 'right' | 'middle', count?: number): Promise<void>;
 
   /** Type text */
-  type(text: string): Promise<void>
+  type(text: string): Promise<void>;
 
   /** Press key or key combination */
-  key(keySequence: string): Promise<void>
+  key(keySequence: string): Promise<void>;
 
   /** Hold key for duration */
-  holdKey(keySequence: string, durationMs: number): Promise<void>
+  holdKey(keySequence: string, durationMs: number): Promise<void>;
 
   /** Move mouse to coordinates */
-  moveMouse(x: number, y: number): Promise<void>
+  moveMouse(x: number, y: number): Promise<void>;
 
   /** Scroll at position */
-  scroll(x: number, y: number, direction: 'up' | 'down' | 'left' | 'right', amount: number): Promise<void>
+  scroll(x: number, y: number, direction: 'up' | 'down' | 'left' | 'right', amount: number): Promise<void>;
 
   /** Drag from one position to another */
-  drag(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void>
+  drag(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void>;
 
   /** Mouse button down */
-  mouseDown(): Promise<void>
+  mouseDown(): Promise<void>;
 
   /** Mouse button up */
-  mouseUp(): Promise<void>
+  mouseUp(): Promise<void>;
 
   /** Get current cursor position */
-  getCursorPosition(): Promise<{ x: number; y: number }>
+  getCursorPosition(): Promise<{ x: number; y: number }>;
 
   /** Get display info */
-  getDisplayInfo(): Promise<DisplayInfo[]>
+  getDisplayInfo(): Promise<DisplayInfo[]>;
 
   /** Read clipboard */
-  readClipboard(): Promise<string>
+  readClipboard(): Promise<string>;
 
   /** Write to clipboard */
-  writeClipboard(text: string): Promise<void>
+  writeClipboard(text: string): Promise<void>;
 }
 
 // ── Mode ────────────────────────────────────────────────────────────────────
 
 /** Which mode the computer use tool is operating in */
-export type ComputerUseMode = 'anthropic' | 'generic'
+export type ComputerUseMode = 'anthropic' | 'generic';

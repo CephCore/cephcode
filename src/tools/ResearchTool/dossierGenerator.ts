@@ -1,9 +1,9 @@
-import fs from "fs";
-import path from "path";
-import os from "os";
-import { logError } from "../../utils/log.js";
-import { DeepDiveResult } from "./deepDive.js";
-import { TruthCheckResult, SourceCredibility } from "./truthChecker.js";
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { logError } from '../../utils/log.js';
+import type { DeepDiveResult } from './deepDive.js';
+import { SourceCredibility, type TruthCheckResult } from './truthChecker.js';
 
 export interface DossierData {
   query: string;
@@ -35,7 +35,7 @@ export interface DossierOptions {
   includeCodeExamples?: boolean;
 }
 
-const DEFAULT_OUTPUT_DIR = path.join(os.homedir(), ".claude", "research-dossiers");
+const DEFAULT_OUTPUT_DIR = path.join(os.homedir(), '.claude', 'research-dossiers');
 
 /**
  * Ensure the output directory exists
@@ -56,17 +56,15 @@ function ensureOutputDir(outputDir: string): void {
  */
 function sanitizeFilename(name: string): string {
   return name
-    .replace(/[/\\?%*:|"<>]/g, "-")
-    .replace(/\s+/g, "_")
+    .replace(/[/\\?%*:|"<>]/g, '-')
+    .replace(/\s+/g, '_')
     .substring(0, 100); // Limit length
 }
 
 /**
  * Extract code examples from content
  */
-function extractCodeExamples(
-  content: string,
-): Array<{ language: string; code: string }> {
+function extractCodeExamples(content: string): Array<{ language: string; code: string }> {
   const examples: Array<{ language: string; code: string }> = [];
 
   // Match code blocks: ```language\ncode\n```
@@ -74,7 +72,7 @@ function extractCodeExamples(
   let match;
 
   while ((match = codeBlockRegex.exec(content)) !== null) {
-    const language = match[1] || "text";
+    const language = match[1] || 'text';
     const code = match[2].trim();
 
     if (code.length > 10) {
@@ -89,10 +87,7 @@ function extractCodeExamples(
 /**
  * Generate Markdown content for the dossier
  */
-function generateMarkdownDossier(
-  data: DossierData,
-  options: DossierOptions = {},
-): string {
+function generateMarkdownDossier(data: DossierData, options: DossierOptions = {}): string {
   const {
     query,
     timestamp,
@@ -105,7 +100,7 @@ function generateMarkdownDossier(
     codeExamples,
   } = data;
 
-  let md = "";
+  let md = '';
 
   // Header
   md += `# Research Dossier: ${query}\n\n`;
@@ -159,8 +154,7 @@ function generateMarkdownDossier(
 
     if (source.credibilityScore !== undefined) {
       const scoreStars =
-        "★".repeat(Math.round(source.credibilityScore / 20)) +
-        "☆".repeat(5 - Math.round(source.credibilityScore / 20));
+        '★'.repeat(Math.round(source.credibilityScore / 20)) + '☆'.repeat(5 - Math.round(source.credibilityScore / 20));
       md += `- **Credibility:** ${source.credibilityScore}/100 ${scoreStars}\n`;
     }
 
@@ -168,11 +162,7 @@ function generateMarkdownDossier(
   });
 
   // Deep Dive Results Section
-  if (
-    deepDiveResults &&
-    deepDiveResults.length > 0 &&
-    options.includeDeepDive !== false
-  ) {
+  if (deepDiveResults && deepDiveResults.length > 0 && options.includeDeepDive !== false) {
     md += `---\n\n`;
     md += `## Deep Dive Results\n\n`;
     md += `The following content was gathered by following links up to 3 levels deep from the original search results.\n\n`;
@@ -210,11 +200,7 @@ function generateMarkdownDossier(
   }
 
   // Truth Check & Conflict Resolution Section
-  if (
-    truthCheckResult &&
-    truthCheckResult.conflicts.length > 0 &&
-    options.includeTruthCheck !== false
-  ) {
+  if (truthCheckResult && truthCheckResult.conflicts.length > 0 && options.includeTruthCheck !== false) {
     md += `---\n\n`;
     md += `## Truth Check & Conflict Resolution\n\n`;
     md += `${truthCheckResult.summary}\n\n`;
@@ -227,7 +213,7 @@ function generateMarkdownDossier(
       conflict.claims.forEach((claim, claimIndex) => {
         md += `${claimIndex + 1}. ${claim.claim}\n`;
         md += `   - Supported by ${claim.sources.length} source(s)\n`;
-        md += `   - Sources: ${claim.sources.slice(0, 2).join(", ")}${claim.sources.length > 2 ? "..." : ""}\n\n`;
+        md += `   - Sources: ${claim.sources.slice(0, 2).join(', ')}${claim.sources.length > 2 ? '...' : ''}\n\n`;
       });
 
       if (conflict.resolution) {
@@ -243,8 +229,8 @@ function generateMarkdownDossier(
 
       truthCheckResult.credibilityScores
         .sort((a, b) => b.score - a.score)
-        .forEach((cred) => {
-          md += `| ${cred.domain} | ${cred.score}/100 | ${cred.type} | ${cred.indicators.join(", ")} |\n`;
+        .forEach(cred => {
+          md += `| ${cred.domain} | ${cred.score}/100 | ${cred.type} | ${cred.indicators.join(', ')} |\n`;
         });
 
       md += `\n`;
@@ -261,11 +247,7 @@ function generateMarkdownDossier(
   }
 
   // Code Examples Section
-  if (
-    codeExamples &&
-    codeExamples.length > 0 &&
-    options.includeCodeExamples !== false
-  ) {
+  if (codeExamples && codeExamples.length > 0 && options.includeCodeExamples !== false) {
     md += `---\n\n`;
     md += `## Code Examples\n\n`;
 
@@ -296,10 +278,7 @@ function generateMarkdownDossier(
 /**
  * Save the research dossier to a Markdown file
  */
-export async function saveDossier(
-  data: DossierData,
-  options: DossierOptions = {},
-): Promise<string> {
+export async function saveDossier(data: DossierData, options: DossierOptions = {}): Promise<string> {
   const {
     outputDir = DEFAULT_OUTPUT_DIR,
     filename,
@@ -313,12 +292,9 @@ export async function saveDossier(
     ensureOutputDir(outputDir);
 
     // Generate filename if not provided
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const baseFilename =
-      filename || `research_${sanitizeFilename(data.query)}_${timestamp}`;
-    const fullFilename = baseFilename.endsWith(".md")
-      ? baseFilename
-      : `${baseFilename}.md`;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const baseFilename = filename || `research_${sanitizeFilename(data.query)}_${timestamp}`;
+    const fullFilename = baseFilename.endsWith('.md') ? baseFilename : `${baseFilename}.md`;
     const outputPath = path.join(outputDir, fullFilename);
 
     // Generate Markdown content
@@ -329,16 +305,14 @@ export async function saveDossier(
     });
 
     // Write to file
-    fs.writeFileSync(outputPath, markdown, "utf-8");
+    fs.writeFileSync(outputPath, markdown, 'utf-8');
 
     console.log(`[DossierGenerator] Saved dossier to: ${outputPath}`);
 
     return outputPath;
   } catch (error) {
     logError(error as Error);
-    throw new Error(
-      `Failed to save dossier: ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
+    throw new Error(`Failed to save dossier: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -361,10 +335,10 @@ export function generateDossierData(
   }));
 
   // Enhance sources with credibility scores
-  const enhancedSources = sources.map((source) => {
-    const credibility = truthCheckResult?.credibilityScores.find((c) => {
+  const enhancedSources = sources.map(source => {
+    const credibility = truthCheckResult?.credibilityScores.find(c => {
       try {
-        const sourceDomain = new URL(source.url).hostname.replace("www.", "");
+        const sourceDomain = new URL(source.url).hostname.replace('www.', '');
         return sourceDomain === c.domain;
       } catch {
         return false;
@@ -380,7 +354,7 @@ export function generateDossierData(
   return {
     query,
     timestamp: new Date().toISOString(),
-    summary: answer.split("\n").slice(0, 10).join("\n"), // First 10 lines as summary
+    summary: answer.split('\n').slice(0, 10).join('\n'), // First 10 lines as summary
     technicalDetails: answer,
     sources: enhancedSources,
     deepDiveResults,

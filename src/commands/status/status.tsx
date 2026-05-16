@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type * as React from 'react';
 import type { LocalJSXCommandContext } from '../../commands.js';
 import { Settings } from '../../components/Settings/Settings.js';
 import type { LocalJSXCommandOnDone } from '../../types/command.js';

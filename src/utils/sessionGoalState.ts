@@ -1,8 +1,8 @@
-import { join } from 'path'
-import { getSessionId } from '../bootstrap/state.js'
-import { getCwd } from './cwd.js'
-import { pathExists } from './file.js'
-import { mkdir, readFile, unlink, writeFile } from 'fs/promises'
+import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
+import { join } from 'path';
+import { getSessionId } from '../bootstrap/state.js';
+import { getCwd } from './cwd.js';
+import { pathExists } from './file.js';
 
 /**
  * Persistent session goal state.
@@ -17,62 +17,67 @@ import { mkdir, readFile, unlink, writeFile } from 'fs/promises'
 
 /** Full goal state persisted to disk */
 export type GoalState = {
-  goal: string
+  goal: string;
   /** Parsed condition (without turn/time bound clauses) */
-  condition?: string
+  condition?: string;
   /** Turn limit if specified (e.g. "or stop after 20 turns") */
-  maxTurns?: number
+  maxTurns?: number;
   /** Time limit in minutes if specified */
-  maxMinutes?: number
+  maxMinutes?: number;
   /** When the goal was set (timestamp) */
-  setAt?: number
+  setAt?: number;
   /** Turn count since goal was set */
-  turnCount?: number
+  turnCount?: number;
   /** Total tokens spent on goal evaluation */
-  evalTokens?: number
+  evalTokens?: number;
   /** Last evaluator reason */
-  lastReason?: string
+  lastReason?: string;
   /** Whether the goal was achieved */
-  achieved?: boolean
+  achieved?: boolean;
   /** When the goal was achieved or cleared */
-  endedAt?: number
-}
+  endedAt?: number;
+};
 
-let currentGoal: string | null = null
-let currentGoalState: GoalState | null = null
-let restored = false
-let persistencePath: string | null = null
+let currentGoal: string | null = null;
+let currentGoalState: GoalState | null = null;
+let restored = false;
+let persistencePath: string | null = null;
 
 function getGoalFilePath(): string {
-  if (persistencePath) return persistencePath
-  const sessionId = getSessionId()
-  const cwd = getCwd()
-  const slug = Buffer.from(cwd).toString('base64url').slice(0, 32)
+  if (persistencePath) return persistencePath;
+  const sessionId = getSessionId();
+  const cwd = getCwd();
+  const slug = Buffer.from(cwd).toString('base64url').slice(0, 32);
   persistencePath = join(
     process.env.HOME || process.env.USERPROFILE || '/tmp',
-    '.claude', 'projects', slug, 'sessions', sessionId, 'goal.json',
-  )
-  return persistencePath
+    '.claude',
+    'projects',
+    slug,
+    'sessions',
+    sessionId,
+    'goal.json',
+  );
+  return persistencePath;
 }
 
 async function tryRestore(): Promise<void> {
-  if (restored) return
-  restored = true
+  if (restored) return;
+  restored = true;
   try {
-    const filePath = getGoalFilePath()
-    const exists = await pathExists(filePath)
-    if (!exists) return
-    const raw = await readFile(filePath, 'utf-8')
-    const parsed = JSON.parse(raw) as GoalState | { goal?: string }
+    const filePath = getGoalFilePath();
+    const exists = await pathExists(filePath);
+    if (!exists) return;
+    const raw = await readFile(filePath, 'utf-8');
+    const parsed = JSON.parse(raw) as GoalState | { goal?: string };
     // Handle both old format ({ goal: string }) and new format (GoalState)
     if ('goal' in parsed && parsed.goal) {
-      currentGoal = parsed.goal
-      const fullState = 'condition' in parsed ? parsed as GoalState : null
-      currentGoalState = fullState
+      currentGoal = parsed.goal;
+      const fullState = 'condition' in parsed ? (parsed as GoalState) : null;
+      currentGoalState = fullState;
       // If goal was already achieved or cleared, don't restore
       if (fullState && (fullState.achieved || fullState.endedAt)) {
-        currentGoal = null
-        currentGoalState = null
+        currentGoal = null;
+        currentGoalState = null;
       }
     }
   } catch {
@@ -81,11 +86,11 @@ async function tryRestore(): Promise<void> {
 }
 
 export function getSessionGoal(): string | null {
-  return currentGoal
+  return currentGoal;
 }
 
 export function getFullGoalState(): GoalState | null {
-  return currentGoalState
+  return currentGoalState;
 }
 
 /**
@@ -96,43 +101,47 @@ export function getFullGoalState(): GoalState | null {
  */
 export function getSessionGoalSync(): string | null {
   if (!restored) {
-    tryRestore()
+    tryRestore();
   }
-  return currentGoal
+  return currentGoal;
 }
 
 export function setSessionGoal(goal: string | null): void {
-  currentGoal = goal
-  restored = true // don't re-restore after explicit set
+  currentGoal = goal;
+  restored = true; // don't re-restore after explicit set
   if (goal === null) {
-    currentGoalState = null
+    currentGoalState = null;
   }
-  persistGoal(currentGoalState).catch(() => {})
+  persistGoal(currentGoalState).catch(() => {});
 }
 
 /** Set the full goal state with all metadata */
 export function setFullGoalState(state: GoalState | null): void {
-  currentGoal = state?.goal ?? null
-  currentGoalState = state
-  restored = true
-  persistGoal(state).catch(() => {})
+  currentGoal = state?.goal ?? null;
+  currentGoalState = state;
+  restored = true;
+  persistGoal(state).catch(() => {});
 }
 
 /** Update specific fields in the goal state */
 export function updateGoalState(updates: Partial<GoalState>): void {
-  if (!currentGoalState) return
-  currentGoalState = { ...currentGoalState, ...updates }
-  persistGoal(currentGoalState).catch(() => {})
+  if (!currentGoalState) return;
+  currentGoalState = { ...currentGoalState, ...updates };
+  persistGoal(currentGoalState).catch(() => {});
 }
 
 async function persistGoal(state: GoalState | null): Promise<void> {
   try {
-    const filePath = getGoalFilePath()
+    const filePath = getGoalFilePath();
     if (state === null) {
-      try { await unlink(filePath) } catch { /* ENOENT ok */ }
+      try {
+        await unlink(filePath);
+      } catch {
+        /* ENOENT ok */
+      }
     } else {
-      await mkdir(join(filePath, '..'), { recursive: true })
-      await writeFile(filePath, JSON.stringify(state), 'utf-8')
+      await mkdir(join(filePath, '..'), { recursive: true });
+      await writeFile(filePath, JSON.stringify(state), 'utf-8');
     }
   } catch {
     // Persistence failures are non-fatal — goal still works in-memory

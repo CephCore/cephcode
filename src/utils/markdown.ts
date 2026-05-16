@@ -1,64 +1,60 @@
-import chalk from 'chalk'
-import { marked, type Token, type Tokens } from 'marked'
-import type { CliHighlight } from './cliHighlight.js'
-import { logForDebugging } from './debug.js'
-import { createHyperlink } from './hyperlink.js'
-import { stripPromptXMLTags } from './messages.js'
-import { decodeHtmlEntities } from './htmlEntities.js'
-import type { ThemeName } from './theme.js'
-import { color } from '../components/design-system/color.js'
-import { BLOCKQUOTE_BAR } from '../constants/figures.js'
-import { stringWidth } from '../ink/stringWidth.js'
-import { supportsHyperlinks } from '../ink/supports-hyperlinks.js'
+import chalk from 'chalk';
+import { marked, type Token, type Tokens } from 'marked';
+import { color } from '../components/design-system/color.js';
+import { BLOCKQUOTE_BAR } from '../constants/figures.js';
+import { stringWidth } from '../ink/stringWidth.js';
+import { supportsHyperlinks } from '../ink/supports-hyperlinks.js';
+import type { CliHighlight } from './cliHighlight.js';
+import { logForDebugging } from './debug.js';
+import { decodeHtmlEntities } from './htmlEntities.js';
+import { createHyperlink } from './hyperlink.js';
+import { stripPromptXMLTags } from './messages.js';
+import type { ThemeName } from './theme.js';
 
 // Use Bun's native stripANSI when available (faster on Bun)
-let _stripAnsi: ((str: string) => string) | null = null
+let _stripAnsi: ((str: string) => string) | null = null;
 function getStripAnsi(): (str: string) => string {
   if (_stripAnsi === null) {
     if (typeof Bun !== 'undefined' && 'stripANSI' in Bun && Bun.stripANSI) {
-      _stripAnsi = (str: string) => Bun.stripANSI(str)
+      _stripAnsi = (str: string) => Bun.stripANSI(str);
     } else {
       // Lazy require for bundled builds
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      _stripAnsi = require('strip-ansi') as (str: string) => string
+      _stripAnsi = require('strip-ansi') as (str: string) => string;
     }
   }
-  return _stripAnsi
+  return _stripAnsi;
 }
 
 // Use \n unconditionally — os.EOL is \r\n on Windows, and the extra \r
 // breaks the character-to-segment mapping in applyStylesToWrappedText,
 // causing styled text to shift right.
-const EOL = '\n'
+const EOL = '\n';
 
-let markedConfigured = false
+let markedConfigured = false;
 
 export function configureMarked(): void {
-  if (markedConfigured) return
-  markedConfigured = true
+  if (markedConfigured) return;
+  markedConfigured = true;
 
   // Disable strikethrough parsing - the model often uses ~ for "approximate"
   // (e.g., ~100) and rarely intends actual strikethrough formatting
   marked.use({
     tokenizer: {
       del() {
-        return undefined
+        return undefined;
       },
     },
-  })
+  });
 }
 
-export function applyMarkdown(
-  content: string,
-  theme: ThemeName,
-  highlight: CliHighlight | null = null,
-): string {
-  configureMarked()
+export function applyMarkdown(content: string, theme: ThemeName, highlight: CliHighlight | null = null): string {
+  configureMarked();
   return marked
     .lexer(stripPromptXMLTags(content))
     .map(_ => formatToken(_, theme, 0, null, null, highlight))
     .join('')
-    .trim()
+    .trim();
 }
 
 export function formatToken(
@@ -71,246 +67,183 @@ export function formatToken(
 ): string {
   switch (token.type) {
     case 'blockquote': {
-      const inner = (token.tokens ?? [])
-        .map(_ => formatToken(_, theme, 0, null, null, highlight))
-        .join('')
+      const inner = (token.tokens ?? []).map(_ => formatToken(_, theme, 0, null, null, highlight)).join('');
       // Prefix each line with a dim vertical bar. Keep text italic but at
       // normal brightness — chalk.dim is nearly invisible on dark themes.
-      const bar = chalk.dim(BLOCKQUOTE_BAR)
+      const bar = chalk.dim(BLOCKQUOTE_BAR);
       return inner
         .split(EOL)
-        .map(line =>
-          getStripAnsi()(line).trim() ? `${bar} ${chalk.italic(line)}` : line,
-        )
-        .join(EOL)
+        .map(line => (getStripAnsi()(line).trim() ? `${bar} ${chalk.italic(line)}` : line))
+        .join(EOL);
     }
     case 'code': {
+      const decodedText = decodeHtmlEntities(token.text);
       if (!highlight) {
-        return token.text + EOL
+        return decodedText + EOL;
       }
-      let language = 'plaintext'
+      let language = 'plaintext';
       if (token.lang) {
         if (highlight.supportsLanguage(token.lang)) {
-          language = token.lang
+          language = token.lang;
         } else {
-          logForDebugging(
-            `Language not supported while highlighting code, falling back to plaintext: ${token.lang}`,
-          )
+          logForDebugging(`Language not supported while highlighting code, falling back to plaintext: ${token.lang}`);
         }
       }
-      return highlight.highlight(token.text, { language }) + EOL
+      return highlight.highlight(decodedText, { language }) + EOL;
     }
     case 'codespan': {
       // inline code
-      return color('permission', theme)(token.text)
+      return color('permission', theme)(decodeHtmlEntities(token.text));
     }
     case 'em':
-      return chalk.italic(
-        (token.tokens ?? [])
-          .map(_ => formatToken(_, theme, 0, null, parent, highlight))
-          .join(''),
-      )
+      return chalk.italic((token.tokens ?? []).map(_ => formatToken(_, theme, 0, null, parent, highlight)).join(''));
     case 'strong':
-      return chalk.bold(
-        (token.tokens ?? [])
-          .map(_ => formatToken(_, theme, 0, null, parent, highlight))
-          .join(''),
-      )
+      return chalk.bold((token.tokens ?? []).map(_ => formatToken(_, theme, 0, null, parent, highlight)).join(''));
     case 'heading':
       switch (token.depth) {
         case 1: // h1
           return (
             chalk.bold.italic.underline(
-              (token.tokens ?? [])
-                .map(_ => formatToken(_, theme, 0, null, null, highlight))
-                .join(''),
+              (token.tokens ?? []).map(_ => formatToken(_, theme, 0, null, null, highlight)).join(''),
             ) +
             EOL +
             EOL
-          )
+          );
         case 2: // h2
           return (
-            chalk.bold(
-              (token.tokens ?? [])
-                .map(_ => formatToken(_, theme, 0, null, null, highlight))
-                .join(''),
-            ) +
+            chalk.bold((token.tokens ?? []).map(_ => formatToken(_, theme, 0, null, null, highlight)).join('')) +
             EOL +
             EOL
-          )
+          );
         default: // h3+
           return (
-            chalk.bold(
-              (token.tokens ?? [])
-                .map(_ => formatToken(_, theme, 0, null, null, highlight))
-                .join(''),
-            ) +
+            chalk.bold((token.tokens ?? []).map(_ => formatToken(_, theme, 0, null, null, highlight)).join('')) +
             EOL +
             EOL
-          )
+          );
       }
     case 'hr':
-      return '---'
+      return '---';
     case 'image':
-      return token.href
+      return token.href;
     case 'link': {
       // Prevent mailto links from being displayed as clickable links
       if (token.href.startsWith('mailto:')) {
         // Extract email from mailto: link and display as plain text
-        const email = token.href.replace(/^mailto:/, '')
-        return email
+        const email = token.href.replace(/^mailto:/, '');
+        return email;
       }
       // Extract display text from the link's child tokens
-      const linkText = (token.tokens ?? [])
-        .map(_ => formatToken(_, theme, 0, null, token, highlight))
-        .join('')
-      const plainLinkText = getStripAnsi()(linkText)
+      const linkText = (token.tokens ?? []).map(_ => formatToken(_, theme, 0, null, token, highlight)).join('');
+      const plainLinkText = getStripAnsi()(linkText);
       // If the link has meaningful display text (different from the URL),
       // show it as a clickable hyperlink. In terminals that support OSC 8,
       // users see the text and can hover/click to see the URL.
       if (plainLinkText && plainLinkText !== token.href) {
-        return createHyperlink(token.href, linkText)
+        return createHyperlink(token.href, linkText);
       }
       // When the display text matches the URL (or is empty), just show the URL
-      return createHyperlink(token.href)
+      return createHyperlink(token.href);
     }
     case 'list': {
       return token.items
         .map((_: Token, index: number) =>
-          formatToken(
-            _,
-            theme,
-            listDepth,
-            token.ordered ? token.start + index : null,
-            token,
-            highlight,
-          ),
+          formatToken(_, theme, listDepth, token.ordered ? token.start + index : null, token, highlight),
         )
-        .join('')
+        .join('');
     }
     case 'list_item':
       return (token.tokens ?? [])
         .map(
-          _ =>
-            `${'  '.repeat(listDepth)}${formatToken(_, theme, listDepth + 1, orderedListNumber, token, highlight)}`,
+          _ => `${'  '.repeat(listDepth)}${formatToken(_, theme, listDepth + 1, orderedListNumber, token, highlight)}`,
         )
-        .join('')
+        .join('');
     case 'paragraph':
-      return (
-        (token.tokens ?? [])
-          .map(_ => formatToken(_, theme, 0, null, null, highlight))
-          .join('') + EOL
-      )
+      return (token.tokens ?? []).map(_ => formatToken(_, theme, 0, null, null, highlight)).join('') + EOL;
     case 'space':
-      return EOL
+      return EOL;
     case 'br':
-      return EOL
+      return EOL;
     case 'text':
       if (parent?.type === 'link') {
         // Already inside a markdown link — the link handler will wrap this
         // in an OSC 8 hyperlink. Linkifying here would nest a second OSC 8
         // sequence, and terminals honor the innermost one, overriding the
         // link's actual href.
-        return decodeHtmlEntities(token.text)
+        return decodeHtmlEntities(token.text);
       }
       if (parent?.type === 'list_item') {
-        const textToken = token as Tokens.Text
+        const textToken = token as Tokens.Text;
         const innerContent = textToken.tokens
-          ? textToken.tokens
-              .map(_ =>
-                formatToken(
-                  _,
-                  theme,
-                  listDepth,
-                  orderedListNumber,
-                  token,
-                  highlight,
-                ),
-              )
-              .join('')
-          : linkifyIssueReferences(decodeHtmlEntities(textToken.text))
-        const reset =
-          innerContent.includes('\x1b') && !innerContent.endsWith('\x1b[0m')
-            ? '\x1b[0m'
-            : ''
-        return `${orderedListNumber === null ? '-' : getListNumber(listDepth, orderedListNumber) + '.'} ${innerContent}${reset}${EOL}`
+          ? textToken.tokens.map(_ => formatToken(_, theme, listDepth, orderedListNumber, token, highlight)).join('')
+          : linkifyIssueReferences(decodeHtmlEntities(textToken.text));
+        const reset = innerContent.includes('\x1b') && !innerContent.endsWith('\x1b[0m') ? '\x1b[0m' : '';
+        return `${orderedListNumber === null ? '-' : getListNumber(listDepth, orderedListNumber) + '.'} ${innerContent}${reset}${EOL}`;
       }
-      return linkifyIssueReferences(decodeHtmlEntities(token.text))
+      return linkifyIssueReferences(decodeHtmlEntities(token.text));
     case 'table': {
-      const tableToken = token as Tokens.Table
+      const tableToken = token as Tokens.Table;
 
       // Helper function to get the text content that will be displayed (after stripAnsi)
       function getDisplayText(tokens: Token[] | undefined): string {
-        return getStripAnsi()(
-          tokens
-            ?.map(_ => formatToken(_, theme, 0, null, null, highlight))
-            .join('') ?? '',
-        )
+        return getStripAnsi()(tokens?.map(_ => formatToken(_, theme, 0, null, null, highlight)).join('') ?? '');
       }
 
       // Determine column widths based on displayed content (without formatting)
       const columnWidths = tableToken.header.map((header, index) => {
-        let maxWidth = stringWidth(getDisplayText(header.tokens))
+        let maxWidth = stringWidth(getDisplayText(header.tokens));
         for (const row of tableToken.rows) {
-          const cellLength = stringWidth(getDisplayText(row[index]?.tokens))
-          maxWidth = Math.max(maxWidth, cellLength)
+          const cellLength = stringWidth(getDisplayText(row[index]?.tokens));
+          maxWidth = Math.max(maxWidth, cellLength);
         }
-        return Math.max(maxWidth, 3) // Minimum width of 3
-      })
+        return Math.max(maxWidth, 3); // Minimum width of 3
+      });
 
       // Format header row
-      let tableOutput = '| '
+      let tableOutput = '| ';
       tableToken.header.forEach((header, index) => {
-        const content =
-          header.tokens
-            ?.map(_ => formatToken(_, theme, 0, null, null, highlight))
-            .join('') ?? ''
-        const displayText = getDisplayText(header.tokens)
-        const width = columnWidths[index]!
-        const align = tableToken.align?.[index]
-        tableOutput +=
-          padAligned(content, stringWidth(displayText), width, align) + ' | '
-      })
-      tableOutput = tableOutput.trimEnd() + EOL
+        const content = header.tokens?.map(_ => formatToken(_, theme, 0, null, null, highlight)).join('') ?? '';
+        const displayText = getDisplayText(header.tokens);
+        const width = columnWidths[index]!;
+        const align = tableToken.align?.[index];
+        tableOutput += padAligned(content, stringWidth(displayText), width, align) + ' | ';
+      });
+      tableOutput = tableOutput.trimEnd() + EOL;
 
       // Add separator row
-      tableOutput += '|'
+      tableOutput += '|';
       columnWidths.forEach(width => {
         // Always use dashes, don't show alignment colons in the output
-        const separator = '-'.repeat(width + 2) // +2 for spaces on each side
-        tableOutput += separator + '|'
-      })
-      tableOutput += EOL
+        const separator = '-'.repeat(width + 2); // +2 for spaces on each side
+        tableOutput += separator + '|';
+      });
+      tableOutput += EOL;
 
       // Format data rows
       tableToken.rows.forEach(row => {
-        tableOutput += '| '
+        tableOutput += '| ';
         row.forEach((cell, index) => {
-          const content =
-            cell.tokens
-              ?.map(_ => formatToken(_, theme, 0, null, null, highlight))
-              .join('') ?? ''
-          const displayText = getDisplayText(cell.tokens)
-          const width = columnWidths[index]!
-          const align = tableToken.align?.[index]
-          tableOutput +=
-            padAligned(content, stringWidth(displayText), width, align) + ' | '
-        })
-        tableOutput = tableOutput.trimEnd() + EOL
-      })
+          const content = cell.tokens?.map(_ => formatToken(_, theme, 0, null, null, highlight)).join('') ?? '';
+          const displayText = getDisplayText(cell.tokens);
+          const width = columnWidths[index]!;
+          const align = tableToken.align?.[index];
+          tableOutput += padAligned(content, stringWidth(displayText), width, align) + ' | ';
+        });
+        tableOutput = tableOutput.trimEnd() + EOL;
+      });
 
-      return tableOutput + EOL
+      return tableOutput + EOL;
     }
     case 'escape':
       // Markdown escape: \) → ), \\ → \, etc.
-      return token.text
+      return decodeHtmlEntities(token.text);
     case 'def':
     case 'del':
     case 'html':
       // These token types are not rendered
-      return ''
+      return '';
   }
-  return ''
+  return '';
 }
 
 // Matches owner/repo#NNN style GitHub issue/PR references. The qualified form
@@ -320,35 +253,30 @@ export function formatToken(
 // only) so hostnames like docs.github.io/guide#42 don't false-positive. Repo
 // segment allows dots (e.g. cc.kurs.web). Lookbehind is avoided — it defeats
 // YARR JIT in JSC.
-const ISSUE_REF_PATTERN =
-  /(^|[^\w./-])([A-Za-z0-9][\w-]*\/[A-Za-z0-9][\w.-]*)#(\d+)\b/g
+const ISSUE_REF_PATTERN = /(^|[^\w./-])([A-Za-z0-9][\w-]*\/[A-Za-z0-9][\w.-]*)#(\d+)\b/g;
 
 /**
  * Replaces owner/repo#123 references with clickable hyperlinks to GitHub.
  */
 function linkifyIssueReferences(text: string): string {
   if (!supportsHyperlinks()) {
-    return text
+    return text;
   }
   return text.replace(
     ISSUE_REF_PATTERN,
     (_match, prefix, repo, num) =>
-      prefix +
-      createHyperlink(
-        `https://github.com/${repo}/issues/${num}`,
-        `${repo}#${num}`,
-      ),
-  )
+      prefix + createHyperlink(`https://github.com/${repo}/issues/${num}`, `${repo}#${num}`),
+  );
 }
 
 function numberToLetter(n: number): string {
-  let result = ''
+  let result = '';
   while (n > 0) {
-    n--
-    result = String.fromCharCode(97 + (n % 26)) + result
-    n = Math.floor(n / 26)
+    n--;
+    result = String.fromCharCode(97 + (n % 26)) + result;
+    n = Math.floor(n / 26);
   }
-  return result
+  return result;
 }
 
 const ROMAN_VALUES: ReadonlyArray<[number, string]> = [
@@ -365,30 +293,30 @@ const ROMAN_VALUES: ReadonlyArray<[number, string]> = [
   [5, 'v'],
   [4, 'iv'],
   [1, 'i'],
-]
+];
 
 function numberToRoman(n: number): string {
-  let result = ''
+  let result = '';
   for (const [value, numeral] of ROMAN_VALUES) {
     while (n >= value) {
-      result += numeral
-      n -= value
+      result += numeral;
+      n -= value;
     }
   }
-  return result
+  return result;
 }
 
 function getListNumber(listDepth: number, orderedListNumber: number): string {
   switch (listDepth) {
     case 0:
     case 1:
-      return orderedListNumber.toString()
+      return orderedListNumber.toString();
     case 2:
-      return numberToLetter(orderedListNumber)
+      return numberToLetter(orderedListNumber);
     case 3:
-      return numberToRoman(orderedListNumber)
+      return numberToRoman(orderedListNumber);
     default:
-      return orderedListNumber.toString()
+      return orderedListNumber.toString();
   }
 }
 
@@ -403,16 +331,16 @@ export function padAligned(
   targetWidth: number,
   align: 'left' | 'center' | 'right' | null | undefined,
 ): string {
-  const padding = Math.max(0, targetWidth - displayWidth)
+  const padding = Math.max(0, targetWidth - displayWidth);
   // If content contains ANSI, append a reset before padding to prevent style leakage
-  const safeContent = content.includes('\x1b') ? content + '\x1b[0m' : content
+  const safeContent = content.includes('\x1b') ? content + '\x1b[0m' : content;
 
   if (align === 'center') {
-    const leftPad = Math.floor(padding / 2)
-    return ' '.repeat(leftPad) + safeContent + ' '.repeat(padding - leftPad)
+    const leftPad = Math.floor(padding / 2);
+    return ' '.repeat(leftPad) + safeContent + ' '.repeat(padding - leftPad);
   }
   if (align === 'right') {
-    return ' '.repeat(padding) + safeContent
+    return ' '.repeat(padding) + safeContent;
   }
-  return safeContent + ' '.repeat(padding)
+  return safeContent + ' '.repeat(padding);
 }

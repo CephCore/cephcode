@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { logError } from '../../utils/log.js';
-import { calculateSourceScore, type SourceScore } from "./smartSourceRanking.js";
+import { calculateSourceScore, type SourceScore } from './smartSourceRanking.js';
 
 // DuckDuckGo Integration (Free, no API key)
 // Docs: https://duckduckgo.com/
@@ -28,25 +28,23 @@ export async function searchDuckDuckGo(
 
   try {
     const startTime = performance.now();
-    const url = new URL("https://api.duckduckgo.com/");
-    url.searchParams.append("q", query);
-    url.searchParams.append("format", "json");
-    url.searchParams.append("no_html", "1");
-    url.searchParams.append("no_redirect", "1");
+    const url = new URL('https://api.duckduckgo.com/');
+    url.searchParams.append('q', query);
+    url.searchParams.append('format', 'json');
+    url.searchParams.append('no_html', '1');
+    url.searchParams.append('no_redirect', '1');
 
     const response = await fetch(url.toString(), {
-      method: "GET",
+      method: 'GET',
       headers: {
-        Accept: "application/json",
-        "User-Agent": "ClaudeCodeResearchTool/1.0",
+        Accept: 'application/json',
+        'User-Agent': 'ClaudeCodeResearchTool/1.0',
       },
       signal: AbortSignal.timeout(timeout),
     });
 
     if (!response.ok) {
-      throw new Error(
-        `DuckDuckGo error: ${response.status} ${response.statusText}`,
-      );
+      throw new Error(`DuckDuckGo error: ${response.status} ${response.statusText}`);
     }
 
     const data = (await response.json()) as any;
@@ -61,7 +59,7 @@ export async function searchDuckDuckGo(
       .filter((r: any) => r.FirstURL && r.Text)
       .slice(0, maxResults)
       .map((r: any) => {
-        const title = r.Text.split(" - ")[0] || r.Text;
+        const title = r.Text.split(' - ')[0] || r.Text;
         const url = r.FirstURL;
         const excerpt = r.Text;
         return {
@@ -86,7 +84,7 @@ export async function searchDuckDuckGo(
 
 // Tavily API Integration
 // Docs: https://docs.tavily.com/docs/tavily-api/introduction
-const TAVILY_API_BASE = "https://api.tavily.com";
+const TAVILY_API_BASE = 'https://api.tavily.com';
 
 export interface TavilySearchResult {
   title: string;
@@ -108,7 +106,7 @@ export interface TavilySearchResponse {
 export async function searchTavily(
   query: string,
   options: {
-    searchDepth?: "basic" | "advanced";
+    searchDepth?: 'basic' | 'advanced';
     maxResults?: number;
     includeAnswer?: boolean;
     includeImages?: boolean;
@@ -119,12 +117,7 @@ export async function searchTavily(
     return null;
   }
 
-  const {
-    searchDepth = "basic",
-    maxResults = 5,
-    includeAnswer = true,
-    includeImages = false,
-  } = options;
+  const { searchDepth = 'basic', maxResults = 5, includeAnswer = true, includeImages = false } = options;
 
   try {
     const response = await axios.post(
@@ -139,7 +132,7 @@ export async function searchTavily(
       },
       {
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         timeout: 30000,
       },
@@ -147,7 +140,7 @@ export async function searchTavily(
 
     const data = response.data as TavilySearchResponse;
     // Attach our smart scores to Tavily results
-    data.results = data.results.map((r) => ({
+    data.results = data.results.map(r => ({
       ...r,
       sourceScore: calculateSourceScore(r.url, r.title, r.content),
     }));
@@ -161,7 +154,7 @@ export async function searchTavily(
 
 // Brave Search API Integration
 // Docs: https://api.search.brave.com/
-const BRAVE_API_BASE = "https://api.search.brave.com/res/v1";
+const BRAVE_API_BASE = 'https://api.search.brave.com/res/v1';
 
 export interface BraveSearchResult {
   title: string;
@@ -177,7 +170,7 @@ export interface BraveSearchResult {
 export interface BraveSearchResponse {
   query: string;
   results: BraveSearchResult[];
-  type: "brave";
+  type: 'brave';
 }
 
 export async function searchBrave(
@@ -202,8 +195,8 @@ export async function searchBrave(
         offset,
       },
       headers: {
-        "X-Subscription-Token": apiKey,
-        Accept: "application/json",
+        'X-Subscription-Token': apiKey,
+        Accept: 'application/json',
       },
       timeout: 30000,
     });
@@ -213,7 +206,7 @@ export async function searchBrave(
 
     return {
       query,
-      type: "brave",
+      type: 'brave',
       results: webResults.map((r: any) => {
         const title = r.title;
         const url = r.url;
@@ -238,7 +231,7 @@ export async function searchBrave(
 
 // Unified search function that tries multiple providers in priority order
 export interface SearchProviderResult {
-  source: "duckduckgo" | "tavily" | "brave";
+  source: 'duckduckgo' | 'tavily' | 'brave';
   query: string;
   results: Array<{
     title: string;
@@ -258,21 +251,19 @@ export interface SearchProviderResult {
  * 2. Tavily (if API key available)
  * 3. Brave (if API key available)
  */
-export function getSearchProviderPriority(): Array<
-  "duckduckgo" | "tavily" | "brave"
-> {
-  const providers: Array<"duckduckgo" | "tavily" | "brave"> = [];
+export function getSearchProviderPriority(): Array<'duckduckgo' | 'tavily' | 'brave'> {
+  const providers: Array<'duckduckgo' | 'tavily' | 'brave'> = [];
 
   // DuckDuckGo as free default (no API key needed)
-  providers.push("duckduckgo");
+  providers.push('duckduckgo');
 
   // API-based providers (if configured)
   if (process.env.TAVILY_API_KEY) {
-    providers.push("tavily");
+    providers.push('tavily');
   }
 
   if (process.env.BRAVE_API_KEY) {
-    providers.push("brave");
+    providers.push('brave');
   }
 
   return providers;
@@ -281,7 +272,7 @@ export function getSearchProviderPriority(): Array<
 export async function searchWithProviders(
   query: string,
   options: {
-    providers?: Array<"duckduckgo" | "tavily" | "brave">;
+    providers?: Array<'duckduckgo' | 'tavily' | 'brave'>;
     maxResults?: number;
     timeout?: number;
   } = {},
@@ -290,76 +281,74 @@ export async function searchWithProviders(
   const providersToUse = providers || getSearchProviderPriority();
 
   // Run all provider searches in parallel for maximum speed
-  const searchPromises = providersToUse.map(
-    async (provider): Promise<SearchProviderResult | null> => {
-      try {
-        if (provider === "duckduckgo") {
-          const ddgResult = await searchDuckDuckGo(query, {
-            maxResults,
-            timeout,
-          });
+  const searchPromises = providersToUse.map(async (provider): Promise<SearchProviderResult | null> => {
+    try {
+      if (provider === 'duckduckgo') {
+        const ddgResult = await searchDuckDuckGo(query, {
+          maxResults,
+          timeout,
+        });
 
-          if (ddgResult && ddgResult.results.length > 0) {
-            return {
-              source: "duckduckgo",
-              query: ddgResult.query,
-              results: ddgResult.results.map((r) => ({
-                title: r.title,
-                url: r.url,
-                description: r.description || "",
-                excerpt: (r.description || "").substring(0, 500),
-              })),
-              responseTime: ddgResult.response_time,
-            };
-          }
+        if (ddgResult && ddgResult.results.length > 0) {
+          return {
+            source: 'duckduckgo',
+            query: ddgResult.query,
+            results: ddgResult.results.map(r => ({
+              title: r.title,
+              url: r.url,
+              description: r.description || '',
+              excerpt: (r.description || '').substring(0, 500),
+            })),
+            responseTime: ddgResult.response_time,
+          };
         }
-
-        if (provider === "tavily") {
-          const tavilyResult = await searchTavily(query, {
-            searchDepth: "advanced",
-            maxResults: 5,
-            includeAnswer: true,
-          });
-
-          if (tavilyResult && tavilyResult.results.length > 0) {
-            return {
-              source: "tavily",
-              query: tavilyResult.query,
-              results: tavilyResult.results.map((r) => ({
-                title: r.title,
-                url: r.url,
-                content: r.content || "",
-                excerpt: (r.content || "").substring(0, 200) + "...",
-              })),
-              answer: tavilyResult.answer,
-              responseTime: tavilyResult.response_time,
-            };
-          }
-        }
-
-        if (provider === "brave") {
-          const braveResult = await searchBrave(query, { count: 10 });
-
-          if (braveResult && braveResult.results.length > 0) {
-            return {
-              source: "brave",
-              query: braveResult.query,
-              results: braveResult.results.map((r) => ({
-                title: r.title,
-                url: r.url,
-                description: r.description,
-                excerpt: r.description || "",
-              })),
-              responseTime: undefined,
-            };
-          }
-        }
-      } catch (error) {
-        logError(error as Error);
       }
-      return null;
-    },
-  );
+
+      if (provider === 'tavily') {
+        const tavilyResult = await searchTavily(query, {
+          searchDepth: 'advanced',
+          maxResults: 5,
+          includeAnswer: true,
+        });
+
+        if (tavilyResult && tavilyResult.results.length > 0) {
+          return {
+            source: 'tavily',
+            query: tavilyResult.query,
+            results: tavilyResult.results.map(r => ({
+              title: r.title,
+              url: r.url,
+              content: r.content || '',
+              excerpt: (r.content || '').substring(0, 200) + '...',
+            })),
+            answer: tavilyResult.answer,
+            responseTime: tavilyResult.response_time,
+          };
+        }
+      }
+
+      if (provider === 'brave') {
+        const braveResult = await searchBrave(query, { count: 10 });
+
+        if (braveResult && braveResult.results.length > 0) {
+          return {
+            source: 'brave',
+            query: braveResult.query,
+            results: braveResult.results.map(r => ({
+              title: r.title,
+              url: r.url,
+              description: r.description,
+              excerpt: r.description || '',
+            })),
+            responseTime: undefined,
+          };
+        }
+      }
+    } catch (error) {
+      logError(error as Error);
+    }
+    return null;
+  });
 
   // Wait for all searches to complete (parallel execution)
   const results = await Promise.all(searchPromises);
@@ -369,20 +358,18 @@ export async function searchWithProviders(
 }
 
 // Check which providers are available
-export function getAvailableSearchProviders(): Array<
-  "duckduckgo" | "tavily" | "brave"
-> {
-  const providers: Array<"duckduckgo" | "tavily" | "brave"> = [];
+export function getAvailableSearchProviders(): Array<'duckduckgo' | 'tavily' | 'brave'> {
+  const providers: Array<'duckduckgo' | 'tavily' | 'brave'> = [];
 
   // DuckDuckGo is always available (free)
-  providers.push("duckduckgo");
+  providers.push('duckduckgo');
 
   if (process.env.TAVILY_API_KEY) {
-    providers.push("tavily");
+    providers.push('tavily');
   }
 
   if (process.env.BRAVE_API_KEY) {
-    providers.push("brave");
+    providers.push('brave');
   }
 
   return providers;

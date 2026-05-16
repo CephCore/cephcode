@@ -1,26 +1,17 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
-import { z } from 'zod/v4'
-import { lazySchema } from '../utils/lazySchema.js'
-import {
-  type HookEvent,
-  HOOK_EVENTS,
-  type HookInput,
-  type PermissionUpdate,
-} from 'src/entrypoints/agentSdkTypes.js'
-import type {
-  HookJSONOutput,
-  AsyncHookJSONOutput,
-  SyncHookJSONOutput,
-} from 'src/entrypoints/agentSdkTypes.js'
-import type { Message } from 'src/types/message.js'
-import type { PermissionResult } from 'src/utils/permissions/PermissionResult.js'
-import { permissionBehaviorSchema } from 'src/utils/permissions/PermissionRule.js'
-import { permissionUpdateSchema } from 'src/utils/permissions/PermissionUpdateSchema.js'
-import type { AppState } from '../state/AppState.js'
-import type { AttributionState } from '../utils/commitAttribution.js'
+import { z } from 'zod/v4';
+import { lazySchema } from '../utils/lazySchema.js';
+import { type HookEvent, HOOK_EVENTS, type HookInput, type PermissionUpdate } from 'src/entrypoints/agentSdkTypes.js';
+import type { HookJSONOutput, AsyncHookJSONOutput, SyncHookJSONOutput } from 'src/entrypoints/agentSdkTypes.js';
+import type { Message } from 'src/types/message.js';
+import type { PermissionResult } from 'src/utils/permissions/PermissionResult.js';
+import { permissionBehaviorSchema } from 'src/utils/permissions/PermissionRule.js';
+import { permissionUpdateSchema } from 'src/utils/permissions/PermissionUpdateSchema.js';
+import type { AppState } from '../state/AppState.js';
+import type { AttributionState } from '../utils/commitAttribution.js';
 
 export function isHookEvent(value: string): value is HookEvent {
-  return HOOK_EVENTS.includes(value as HookEvent)
+  return HOOK_EVENTS.includes(value as HookEvent);
 }
 
 // Prompt elicitation protocol types. The `prompt` key acts as discriminator
@@ -37,53 +28,35 @@ export const promptRequestSchema = lazySchema(() =>
       }),
     ),
   }),
-)
+);
 
-export type PromptRequest = z.infer<ReturnType<typeof promptRequestSchema>>
+export type PromptRequest = z.infer<ReturnType<typeof promptRequestSchema>>;
 
 export type PromptResponse = {
-  prompt_response: string // request id
-  selected: string
-}
+  prompt_response: string; // request id
+  selected: string;
+};
 
 // Sync hook response schema
 export const syncHookResponseSchema = lazySchema(() =>
   z.object({
-    continue: z
-      .boolean()
-      .describe('Whether Claude should continue after hook (default: true)')
-      .optional(),
-    suppressOutput: z
-      .boolean()
-      .describe('Hide stdout from transcript (default: false)')
-      .optional(),
+    continue: z.boolean().describe('Whether Claude should continue after hook (default: true)').optional(),
+    suppressOutput: z.boolean().describe('Hide stdout from transcript (default: false)').optional(),
     terminalSequence: z
       .object({
-        notification: z
-          .string()
-          .optional()
-          .describe('Desktop notification text'),
+        notification: z.string().optional().describe('Desktop notification text'),
         title: z.string().optional().describe('Window title'),
-        bell: z
-          .boolean()
-          .optional()
-          .describe('Terminal bell (stored, not rung directly)'),
+        bell: z.boolean().optional().describe('Terminal bell (stored, not rung directly)'),
       })
       .describe(
         'Terminal capabilities that hooks can emit without a controlling terminal. ' +
           'Returned as structured data from hook JSON output for the client to render.',
       )
       .optional(),
-    stopReason: z
-      .string()
-      .describe('Message shown when continue is false')
-      .optional(),
+    stopReason: z.string().describe('Message shown when continue is false').optional(),
     decision: z.enum(['approve', 'block']).optional(),
     reason: z.string().describe('Explanation for the decision').optional(),
-    systemMessage: z
-      .string()
-      .describe('Warning message shown to the user')
-      .optional(),
+    systemMessage: z.string().describe('Warning message shown to the user').optional(),
     hookSpecificOutput: z
       .union([
         z.object({
@@ -103,10 +76,7 @@ export const syncHookResponseSchema = lazySchema(() =>
           hookEventName: z.literal('SessionStart'),
           additionalContext: z.string().optional(),
           initialUserMessage: z.string().optional(),
-          watchPaths: z
-            .array(z.string())
-            .describe('Absolute paths to watch for FileChanged hooks')
-            .optional(),
+          watchPaths: z.array(z.string()).describe('Absolute paths to watch for FileChanged hooks').optional(),
         }),
         z.object({
           hookEventName: z.literal('Setup'),
@@ -119,10 +89,7 @@ export const syncHookResponseSchema = lazySchema(() =>
         z.object({
           hookEventName: z.literal('PostToolUse'),
           additionalContext: z.string().optional(),
-          updatedMCPToolOutput: z
-            .unknown()
-            .describe('Updates the output for MCP tools')
-            .optional(),
+          updatedMCPToolOutput: z.unknown().describe('Updates the output for MCP tools').optional(),
         }),
         z.object({
           hookEventName: z.literal('PostToolUseFailure'),
@@ -163,17 +130,11 @@ export const syncHookResponseSchema = lazySchema(() =>
         }),
         z.object({
           hookEventName: z.literal('CwdChanged'),
-          watchPaths: z
-            .array(z.string())
-            .describe('Absolute paths to watch for FileChanged hooks')
-            .optional(),
+          watchPaths: z.array(z.string()).describe('Absolute paths to watch for FileChanged hooks').optional(),
         }),
         z.object({
           hookEventName: z.literal('FileChanged'),
-          watchPaths: z
-            .array(z.string())
-            .describe('Absolute paths to watch for FileChanged hooks')
-            .optional(),
+          watchPaths: z.array(z.string()).describe('Absolute paths to watch for FileChanged hooks').optional(),
         }),
         z.object({
           hookEventName: z.literal('WorktreeCreate'),
@@ -182,7 +143,7 @@ export const syncHookResponseSchema = lazySchema(() =>
       ])
       .optional(),
   }),
-)
+);
 
 // Zod schema for hook JSON output validation
 export const hookJSONOutputSchema = lazySchema(() => {
@@ -190,45 +151,37 @@ export const hookJSONOutputSchema = lazySchema(() => {
   const asyncHookResponseSchema = z.object({
     async: z.literal(true),
     asyncTimeout: z.number().optional(),
-  })
-  return z.union([asyncHookResponseSchema, syncHookResponseSchema()])
-})
+  });
+  return z.union([asyncHookResponseSchema, syncHookResponseSchema()]);
+});
 
 // Infer the TypeScript type from the schema
-type SchemaHookJSONOutput = z.infer<ReturnType<typeof hookJSONOutputSchema>>
+type SchemaHookJSONOutput = z.infer<ReturnType<typeof hookJSONOutputSchema>>;
 
 // Type guard function to check if response is sync
-export function isSyncHookJSONOutput(
-  json: HookJSONOutput,
-): json is SyncHookJSONOutput {
-  return !('async' in json && json.async === true)
+export function isSyncHookJSONOutput(json: HookJSONOutput): json is SyncHookJSONOutput {
+  return !('async' in json && json.async === true);
 }
 
 // Type guard function to check if response is async
-export function isAsyncHookJSONOutput(
-  json: HookJSONOutput,
-): json is AsyncHookJSONOutput {
-  return 'async' in json && json.async === true
+export function isAsyncHookJSONOutput(json: HookJSONOutput): json is AsyncHookJSONOutput {
+  return 'async' in json && json.async === true;
 }
 
 // Compile-time assertion that SDK and Zod types match
-import type { IsEqual } from 'type-fest'
-type Assert<T extends true> = T
-type _assertSDKTypesMatch = Assert<
-  IsEqual<SchemaHookJSONOutput, HookJSONOutput>
->
+import type { IsEqual } from 'type-fest';
+type Assert<T extends true> = T;
+type _assertSDKTypesMatch = Assert<IsEqual<SchemaHookJSONOutput, HookJSONOutput>>;
 
 /** Context passed to callback hooks for state access */
 export type HookCallbackContext = {
-  getAppState: () => AppState
-  updateAttributionState: (
-    updater: (prev: AttributionState) => AttributionState,
-  ) => void
-}
+  getAppState: () => AppState;
+  updateAttributionState: (updater: (prev: AttributionState) => AttributionState) => void;
+};
 
 /** Hook that is a callback. */
 export type HookCallback = {
-  type: 'callback'
+  type: 'callback';
   callback: (
     input: HookInput,
     toolUseID: string | null,
@@ -237,80 +190,80 @@ export type HookCallback = {
     hookIndex?: number,
     /** Optional context for accessing app state */
     context?: HookCallbackContext,
-  ) => Promise<HookJSONOutput>
+  ) => Promise<HookJSONOutput>;
   /** Timeout in seconds for this hook */
-  timeout?: number
+  timeout?: number;
   /** Internal hooks (e.g. session file access analytics) are excluded from tengu_run_hook metrics */
-  internal?: boolean
-}
+  internal?: boolean;
+};
 
 export type HookCallbackMatcher = {
-  matcher?: string
-  hooks: HookCallback[]
-  pluginName?: string
-}
+  matcher?: string;
+  hooks: HookCallback[];
+  pluginName?: string;
+};
 
 export type HookProgress = {
-  type: 'hook_progress'
-  hookEvent: HookEvent
-  hookName: string
-  command: string
-  promptText?: string
-  statusMessage?: string
-}
+  type: 'hook_progress';
+  hookEvent: HookEvent;
+  hookName: string;
+  command: string;
+  promptText?: string;
+  statusMessage?: string;
+};
 
 export type HookBlockingError = {
-  blockingError: string
-  command: string
-}
+  blockingError: string;
+  command: string;
+};
 
 export type PermissionRequestResult =
   | {
-      behavior: 'allow'
-      updatedInput?: Record<string, unknown>
-      updatedPermissions?: PermissionUpdate[]
+      behavior: 'allow';
+      updatedInput?: Record<string, unknown>;
+      updatedPermissions?: PermissionUpdate[];
     }
   | {
-      behavior: 'deny'
-      message?: string
-      interrupt?: boolean
-    }
+      behavior: 'deny';
+      message?: string;
+      interrupt?: boolean;
+    };
 
 export type HookResult = {
-  message?: Message
-  systemMessage?: Message
-  blockingError?: HookBlockingError
-  outcome: 'success' | 'blocking' | 'non_blocking_error' | 'cancelled'
-  preventContinuation?: boolean
-  stopReason?: string
-  permissionBehavior?: 'ask' | 'deny' | 'allow' | 'passthrough' | 'defer'
-  hookPermissionDecisionReason?: string
-  additionalContext?: string
-  initialUserMessage?: string
-  updatedInput?: Record<string, unknown>
-  updatedMCPToolOutput?: unknown
-  permissionRequestResult?: PermissionRequestResult
-  retry?: boolean
-  deferredMarker?: string
+  message?: Message;
+  systemMessage?: Message;
+  blockingError?: HookBlockingError;
+  outcome: 'success' | 'blocking' | 'non_blocking_error' | 'cancelled';
+  preventContinuation?: boolean;
+  stopReason?: string;
+  permissionBehavior?: 'ask' | 'deny' | 'allow' | 'passthrough' | 'defer';
+  hookPermissionDecisionReason?: string;
+  additionalContext?: string;
+  initialUserMessage?: string;
+  updatedInput?: Record<string, unknown>;
+  updatedMCPToolOutput?: unknown;
+  permissionRequestResult?: PermissionRequestResult;
+  retry?: boolean;
+  deferredMarker?: string;
   terminalSequence?: {
-    notification?: string
-    title?: string
-    bell?: boolean
-  }
-}
+    notification?: string;
+    title?: string;
+    bell?: boolean;
+  };
+};
 
 export type AggregatedHookResult = {
-  message?: Message
-  blockingErrors?: HookBlockingError[]
-  preventContinuation?: boolean
-  stopReason?: string
-  hookPermissionDecisionReason?: string
-  permissionBehavior?: PermissionResult['behavior']
-  additionalContexts?: string[]
-  initialUserMessage?: string
-  updatedInput?: Record<string, unknown>
-  updatedMCPToolOutput?: unknown
-  permissionRequestResult?: PermissionRequestResult
-  retry?: boolean
-  deferredMarker?: string
-}
+  message?: Message;
+  blockingErrors?: HookBlockingError[];
+  preventContinuation?: boolean;
+  stopReason?: string;
+  hookPermissionDecisionReason?: string;
+  permissionBehavior?: PermissionResult['behavior'];
+  additionalContexts?: string[];
+  initialUserMessage?: string;
+  updatedInput?: Record<string, unknown>;
+  updatedMCPToolOutput?: unknown;
+  permissionRequestResult?: PermissionRequestResult;
+  retry?: boolean;
+  deferredMarker?: string;
+};

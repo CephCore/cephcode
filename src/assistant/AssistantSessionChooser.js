@@ -1,1 +1,3 @@
-export default function AssistantSessionChooser() { return null }
+export default function AssistantSessionChooser() {
+  return null;
+}

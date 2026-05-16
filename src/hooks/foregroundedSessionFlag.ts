@@ -7,12 +7,12 @@
  * and can't depend on React hooks directly.
  */
 
-let active = false
+let active = false;
 
 export function setForegroundedSessionActive(val: boolean): void {
-  active = val
+  active = val;
 }
 
 export function getForegroundedSessionActive(): boolean {
-  return active
+  return active;
 }

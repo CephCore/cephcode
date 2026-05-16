@@ -3,8 +3,8 @@
  * Used for validation and JSON schema generation.
  */
 
-import { z } from 'zod/v4'
-import { lazySchema } from '../utils/lazySchema.js'
+import { z } from 'zod/v4';
+import { lazySchema } from '../utils/lazySchema.js';
 
 /**
  * Valid context names where keybindings can be applied.
@@ -29,15 +29,12 @@ export const KEYBINDING_CONTEXTS = [
   'ModelPicker',
   'Select',
   'Plugin',
-] as const
+] as const;
 
 /**
  * Human-readable descriptions for each keybinding context.
  */
-export const KEYBINDING_CONTEXT_DESCRIPTIONS: Record<
-  (typeof KEYBINDING_CONTEXTS)[number],
-  string
-> = {
+export const KEYBINDING_CONTEXT_DESCRIPTIONS: Record<(typeof KEYBINDING_CONTEXTS)[number], string> = {
   Global: 'Active everywhere, regardless of focus',
   Chat: 'When the chat input is focused',
   Autocomplete: 'When autocomplete menu is visible',
@@ -56,7 +53,7 @@ export const KEYBINDING_CONTEXT_DESCRIPTIONS: Record<
   ModelPicker: 'When the model picker is open',
   Select: 'When a select/list component is focused',
   Plugin: 'When the plugin dialog is open',
-}
+};
 
 /**
  * All valid keybinding action identifiers.
@@ -169,7 +166,7 @@ export const KEYBINDING_ACTIONS = [
   'settings:close',
   // Voice actions
   'voice:pushToTalk',
-] as const
+] as const;
 
 /**
  * Schema for a single keybinding block.
@@ -179,14 +176,10 @@ export const KeybindingBlockSchema = lazySchema(() =>
     .object({
       context: z
         .enum(KEYBINDING_CONTEXTS)
-        .describe(
-          'UI context where these bindings apply. Global bindings work everywhere.',
-        ),
+        .describe('UI context where these bindings apply. Global bindings work everywhere.'),
       bindings: z
         .record(
-          z
-            .string()
-            .describe('Keystroke pattern (e.g., "ctrl+k", "shift+tab")'),
+          z.string().describe('Keystroke pattern (e.g., "ctrl+k", "shift+tab")'),
           z
             .union([
               z.enum(KEYBINDING_ACTIONS),
@@ -198,14 +191,12 @@ export const KeybindingBlockSchema = lazySchema(() =>
                 ),
               z.null().describe('Set to null to unbind a default shortcut'),
             ])
-            .describe(
-              'Action to trigger, command to invoke, or null to unbind',
-            ),
+            .describe('Action to trigger, command to invoke, or null to unbind'),
         )
         .describe('Map of keystroke patterns to actions'),
     })
     .describe('A block of keybindings for a specific context'),
-)
+);
 
 /**
  * Schema for the entire keybindings.json file.
@@ -214,23 +205,14 @@ export const KeybindingBlockSchema = lazySchema(() =>
 export const KeybindingsSchema = lazySchema(() =>
   z
     .object({
-      $schema: z
-        .string()
-        .optional()
-        .describe('JSON Schema URL for editor validation'),
+      $schema: z.string().optional().describe('JSON Schema URL for editor validation'),
       $docs: z.string().optional().describe('Documentation URL'),
-      bindings: z
-        .array(KeybindingBlockSchema())
-        .describe('Array of keybinding blocks by context'),
+      bindings: z.array(KeybindingBlockSchema()).describe('Array of keybinding blocks by context'),
     })
-    .describe(
-      'Claude Code keybindings configuration. Customize keyboard shortcuts by context.',
-    ),
-)
+    .describe('Claude Code keybindings configuration. Customize keyboard shortcuts by context.'),
+);
 
 /**
  * TypeScript types derived from the schema.
  */
-export type KeybindingsSchemaType = z.infer<
-  ReturnType<typeof KeybindingsSchema>
->
+export type KeybindingsSchemaType = z.infer<ReturnType<typeof KeybindingsSchema>>;

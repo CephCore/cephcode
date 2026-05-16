@@ -10,7 +10,7 @@ Subscribe to GitHub pull request activity. The coordinator will receive PR event
 Events arrive as user messages. Merge conflict transitions may not arrive — poll \`gh pr view N --json mergeable\` if tracking conflict status.
 
 Call this directly — do not delegate subscription management to workers.
-`.trim()
+`.trim();
 }
 
 export function getUnsubscribePrompt(): string {
@@ -21,5 +21,5 @@ Stop watching a GitHub pull request for activity.
 
 ## Parameters
 - \`pr_url\` (required): Full URL of the GitHub pull request to stop watching
-`.trim()
+`.trim();
 }

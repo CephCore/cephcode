@@ -3,22 +3,22 @@
  * Supports: plain text prompts, @<agent>, @<repo>, /<skill>, #<PR>, a:<name>, s:<state>
  */
 
-import * as React from 'react'
-import { Box, Text } from '../../ink.js'
-import TextInput from '../TextInput.js'
+import * as React from 'react';
+import { Box, Text } from '../../ink.js';
+import TextInput from '../TextInput.js';
 
-type DispatchMode = 'dispatch' | 'filter'
+type DispatchMode = 'dispatch' | 'filter';
 
 type Props = {
-  mode: DispatchMode
-  value: string
-  onChange: (text: string) => void
-  onSubmit: (text: string) => void
-  cursorOffset: number
-  onCursorOffsetChange: (offset: number) => void
-  placeholder?: string
-  filterSyntax?: string
-}
+  mode: DispatchMode;
+  value: string;
+  onChange: (text: string) => void;
+  onSubmit: (text: string) => void;
+  cursorOffset: number;
+  onCursorOffsetChange: (offset: number) => void;
+  placeholder?: string;
+  filterSyntax?: string;
+};
 
 /**
  * Parse dispatch/filter input for special syntax:
@@ -30,21 +30,21 @@ type Props = {
  * - s:<state> — filter by state
  */
 export function parseDispatchSyntax(input: string): {
-  agentName?: string
-  repoName?: string
-  skillName?: string
-  prNumber?: number
-  filterAgent?: string
-  filterState?: string
-  cleanPrompt: string
-  isFilter: boolean
-  isPRLookup: boolean
+  agentName?: string;
+  repoName?: string;
+  skillName?: string;
+  prNumber?: number;
+  filterAgent?: string;
+  filterState?: string;
+  cleanPrompt: string;
+  isFilter: boolean;
+  isPRLookup: boolean;
 } {
-  const trimmed = input.trim()
+  const trimmed = input.trim();
 
   // Filter syntax (a:<name> or s:<state>)
-  const filterAgentMatch = trimmed.match(/^a:(\S+)/)
-  const filterStateMatch = trimmed.match(/^s:(\S+)/)
+  const filterAgentMatch = trimmed.match(/^a:(\S+)/);
+  const filterStateMatch = trimmed.match(/^s:(\S+)/);
   if (filterAgentMatch || filterStateMatch) {
     return {
       filterAgent: filterAgentMatch?.[1],
@@ -52,19 +52,19 @@ export function parseDispatchSyntax(input: string): {
       cleanPrompt: '',
       isFilter: true,
       isPRLookup: false,
-    }
+    };
   }
 
   // PR lookup (#<number> or PR URL)
-  const prMatch = trimmed.match(/^#(\d+)/)
-  const prUrlMatch = trimmed.match(/^https?:\/\/[^/]+\/[^/]+\/[^/]+\/pull\/(\d+)/i)
+  const prMatch = trimmed.match(/^#(\d+)/);
+  const prUrlMatch = trimmed.match(/^https?:\/\/[^/]+\/[^/]+\/[^/]+\/pull\/(\d+)/i);
   if (prMatch) {
     return {
       prNumber: parseInt(prMatch[1]!, 10),
       cleanPrompt: '',
       isFilter: true,
       isPRLookup: true,
-    }
+    };
   }
   if (prUrlMatch) {
     return {
@@ -72,43 +72,43 @@ export function parseDispatchSyntax(input: string): {
       cleanPrompt: '',
       isFilter: true,
       isPRLookup: true,
-    }
+    };
   }
 
   // @agent or @repo mentions
-  const agentMatch = trimmed.match(/^@(\S+)/)
-  let agentName: string | undefined
-  let repoName: string | undefined
+  const agentMatch = trimmed.match(/^@(\S+)/);
+  let agentName: string | undefined;
+  let repoName: string | undefined;
   if (agentMatch) {
-    const name = agentMatch[1]!
+    const name = agentMatch[1]!;
     // Remove @mention from prompt
-    const remaining = trimmed.replace(/^@\S+\s*/, '')
+    const remaining = trimmed.replace(/^@\S+\s*/, '');
     // Assume it's an agent first (caller resolves priority)
-    agentName = name
+    agentName = name;
     return {
       agentName,
       cleanPrompt: remaining || trimmed,
       isFilter: false,
       isPRLookup: false,
-    }
+    };
   }
 
   // /skill mention
-  const skillMatch = trimmed.match(/^\/(\S+)/)
+  const skillMatch = trimmed.match(/^\/(\S+)/);
   if (skillMatch) {
     return {
       skillName: skillMatch[1]!,
       cleanPrompt: trimmed,
       isFilter: false,
       isPRLookup: false,
-    }
+    };
   }
 
   return {
     cleanPrompt: trimmed,
     isFilter: false,
     isPRLookup: false,
-  }
+  };
 }
 
 export function AgentViewDispatchInput({
@@ -121,14 +121,12 @@ export function AgentViewDispatchInput({
   placeholder,
   filterSyntax,
 }: Props) {
-  const parsed = React.useMemo(() => parseDispatchSyntax(value), [value])
+  const parsed = React.useMemo(() => parseDispatchSyntax(value), [value]);
 
   return (
     <Box flexDirection="column">
       <Box flexDirection="row" gap={1}>
-        <Text color={mode === 'dispatch' ? 'suggestion' : 'dim'}>
-          {mode === 'dispatch' ? '>' : '/'}
-        </Text>
+        <Text color={mode === 'dispatch' ? 'suggestion' : 'dim'}>{mode === 'dispatch' ? '>' : '/'}</Text>
         <TextInput
           value={value}
           onChange={onChange}
@@ -157,5 +155,5 @@ export function AgentViewDispatchInput({
         </Box>
       )}
     </Box>
-  )
+  );
 }

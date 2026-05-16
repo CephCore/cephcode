@@ -1,4 +1,4 @@
-import { registerBundledSkill } from '../bundledSkills.js'
+import { registerBundledSkill } from '../bundledSkills.js';
 
 const WEB_SEARCH_PROMPT = `# Web Search Skill
 
@@ -37,7 +37,7 @@ Format results as markdown with:
 - Source URL
 
 **Important**: Always include source URLs in your response.
-`
+`;
 
 export function registerWebSearchSkill(): void {
   registerBundledSkill({
@@ -46,21 +46,19 @@ export function registerWebSearchSkill(): void {
     userInvocable: true,
     argumentHint: '[google|bing|ddg] <query>',
     async getPromptForCommand(args) {
-      const parts = args.trim().split(/\s+/)
-      let engine = 'google'
-      let query = args
+      const parts = args.trim().split(/\s+/);
+      let engine = 'google';
+      let query = args;
 
       // Check if first arg is a known engine
       if (['google', 'bing', 'ddg', 'duckduckgo'].includes(parts[0]?.toLowerCase())) {
-        engine = parts[0].toLowerCase()
-        query = parts.slice(1).join(' ')
+        engine = parts[0].toLowerCase();
+        query = parts.slice(1).join(' ');
       }
 
-      const prompt = WEB_SEARCH_PROMPT
-        .replace('{{query}}', query || 'the search query')
-        .replace('{{engine}}', engine)
+      const prompt = WEB_SEARCH_PROMPT.replace('{{query}}', query || 'the search query').replace('{{engine}}', engine);
 
-      return [{ type: 'text', text: prompt }]
+      return [{ type: 'text', text: prompt }];
     },
-  })
+  });
 }

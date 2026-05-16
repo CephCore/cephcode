@@ -1,20 +1,16 @@
-import { feature } from 'bun:bundle'
-import { logForDebugging } from '../utils/debug.js'
-import { errorMessage } from '../utils/errors.js'
-import { getDefaultSonnetModel } from '../utils/model/model.js'
-import { sideQuery } from '../utils/sideQuery.js'
-import { jsonParse } from '../utils/slowOperations.js'
-import {
-  formatMemoryManifest,
-  type MemoryHeader,
-  scanMemoryFiles,
-} from './memoryScan.js'
-import { searchMemories as semanticSearch } from './semanticSearch.js'
+import { feature } from 'bun:bundle';
+import { logForDebugging } from '../utils/debug.js';
+import { errorMessage } from '../utils/errors.js';
+import { getDefaultSonnetModel } from '../utils/model/model.js';
+import { sideQuery } from '../utils/sideQuery.js';
+import { jsonParse } from '../utils/slowOperations.js';
+import { formatMemoryManifest, type MemoryHeader, scanMemoryFiles } from './memoryScan.js';
+import { searchMemories as semanticSearch } from './semanticSearch.js';
 
 export type RelevantMemory = {
-  path: string
-  mtimeMs: number
-}
+  path: string;
+  mtimeMs: number;
+};
 
 const SELECT_MEMORIES_SYSTEM_PROMPT = `You are selecting memories that will be useful to Claude Code as it processes a user's query. You will be given the user's query and a list of available memory files with their filenames and descriptions.
 
@@ -22,7 +18,7 @@ Return a list of filenames for the memories that will clearly be useful to Claud
 - If you are unsure if a memory will be useful in processing the user's query, then do not include it in your list. Be selective and discerning.
 - If there are no memories in the list that would clearly be useful, feel free to return an empty list.
 - If a list of recently-used tools is provided, do not select memories that are usage reference or API documentation for those tools (Claude Code is already exercising them). DO still select memories containing warnings, gotchas, or known issues about those tools — active use is exactly when those matter.
-`
+`;
 
 /**
  * Find memory files relevant to a query using hybrid approach:
@@ -39,81 +35,65 @@ export async function findRelevantMemories(
   recentTools: readonly string[] = [],
   alreadySurfaced: ReadonlySet<string> = new Set(),
 ): Promise<RelevantMemory[]> {
-  const memories = (await scanMemoryFiles(memoryDir, signal)).filter(
-    m => !alreadySurfaced.has(m.filePath),
-  )
+  const memories = (await scanMemoryFiles(memoryDir, signal)).filter(m => !alreadySurfaced.has(m.filePath));
   if (memories.length === 0) {
-    return []
+    return [];
   }
 
   // Try semantic search first (fast, local, no API cost)
-  const semanticResults = await trySemanticSearch(query, memories)
+  const semanticResults = await trySemanticSearch(query, memories);
   if (semanticResults.length > 0) {
     // If semantic search found good results, use them
     const selected = semanticResults
       .map(r => memories.find(m => m.filePath === r.filePath))
-      .filter((m): m is MemoryHeader => m !== undefined)
+      .filter((m): m is MemoryHeader => m !== undefined);
 
     if (feature('MEMORY_SHAPE_TELEMETRY')) {
       /* eslint-disable @typescript-eslint/no-require-imports */
       const { logMemoryRecallShape } =
-        require('./memoryShapeTelemetry.js') as typeof import('./memoryShapeTelemetry.js')
+        require('./memoryShapeTelemetry.js') as typeof import('./memoryShapeTelemetry.js');
       /* eslint-enable @typescript-eslint/no-require-imports */
-      logMemoryRecallShape(memories, selected)
+      logMemoryRecallShape(memories, selected);
     }
 
-    return selected.map(m => ({ path: m.filePath, mtimeMs: m.mtimeMs }))
+    return selected.map(m => ({ path: m.filePath, mtimeMs: m.mtimeMs }));
   }
 
   // Fall back to LLM-based selection if semantic search found nothing
-  const selectedFilenames = await selectRelevantMemories(
-    query,
-    memories,
-    signal,
-    recentTools,
-  )
-  const byFilename = new Map(memories.map(m => [m.filename, m]))
+  const selectedFilenames = await selectRelevantMemories(query, memories, signal, recentTools);
+  const byFilename = new Map(memories.map(m => [m.filename, m]));
   const selected = selectedFilenames
     .map(filename => byFilename.get(filename))
-    .filter((m): m is MemoryHeader => m !== undefined)
+    .filter((m): m is MemoryHeader => m !== undefined);
 
   // Fires even on empty selection: selection-rate needs the denominator,
   // and -1 ages distinguish "ran, picked nothing" from "never ran".
   if (feature('MEMORY_SHAPE_TELEMETRY')) {
     /* eslint-disable @typescript-eslint/no-require-imports */
-    const { logMemoryRecallShape } =
-      require('./memoryShapeTelemetry.js') as typeof import('./memoryShapeTelemetry.js')
+    const { logMemoryRecallShape } = require('./memoryShapeTelemetry.js') as typeof import('./memoryShapeTelemetry.js');
     /* eslint-enable @typescript-eslint/no-require-imports */
-    logMemoryRecallShape(memories, selected)
+    logMemoryRecallShape(memories, selected);
   }
 
-  return selected.map(m => ({ path: m.filePath, mtimeMs: m.mtimeMs }))
+  return selected.map(m => ({ path: m.filePath, mtimeMs: m.mtimeMs }));
 }
 
 /**
  * Try semantic search as a fast, local alternative of LLM-based selection.
  * Returns results sorted by relevance score.
  */
-async function trySemanticSearch(
-  query: string,
-  memories: MemoryHeader[],
-): Promise<MemoryHeader[]> {
+async function trySemanticSearch(query: string, memories: MemoryHeader[]): Promise<MemoryHeader[]> {
   try {
-    const results = await semanticSearch(query, 5, 0.6)
-    if (results.length === 0) return []
+    const results = await semanticSearch(query, 5, 0.6);
+    if (results.length === 0) return [];
 
     // Map semantic results back to MemoryHeader objects
-    const byPath = new Map(memories.map(m => [m.filePath, m]))
-    return results
-      .map(r => byPath.get(r.filePath))
-      .filter((m): m is MemoryHeader => m !== undefined)
+    const byPath = new Map(memories.map(m => [m.filePath, m]));
+    return results.map(r => byPath.get(r.filePath)).filter((m): m is MemoryHeader => m !== undefined);
   } catch (e) {
     // Semantic search failed, fall back to LLM
-    logForDebugging(
-      `[memdir] semantic search failed: ${errorMessage(e)}, falling back to LLM`,
-      { level: 'debug' },
-    )
-    return []
+    logForDebugging(`[memdir] semantic search failed: ${errorMessage(e)}, falling back to LLM`, { level: 'debug' });
+    return [];
   }
 }
 
@@ -123,19 +103,16 @@ async function selectRelevantMemories(
   signal: AbortSignal,
   recentTools: readonly string[],
 ): Promise<string[]> {
-  const validFilenames = new Set(memories.map(m => m.filename))
+  const validFilenames = new Set(memories.map(m => m.filename));
 
-  const manifest = formatMemoryManifest(memories)
+  const manifest = formatMemoryManifest(memories);
 
   // When Claude Code is actively using a tool (e.g. mcp__X__spawn),
   // surfacing that tool's reference docs is noise — the conversation
   // already contains working usage.  The selector otherwise matches
   // on keyword overlap ("spawn" in query + "spawn" in a memory
   // description → false positive).
-  const toolsSection =
-    recentTools.length > 0
-      ? `\n\nRecently used tools: ${recentTools.join(', ')}`
-      : ''
+  const toolsSection = recentTools.length > 0 ? `\n\nRecently used tools: ${recentTools.join(', ')}` : '';
 
   try {
     const result = await sideQuery({
@@ -162,23 +139,20 @@ async function selectRelevantMemories(
       },
       signal,
       querySource: 'memdir_relevance',
-    })
+    });
 
-    const textBlock = result.content.find(block => block.type === 'text')
+    const textBlock = result.content.find(block => block.type === 'text');
     if (!textBlock || textBlock.type !== 'text') {
-      return []
+      return [];
     }
 
-    const parsed: { selected_memories: string[] } = jsonParse(textBlock.text)
-    return parsed.selected_memories.filter(f => validFilenames.has(f))
+    const parsed: { selected_memories: string[] } = jsonParse(textBlock.text);
+    return parsed.selected_memories.filter(f => validFilenames.has(f));
   } catch (e) {
     if (signal.aborted) {
-      return []
+      return [];
     }
-    logForDebugging(
-      `[memdir] selectRelevantMemories failed: ${errorMessage(e)}`,
-      { level: 'warn' },
-    )
-    return []
+    logForDebugging(`[memdir] selectRelevantMemories failed: ${errorMessage(e)}`, { level: 'warn' });
+    return [];
   }
 }

@@ -1,22 +1,23 @@
-import React, { useCallback, useState } from 'react'
-import type { Workflow } from '../commands/install-github-app/types.js'
-import type { ExitState } from '../hooks/useExitOnCtrlCDWithKeybindings.js'
-import { Box, Link, Text } from '../ink.js'
-import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js'
-import { SelectMulti } from './CustomSelect/SelectMulti.js'
-import { Byline } from './design-system/Byline.js'
-import { Dialog } from './design-system/Dialog.js'
-import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js'
+import type React from 'react';
+import { useCallback, useState } from 'react';
+import type { Workflow } from '../commands/install-github-app/types.js';
+import type { ExitState } from '../hooks/useExitOnCtrlCDWithKeybindings.js';
+import { Box, Link, Text } from '../ink.js';
+import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js';
+import { SelectMulti } from './CustomSelect/SelectMulti.js';
+import { Byline } from './design-system/Byline.js';
+import { Dialog } from './design-system/Dialog.js';
+import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js';
 
 type WorkflowOption = {
-  value: Workflow
-  label: string
-}
+  value: Workflow;
+  label: string;
+};
 
 type Props = {
-  onSubmit: (selectedWorkflows: Workflow[]) => void
-  defaultSelections: Workflow[]
-}
+  onSubmit: (selectedWorkflows: Workflow[]) => void;
+  defaultSelections: Workflow[];
+};
 
 const WORKFLOWS: WorkflowOption[] = [
   {
@@ -27,53 +28,45 @@ const WORKFLOWS: WorkflowOption[] = [
     value: 'claude-review' as const,
     label: 'Claude Code Review - Automated code review on new PRs',
   },
-]
+];
 
 function renderInputGuide(exitState: ExitState): React.ReactNode {
   if (exitState.pending) {
-    return <Text>Press {exitState.keyName} again to exit</Text>
+    return <Text>Press {exitState.keyName} again to exit</Text>;
   }
   return (
     <Byline>
       <KeyboardShortcutHint shortcut="↑↓" action="navigate" />
       <KeyboardShortcutHint shortcut="Space" action="toggle" />
       <KeyboardShortcutHint shortcut="Enter" action="confirm" />
-      <ConfigurableShortcutHint
-        action="confirm:no"
-        context="Confirmation"
-        fallback="Esc"
-        description="cancel"
-      />
+      <ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="cancel" />
     </Byline>
-  )
+  );
 }
 
-export function WorkflowMultiselectDialog({
-  onSubmit,
-  defaultSelections,
-}: Props): React.ReactNode {
-  const [showError, setShowError] = useState(false)
+export function WorkflowMultiselectDialog({ onSubmit, defaultSelections }: Props): React.ReactNode {
+  const [showError, setShowError] = useState(false);
 
   const handleSubmit = useCallback(
     (selectedValues: Workflow[]) => {
       if (selectedValues.length === 0) {
-        setShowError(true)
-        return
+        setShowError(true);
+        return;
       }
-      setShowError(false)
-      onSubmit(selectedValues)
+      setShowError(false);
+      onSubmit(selectedValues);
     },
     [onSubmit],
-  )
+  );
 
   const handleChange = useCallback(() => {
-    setShowError(false)
-  }, [])
+    setShowError(false);
+  }, []);
 
   // Cancel just shows the error - user must select at least one workflow
   const handleCancel = useCallback(() => {
-    setShowError(true)
-  }, [])
+    setShowError(true);
+  }, []);
 
   return (
     <Dialog
@@ -105,11 +98,9 @@ export function WorkflowMultiselectDialog({
 
       {showError && (
         <Box>
-          <Text color="error">
-            You must select at least one workflow to continue
-          </Text>
+          <Text color="error">You must select at least one workflow to continue</Text>
         </Box>
       )}
     </Dialog>
-  )
+  );
 }

@@ -6,11 +6,7 @@ import type { PermissionRequestProps } from '../PermissionRequest.js';
 // Monitor tool uses the fallback permission request
 // since it's read-only and low-risk
 export function MonitorPermissionRequest(props: PermissionRequestProps) {
-  return (
-    <FallbackPermissionRequest
-      {...props}
-    />
-  );
+  return <FallbackPermissionRequest {...props} />;
 }
 
 export default MonitorPermissionRequest;

@@ -1,6 +1,6 @@
-import type { Key } from '../ink.js'
-import type { ParsedBinding, ParsedKeystroke } from './types.js'
-import { getPlatform } from '../utils/platform.js'
+import type { Key } from '../ink.js';
+import { getPlatform } from '../utils/platform.js';
+import type { ParsedBinding, ParsedKeystroke } from './types.js';
 
 /**
  * macOS US keyboard: Option+letter → base letter reverse mapping.
@@ -45,14 +45,14 @@ const MACOS_OPTION_KEY_MAP: Record<string, string> = {
   '\u00D8': 'o', // Option+Shift+O → Ø
   // Digit/symbol keys used in bindings
   '\u2122': '2', // Option+Shift+2 → ™
-}
+};
 
 /**
  * Modifier keys from Ink's Key type that we care about for matching.
  * Note: `fn` from Key is intentionally excluded as it's rarely used and
  * not commonly configurable in terminal applications.
  */
-type InkModifiers = Pick<Key, 'ctrl' | 'shift' | 'meta' | 'super'>
+type InkModifiers = Pick<Key, 'ctrl' | 'shift' | 'meta' | 'super'>;
 
 /**
  * Extract modifiers from an Ink Key object.
@@ -64,7 +64,7 @@ function getInkModifiers(key: Key): InkModifiers {
     shift: key.shift,
     meta: key.meta,
     super: key.super,
-  }
+  };
 }
 
 /**
@@ -73,23 +73,23 @@ function getInkModifiers(key: Key): InkModifiers {
  * that match our ParsedKeystroke.key format.
  */
 export function getKeyName(input: string, key: Key): string | null {
-  if (key.escape) return 'escape'
-  if (key.return) return 'enter'
-  if (key.tab) return 'tab'
-  if (key.backspace) return 'backspace'
-  if (key.delete) return 'delete'
-  if (key.upArrow) return 'up'
-  if (key.downArrow) return 'down'
-  if (key.leftArrow) return 'left'
-  if (key.rightArrow) return 'right'
-  if (key.pageUp) return 'pageup'
-  if (key.pageDown) return 'pagedown'
-  if (key.wheelUp) return 'wheelup'
-  if (key.wheelDown) return 'wheeldown'
-  if (key.home) return 'home'
-  if (key.end) return 'end'
-  if (input.length === 1) return input.toLowerCase()
-  return null
+  if (key.escape) return 'escape';
+  if (key.return) return 'enter';
+  if (key.tab) return 'tab';
+  if (key.backspace) return 'backspace';
+  if (key.delete) return 'delete';
+  if (key.upArrow) return 'up';
+  if (key.downArrow) return 'down';
+  if (key.leftArrow) return 'left';
+  if (key.rightArrow) return 'right';
+  if (key.pageUp) return 'pageup';
+  if (key.pageDown) return 'pagedown';
+  if (key.wheelUp) return 'wheelup';
+  if (key.wheelDown) return 'wheeldown';
+  if (key.home) return 'home';
+  if (key.end) return 'end';
+  if (input.length === 1) return input.toLowerCase();
+  return null;
 }
 
 /**
@@ -103,25 +103,22 @@ export function getKeyName(input: string, key: Key): string | null {
  * keyboard protocol on supporting terminals. A `cmd`/`super` binding will
  * simply never fire on terminals that don't send it.
  */
-function modifiersMatch(
-  inkMods: InkModifiers,
-  target: ParsedKeystroke,
-): boolean {
+function modifiersMatch(inkMods: InkModifiers, target: ParsedKeystroke): boolean {
   // Check ctrl modifier
-  if (inkMods.ctrl !== target.ctrl) return false
+  if (inkMods.ctrl !== target.ctrl) return false;
 
   // Check shift modifier
-  if (inkMods.shift !== target.shift) return false
+  if (inkMods.shift !== target.shift) return false;
 
   // Alt and meta both map to key.meta in Ink (terminal limitation)
   // So we check if EITHER alt OR meta is required in target
-  const targetNeedsMeta = target.alt || target.meta
-  if (inkMods.meta !== targetNeedsMeta) return false
+  const targetNeedsMeta = target.alt || target.meta;
+  if (inkMods.meta !== targetNeedsMeta) return false;
 
   // Super (cmd/win) is a distinct modifier from alt/meta
-  if (inkMods.super !== target.super) return false
+  if (inkMods.super !== target.super) return false;
 
-  return true
+  return true;
 }
 
 /**
@@ -129,12 +126,8 @@ function modifiersMatch(
  *
  * The display text will show platform-appropriate names (opt on macOS, alt elsewhere).
  */
-export function matchesKeystroke(
-  input: string,
-  key: Key,
-  target: ParsedKeystroke,
-): boolean {
-  let keyName = getKeyName(input, key)
+export function matchesKeystroke(input: string, key: Key, target: ParsedKeystroke): boolean {
+  const keyName = getKeyName(input, key);
   if (keyName !== target.key) {
     // macOS fallback: when "Option as Meta" is disabled, Option+letter sends
     // the literal Unicode character (e.g., Option+T → '†'). Try to reverse-map
@@ -146,40 +139,36 @@ export function matchesKeystroke(
       (target.alt || target.meta) &&
       keyName.length === 1
     ) {
-      const mapped = MACOS_OPTION_KEY_MAP[keyName]
+      const mapped = MACOS_OPTION_KEY_MAP[keyName];
       if (mapped === target.key) {
         // Found a mapping — treat as if meta were pressed
-        const inkMods = { ...getInkModifiers(key), meta: true }
-        return modifiersMatch(inkMods, target)
+        const inkMods = { ...getInkModifiers(key), meta: true };
+        return modifiersMatch(inkMods, target);
       }
     }
-    return false
+    return false;
   }
 
-  const inkMods = getInkModifiers(key)
+  const inkMods = getInkModifiers(key);
 
   // QUIRK: Ink sets key.meta=true when escape is pressed (see input-event.ts).
   // This is a legacy behavior from how escape sequences work in terminals.
   // We need to ignore the meta modifier when matching the escape key itself,
   // otherwise bindings like "escape" (without modifiers) would never match.
   if (key.escape) {
-    return modifiersMatch({ ...inkMods, meta: false }, target)
+    return modifiersMatch({ ...inkMods, meta: false }, target);
   }
 
-  return modifiersMatch(inkMods, target)
+  return modifiersMatch(inkMods, target);
 }
 
 /**
  * Check if Ink's Key + input matches a parsed binding's first keystroke.
  * For single-keystroke bindings only (Phase 1).
  */
-export function matchesBinding(
-  input: string,
-  key: Key,
-  binding: ParsedBinding,
-): boolean {
-  if (binding.chord.length !== 1) return false
-  const keystroke = binding.chord[0]
-  if (!keystroke) return false
-  return matchesKeystroke(input, key, keystroke)
+export function matchesBinding(input: string, key: Key, binding: ParsedBinding): boolean {
+  if (binding.chord.length !== 1) return false;
+  const keystroke = binding.chord[0];
+  if (!keystroke) return false;
+  return matchesKeystroke(input, key, keystroke);
 }

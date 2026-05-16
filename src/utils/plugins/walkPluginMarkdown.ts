@@ -1,8 +1,8 @@
-import { join } from 'path'
-import { logForDebugging } from '../debug.js'
-import { getFsImplementation } from '../fsOperations.js'
+import { join } from 'path';
+import { logForDebugging } from '../debug.js';
+import { getFsImplementation } from '../fsOperations.js';
 
-const SKILL_MD_RE = /^skill\.md$/i
+const SKILL_MD_RE = /^skill\.md$/i;
 
 /**
  * Recursively walk a plugin directory, invoking onFile for each .md file.
@@ -23,17 +23,14 @@ export async function walkPluginMarkdown(
   onFile: (fullPath: string, namespace: string[]) => Promise<void>,
   opts: { stopAtSkillDir?: boolean; logLabel?: string } = {},
 ): Promise<void> {
-  const fs = getFsImplementation()
-  const label = opts.logLabel ?? 'plugin'
+  const fs = getFsImplementation();
+  const label = opts.logLabel ?? 'plugin';
 
   async function scan(dirPath: string, namespace: string[]): Promise<void> {
     try {
-      const entries = await fs.readdir(dirPath)
+      const entries = await fs.readdir(dirPath);
 
-      if (
-        opts.stopAtSkillDir &&
-        entries.some(e => e.isFile() && SKILL_MD_RE.test(e.name))
-      ) {
+      if (opts.stopAtSkillDir && entries.some(e => e.isFile() && SKILL_MD_RE.test(e.name))) {
         // Skill directory: collect .md files here, don't recurse.
         await Promise.all(
           entries.map(entry =>
@@ -41,29 +38,26 @@ export async function walkPluginMarkdown(
               ? onFile(join(dirPath, entry.name), namespace)
               : undefined,
           ),
-        )
-        return
+        );
+        return;
       }
 
       await Promise.all(
         entries.map(entry => {
-          const fullPath = join(dirPath, entry.name)
+          const fullPath = join(dirPath, entry.name);
           if (entry.isDirectory()) {
-            return scan(fullPath, [...namespace, entry.name])
+            return scan(fullPath, [...namespace, entry.name]);
           }
           if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) {
-            return onFile(fullPath, namespace)
+            return onFile(fullPath, namespace);
           }
-          return undefined
+          return undefined;
         }),
-      )
+      );
     } catch (error) {
-      logForDebugging(
-        `Failed to scan ${label} directory ${dirPath}: ${error}`,
-        { level: 'error' },
-      )
+      logForDebugging(`Failed to scan ${label} directory ${dirPath}: ${error}`, { level: 'error' });
     }
   }
 
-  await scan(rootDir, [])
+  await scan(rootDir, []);
 }

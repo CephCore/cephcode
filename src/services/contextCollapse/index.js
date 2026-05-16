@@ -1,1 +1,3 @@
-export function contextCollapse() { return '' }
+export function contextCollapse() {
+  return '';
+}

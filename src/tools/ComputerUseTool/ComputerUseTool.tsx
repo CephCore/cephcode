@@ -12,35 +12,35 @@
  * Built from scratch by Dek1MillionToken. No @ant/* dependencies.
  */
 
-import * as React from 'react'
-import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
-import { z } from 'zod/v4'
-import { Text } from '../../ink.js'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { handleComputerAction } from './handler.js'
-import { buildDisplayConfig } from './scaling.js'
-import { getScreenDimensions } from './screenshot.js'
-import type { ComputerToolInput, DisplayConfig } from './types.js'
+import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs';
+import * as React from 'react';
+import { z } from 'zod/v4';
+import { Text } from '../../ink.js';
+import { buildTool, type ToolDef } from '../../Tool.js';
+import { logForDebugging } from '../../utils/debug.js';
+import { lazySchema } from '../../utils/lazySchema.js';
+import { handleComputerAction } from './handler.js';
+import { buildDisplayConfig } from './scaling.js';
+import { getScreenDimensions } from './screenshot.js';
+import type { ComputerToolInput, DisplayConfig } from './types.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-export const COMPUTER_USE_TOOL_NAME = 'computer' as const
+export const COMPUTER_USE_TOOL_NAME = 'computer' as const;
 
 // ── Cached Display Config ────────────────────────────────────────────────────
 
-let cachedDisplayConfig: DisplayConfig | null = null
+let cachedDisplayConfig: DisplayConfig | null = null;
 
 async function getDisplayConfig(): Promise<DisplayConfig> {
   if (!cachedDisplayConfig) {
-    const screen = await getScreenDimensions()
-    cachedDisplayConfig = buildDisplayConfig(screen.width, screen.height)
+    const screen = await getScreenDimensions();
+    cachedDisplayConfig = buildDisplayConfig(screen.width, screen.height);
     logForDebugging(
       `[ComputerUse] Display: ${screen.width}x${screen.height} → API: ${cachedDisplayConfig.apiWidth}x${cachedDisplayConfig.apiHeight}`,
-    )
+    );
   }
-  return cachedDisplayConfig
+  return cachedDisplayConfig;
 }
 
 // ── Schema ───────────────────────────────────────────────────────────────────
@@ -54,36 +54,35 @@ const inputSchema = lazySchema(() =>
       if (val && val.input && typeof val.input === 'object') return val.input;
       return val;
     },
-    z.object({
-      action: z.any().describe('The action to perform'),
-      coordinate: z.any().describe('[x, y] coordinates'),
-      text: z.any().describe('Text to type'),
-      key: z.any().describe('Key to press'),
-      scroll_direction: z.any().describe('Scroll direction'),
-      scroll_amount: z.any().describe('Scroll amount'),
-      start_coordinate: z.any().describe('Start [x, y] for drag'),
-      duration: z.any().describe('Duration in seconds'),
-      region: z.any().describe('Region to zoom into [x1, y1, x2, y2]'),
-      window_query: z.any().describe('Window title or ID to focus'),
-    }).passthrough()
-  )
-)
-type InputSchema = ReturnType<typeof inputSchema>
-type Input = any // Use any for maximum flexibility in the call method
+    z
+      .object({
+        action: z.any().describe('The action to perform'),
+        coordinate: z.any().describe('[x, y] coordinates'),
+        text: z.any().describe('Text to type'),
+        key: z.any().describe('Key to press'),
+        scroll_direction: z.any().describe('Scroll direction'),
+        scroll_amount: z.any().describe('Scroll amount'),
+        start_coordinate: z.any().describe('Start [x, y] for drag'),
+        duration: z.any().describe('Duration in seconds'),
+        region: z.any().describe('Region to zoom into [x1, y1, x2, y2]'),
+        window_query: z.any().describe('Window title or ID to focus'),
+      })
+      .passthrough(),
+  ),
+);
+type InputSchema = ReturnType<typeof inputSchema>;
+type Input = any; // Use any for maximum flexibility in the call method
 
 // ── Output ───────────────────────────────────────────────────────────────────
 
 const outputSchema = lazySchema(() =>
   z.object({
     result: z.string().describe('Text description of the action performed'),
-    screenshot: z
-      .string()
-      .optional()
-      .describe('Base64 JPEG screenshot data'),
+    screenshot: z.string().optional().describe('Base64 JPEG screenshot data'),
   }),
-)
-type OutputSchema = ReturnType<typeof outputSchema>
-type Out = z.infer<OutputSchema>
+);
+type OutputSchema = ReturnType<typeof outputSchema>;
+type Out = z.infer<OutputSchema>;
 
 // ── Tool Definition ──────────────────────────────────────────────────────────
 
@@ -94,7 +93,7 @@ export const ComputerUseTool = buildTool({
   maxResultSizeChars: 100_000, // Screenshots can be large
 
   async description(): Promise<string> {
-    return 'Control the mouse and keyboard, and take screenshots to interact with the computer desktop GUI.'
+    return 'Control the mouse and keyboard, and take screenshots to interact with the computer desktop GUI.';
   },
 
   async prompt(): Promise<string> {
@@ -104,7 +103,7 @@ export const ComputerUseTool = buildTool({
       scaleFactor: 1,
       apiWidth: 1280,
       apiHeight: 800,
-    }))
+    }));
     return `Control the computer screen to complete tasks autonomously.
 
 IMPORTANT: Always take a screenshot FIRST to see what is currently on screen before performing any actions.
@@ -140,92 +139,92 @@ Tips:
 - For text input fields, click first, then use "type" action
 - For dropdowns, try using keyboard (arrow keys) after clicking
 - Use the separate browser tool for websites and selector-based web automation
-- Take a screenshot after each step to verify the outcome`
+- Take a screenshot after each step to verify the outcome`;
   },
 
   isEnabled(): boolean {
     return (
       (process.env.ENABLE_COMPUTER_USE === '1' && process.platform === 'win32') ||
       (process.env.ENABLE_COMPUTER_USE === '1' && process.env.CI === 'true')
-    )
+    );
   },
 
   isReadOnly(input: Input): boolean {
     // Only screenshot and cursor_position and list_windows are truly read-only
-    return input.action === 'screenshot' || input.action === 'cursor_position' || input.action === 'list_windows'
+    return input.action === 'screenshot' || input.action === 'cursor_position' || input.action === 'list_windows';
   },
 
   isConcurrencySafe(input: Input): boolean {
-    return input.action === 'screenshot' || input.action === 'cursor_position' || input.action === 'list_windows'
+    return input.action === 'screenshot' || input.action === 'cursor_position' || input.action === 'list_windows';
   },
 
   toAutoClassifierInput(input: Input) {
-    return `${input.action}${input.coordinate ? ` at (${input.coordinate.join(',')})` : ''}${input.text ? ` "${input.text}"` : ''}${input.key ? ` ${input.key}` : ''}`
+    return `${input.action}${input.coordinate ? ` at (${input.coordinate.join(',')})` : ''}${input.text ? ` "${input.text}"` : ''}${input.key ? ` ${input.key}` : ''}`;
   },
 
   get inputSchema(): InputSchema {
-    return inputSchema()
+    return inputSchema();
   },
 
   get outputSchema(): OutputSchema {
-    return outputSchema()
+    return outputSchema();
   },
 
   userFacingName(): string {
-    return '🖥️ Computer'
+    return '🖥️ Computer';
   },
 
   getToolUseSummary(input: Partial<Input> | undefined): string | null {
-    if (!input?.action) return null
+    if (!input?.action) return null;
     switch (input.action) {
       case 'screenshot':
-        return 'Take screenshot'
+        return 'Take screenshot';
       case 'left_click':
       case 'right_click':
       case 'double_click':
-        return `${input.action.replace('_', ' ')} at (${input.coordinate?.join(', ') ?? '?'})`
+        return `${input.action.replace('_', ' ')} at (${input.coordinate?.join(', ') ?? '?'})`;
       case 'type':
-        return `Type "${(input.text ?? '').substring(0, 30)}"`
+        return `Type "${(input.text ?? '').substring(0, 30)}"`;
       case 'key':
-        return `Press ${input.key}`
+        return `Press ${input.key}`;
       case 'mouse_move':
-        return `Move to (${input.coordinate?.join(', ') ?? '?'})`
+        return `Move to (${input.coordinate?.join(', ') ?? '?'})`;
       case 'scroll':
-        return `Scroll ${input.scroll_direction ?? 'down'}`
+        return `Scroll ${input.scroll_direction ?? 'down'}`;
       case 'zoom':
-        return `Zoom into region ${input.region?.join(', ') ?? '?'}`
+        return `Zoom into region ${input.region?.join(', ') ?? '?'}`;
       case 'list_windows':
-        return 'List open windows'
+        return 'List open windows';
       case 'focus_window':
-        return `Focus window "${input.window_query ?? '?'}"`
+        return `Focus window "${input.window_query ?? '?'}"`;
       default:
-        return input.action
+        return input.action;
     }
   },
 
   getActivityDescription(input: Partial<Input> | undefined): string {
-    if (!input?.action) return 'Using computer'
+    if (!input?.action) return 'Using computer';
     switch (input.action) {
       case 'screenshot':
-        return 'Taking screenshot'
+        return 'Taking screenshot';
       case 'left_click':
       case 'right_click':
       case 'double_click':
-        return `Clicking at (${input.coordinate?.join(', ') ?? '?'})`
+        return `Clicking at (${input.coordinate?.join(', ') ?? '?'})`;
       case 'type':
-        return 'Typing text'
+        return 'Typing text';
       case 'key':
-        return `Pressing ${input.key ?? 'key'}`
+        return `Pressing ${input.key ?? 'key'}`;
       case 'scroll':
-        return `Scrolling ${input.scroll_direction ?? 'down'}`
+        return `Scrolling ${input.scroll_direction ?? 'down'}`;
       case 'zoom':
-        return 'Zooming into region'
+        return 'Zooming into region';
       case 'list_windows':
-        return 'Listing open windows'
+        return 'Listing open windows';
       case 'focus_window':
-        return `Focusing window "${input.window_query ?? '?'}"`
+        return `Focusing window "${input.window_query ?? '?'}"`;
       default:
-        return `Performing ${input.action}`
+        return `Performing ${input.action}`;
     }
   },
 
@@ -234,29 +233,23 @@ Tips:
     return {
       behavior: 'ask' as const,
       message: `Computer Use: ${input.action}${input.coordinate ? ` at (${input.coordinate.join(', ')})` : ''}${input.text ? ` text="${input.text.substring(0, 50)}"` : ''}${input.key ? ` key="${input.key}"` : ''}${input.window_query ? ` window="${input.window_query}"` : ''}`,
-    }
+    };
   },
 
-  renderToolUseMessage(
-    input: Partial<Input>,
-    options: { theme: string; verbose: boolean },
-  ): React.ReactNode {
-    if (!input.action) return React.createElement(Text, null, '🖥️ Computer Use')
-    const parts = [`🖥️ ${input.action}`]
-    if (input.coordinate) parts.push(`at (${input.coordinate.join(', ')})`)
-    if (input.text) parts.push(`"${input.text.substring(0, 50)}"`)
-    if (input.key) parts.push(input.key)
-    if (input.scroll_direction) parts.push(input.scroll_direction)
-    if (input.window_query) parts.push(`"${input.window_query}"`)
-    if (input.region) parts.push(`[${input.region.join(', ')}]`)
-    return React.createElement(Text, null, parts.join(' '))
+  renderToolUseMessage(input: Partial<Input>, options: { theme: string; verbose: boolean }): React.ReactNode {
+    if (!input.action) return React.createElement(Text, null, '🖥️ Computer Use');
+    const parts = [`🖥️ ${input.action}`];
+    if (input.coordinate) parts.push(`at (${input.coordinate.join(', ')})`);
+    if (input.text) parts.push(`"${input.text.substring(0, 50)}"`);
+    if (input.key) parts.push(input.key);
+    if (input.scroll_direction) parts.push(input.scroll_direction);
+    if (input.window_query) parts.push(`"${input.window_query}"`);
+    if (input.region) parts.push(`[${input.region.join(', ')}]`);
+    return React.createElement(Text, null, parts.join(' '));
   },
 
-  mapToolResultToToolResultBlockParam(
-    output: Out,
-    toolUseID: string,
-  ): ToolResultBlockParam {
-    const content: ToolResultBlockParam['content'] = []
+  mapToolResultToToolResultBlockParam(output: Out, toolUseID: string): ToolResultBlockParam {
+    const content: ToolResultBlockParam['content'] = [];
 
     // Add screenshot as image block if present
     if (output.screenshot) {
@@ -267,7 +260,7 @@ Tips:
           media_type: 'image/jpeg',
           data: output.screenshot,
         },
-      })
+      });
     }
 
     // Add text result
@@ -275,43 +268,42 @@ Tips:
       content.push({
         type: 'text',
         text: output.result,
-      })
+      });
     }
 
     return {
       tool_use_id: toolUseID,
       type: 'tool_result' as const,
       content: content.length > 0 ? content : output.result,
-    }
+    };
   },
 
-  async call(
-    input: any,
-  ): Promise<{ data: Out }> {
+  async call(input: any): Promise<{ data: Out }> {
     // Helper to normalize coordinates from various formats [x,y], {x,y}, "x,y"
     const normalizeCoord = (c: any): [number, number] | undefined => {
-      if (!c) return undefined
-      if (Array.isArray(c) && c.length >= 2) return [Number(c[0]), Number(c[1])]
+      if (!c) return undefined;
+      if (Array.isArray(c) && c.length >= 2) return [Number(c[0]), Number(c[1])];
       if (typeof c === 'object') {
-        const x = c.x ?? c.X ?? c.left ?? c.coordinate?.[0]
-        const y = c.y ?? c.Y ?? c.top ?? c.coordinate?.[1]
-        if (x !== undefined && y !== undefined) return [Number(x), Number(y)]
+        const x = c.x ?? c.X ?? c.left ?? c.coordinate?.[0];
+        const y = c.y ?? c.Y ?? c.top ?? c.coordinate?.[1];
+        if (x !== undefined && y !== undefined) return [Number(x), Number(y)];
       }
       if (typeof c === 'string') {
         try {
-          const p = JSON.parse(c); return normalizeCoord(p)
+          const p = JSON.parse(c);
+          return normalizeCoord(p);
         } catch {
-          const m = c.match(/\[?(\d+(?:\.\d+)?)[,\s]+(\d+(?:\.\d+)?)\]?/)
-          if (m) return [Number(m[1]), Number(m[2])]
+          const m = c.match(/\[?(\d+(?:\.\d+)?)[,\s]+(\d+(?:\.\d+)?)\]?/);
+          if (m) return [Number(m[1]), Number(m[2])];
         }
       }
-      return undefined
-    }
+      return undefined;
+    };
 
-    const action = String(input.action || '').toLowerCase()
-    logForDebugging(`[ComputerUse] Action: ${action}`)
+    const action = String(input.action || '').toLowerCase();
+    logForDebugging(`[ComputerUse] Action: ${action}`);
 
-    const config = await getDisplayConfig()
+    const config = await getDisplayConfig();
 
     // Map input to ComputerToolInput with extreme normalization
     const toolInput: ComputerToolInput = {
@@ -319,26 +311,29 @@ Tips:
       coordinate: normalizeCoord(input.coordinate),
       text: input.text !== null && input.text !== undefined ? String(input.text) : undefined,
       key: input.key !== null && input.key !== undefined ? String(input.key) : undefined,
-      scroll_direction: input.scroll_direction ? String(input.scroll_direction).toLowerCase() as any : undefined,
-      scroll_amount: input.scroll_amount !== undefined && input.scroll_amount !== null ? Number(input.scroll_amount) : undefined,
+      scroll_direction: input.scroll_direction ? (String(input.scroll_direction).toLowerCase() as any) : undefined,
+      scroll_amount:
+        input.scroll_amount !== undefined && input.scroll_amount !== null ? Number(input.scroll_amount) : undefined,
       start_coordinate: normalizeCoord(input.start_coordinate),
       duration: input.duration !== undefined && input.duration !== null ? Number(input.duration) : undefined,
-      region: Array.isArray(input.region) ? [Number(input.region[0]), Number(input.region[1]), Number(input.region[2]), Number(input.region[3])] : undefined,
+      region: Array.isArray(input.region)
+        ? [Number(input.region[0]), Number(input.region[1]), Number(input.region[2]), Number(input.region[3])]
+        : undefined,
       window_query: input.window_query ? String(input.window_query) : undefined,
-    }
+    };
 
     // Execute the action
-    const results = await handleComputerAction(toolInput, config)
+    const results = await handleComputerAction(toolInput, config);
 
     // Extract results
-    let textResult = ''
-    let screenshotData: string | undefined
+    let textResult = '';
+    let screenshotData: string | undefined;
 
     for (const block of results) {
       if (block.type === 'text') {
-        textResult = block.text
+        textResult = block.text;
       } else if (block.type === 'image') {
-        screenshotData = block.source.data
+        screenshotData = block.source.data;
       }
     }
 
@@ -346,10 +341,10 @@ Tips:
     if (action !== 'screenshot' && !screenshotData) {
       try {
         // Small delay to let the screen update
-        await new Promise(resolve => setTimeout(resolve, 300))
-        const { captureScreenshot } = await import('./screenshot.js')
-        const ss = await captureScreenshot()
-        screenshotData = ss.base64
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const { captureScreenshot } = await import('./screenshot.js');
+        const ss = await captureScreenshot();
+        screenshotData = ss.base64;
       } catch {
         // Screenshot after action is best-effort
       }
@@ -360,6 +355,6 @@ Tips:
         result: textResult || `Action "${input.action}" completed`,
         screenshot: screenshotData,
       },
-    }
+    };
   },
-} satisfies ToolDef<InputSchema, Out>)
+} satisfies ToolDef<InputSchema, Out>);

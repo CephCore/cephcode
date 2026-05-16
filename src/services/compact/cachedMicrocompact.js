@@ -1,1 +1,3 @@
-export function cachedMicrocompact() { return '' }
+export function cachedMicrocompact() {
+  return '';
+}

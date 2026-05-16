@@ -1,50 +1,47 @@
-import React, { type ReactNode, useCallback, useState } from 'react'
-import { Box, Text } from '../../../../ink.js'
-import { useKeybinding } from '../../../../keybindings/useKeybinding.js'
-import { editPromptInEditor } from '../../../../utils/promptEditor.js'
-import { ConfigurableShortcutHint } from '../../../ConfigurableShortcutHint.js'
-import { Byline } from '../../../design-system/Byline.js'
-import { KeyboardShortcutHint } from '../../../design-system/KeyboardShortcutHint.js'
-import TextInput from '../../../TextInput.js'
-import { useWizard } from '../../../wizard/index.js'
-import { WizardDialogLayout } from '../../../wizard/WizardDialogLayout.js'
-import type { AgentWizardData } from '../types.js'
+import React, { type ReactNode, useCallback, useState } from 'react';
+import { Box, Text } from '../../../../ink.js';
+import { useKeybinding } from '../../../../keybindings/useKeybinding.js';
+import { editPromptInEditor } from '../../../../utils/promptEditor.js';
+import { ConfigurableShortcutHint } from '../../../ConfigurableShortcutHint.js';
+import { Byline } from '../../../design-system/Byline.js';
+import { KeyboardShortcutHint } from '../../../design-system/KeyboardShortcutHint.js';
+import TextInput from '../../../TextInput.js';
+import { useWizard } from '../../../wizard/index.js';
+import { WizardDialogLayout } from '../../../wizard/WizardDialogLayout.js';
+import type { AgentWizardData } from '../types.js';
 
 export function PromptStep(): ReactNode {
-  const { goNext, goBack, updateWizardData, wizardData } =
-    useWizard<AgentWizardData>()
-  const [systemPrompt, setSystemPrompt] = useState(
-    wizardData.systemPrompt || '',
-  )
-  const [cursorOffset, setCursorOffset] = useState(systemPrompt.length)
-  const [error, setError] = useState<string | null>(null)
+  const { goNext, goBack, updateWizardData, wizardData } = useWizard<AgentWizardData>();
+  const [systemPrompt, setSystemPrompt] = useState(wizardData.systemPrompt || '');
+  const [cursorOffset, setCursorOffset] = useState(systemPrompt.length);
+  const [error, setError] = useState<string | null>(null);
 
   // Handle escape key - use Settings context so 'n' key doesn't cancel (allows typing 'n' in input)
-  useKeybinding('confirm:no', goBack, { context: 'Settings' })
+  useKeybinding('confirm:no', goBack, { context: 'Settings' });
 
   const handleExternalEditor = useCallback(async () => {
-    const result = await editPromptInEditor(systemPrompt)
+    const result = await editPromptInEditor(systemPrompt);
     if (result.content !== null) {
-      setSystemPrompt(result.content)
-      setCursorOffset(result.content.length)
+      setSystemPrompt(result.content);
+      setCursorOffset(result.content.length);
     }
-  }, [systemPrompt])
+  }, [systemPrompt]);
 
   useKeybinding('chat:externalEditor', handleExternalEditor, {
     context: 'Chat',
-  })
+  });
 
   const handleSubmit = (): void => {
-    const trimmedPrompt = systemPrompt.trim()
+    const trimmedPrompt = systemPrompt.trim();
     if (!trimmedPrompt) {
-      setError('System prompt is required')
-      return
+      setError('System prompt is required');
+      return;
     }
 
-    setError(null)
-    updateWizardData({ systemPrompt: trimmedPrompt })
-    goNext()
-  }
+    setError(null);
+    updateWizardData({ systemPrompt: trimmedPrompt });
+    goNext();
+  };
 
   return (
     <WizardDialogLayout
@@ -59,12 +56,7 @@ export function PromptStep(): ReactNode {
             fallback="ctrl+g"
             description="open in editor"
           />
-          <ConfigurableShortcutHint
-            action="confirm:no"
-            context="Settings"
-            fallback="Esc"
-            description="go back"
-          />
+          <ConfigurableShortcutHint action="confirm:no" context="Settings" fallback="Esc" description="go back" />
         </Byline>
       }
     >
@@ -93,5 +85,5 @@ export function PromptStep(): ReactNode {
         )}
       </Box>
     </WizardDialogLayout>
-  )
+  );
 }

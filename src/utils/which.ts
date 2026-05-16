@@ -1,5 +1,5 @@
-import { execa } from 'execa'
-import { execSync_DEPRECATED } from './execSyncWrapper.js'
+import { execa } from 'execa';
+import { execSync_DEPRECATED } from './execSyncWrapper.js';
 
 /**
  * Short-lived cache for missing executables to avoid repeated synchronous
@@ -10,22 +10,22 @@ import { execSync_DEPRECATED } from './execSyncWrapper.js'
  * checks in a single operation, but short enough that a newly installed
  * executable is picked up soon after.
  */
-const missingCache = new Map<string, number>()
-const MISSING_TTL_MS = 30_000
+const missingCache = new Map<string, number>();
+const MISSING_TTL_MS = 30_000;
 
 function isMissingCached(command: string): boolean {
-  const expiry = missingCache.get(command)
-  if (expiry && Date.now() < expiry) return true
-  missingCache.delete(command)
-  return false
+  const expiry = missingCache.get(command);
+  if (expiry && Date.now() < expiry) return true;
+  missingCache.delete(command);
+  return false;
 }
 
 function setMissingCache(command: string): void {
-  missingCache.set(command, Date.now() + MISSING_TTL_MS)
+  missingCache.set(command, Date.now() + MISSING_TTL_MS);
 }
 
 async function whichNodeAsync(command: string): Promise<string | null> {
-  if (isMissingCached(command)) return null
+  if (isMissingCached(command)) return null;
 
   if (process.platform === 'win32') {
     // On Windows, use where.exe and return the first result
@@ -33,13 +33,13 @@ async function whichNodeAsync(command: string): Promise<string | null> {
       shell: true,
       stderr: 'ignore',
       reject: false,
-    })
+    });
     if (result.exitCode !== 0 || !result.stdout) {
-      setMissingCache(command)
-      return null
+      setMissingCache(command);
+      return null;
     }
     // where.exe returns multiple paths separated by newlines, return the first
-    return result.stdout.trim().split(/\r?\n/)[0] || null
+    return result.stdout.trim().split(/\r?\n/)[0] || null;
   }
 
   // On POSIX systems (macOS, Linux, WSL), use which
@@ -49,32 +49,32 @@ async function whichNodeAsync(command: string): Promise<string | null> {
     shell: true,
     stderr: 'ignore',
     reject: false,
-  })
+  });
   if (result.exitCode !== 0 || !result.stdout) {
-    setMissingCache(command)
-    return null
+    setMissingCache(command);
+    return null;
   }
-  return result.stdout.trim()
+  return result.stdout.trim();
 }
 
 function whichNodeSync(command: string): string | null {
-  if (isMissingCached(command)) return null
+  if (isMissingCached(command)) return null;
 
   if (process.platform === 'win32') {
     try {
       const result = execSync_DEPRECATED(`where.exe ${command}`, {
         encoding: 'utf-8',
         stdio: ['ignore', 'pipe', 'ignore'],
-      })
-      const output = result.toString().trim()
+      });
+      const output = result.toString().trim();
       if (!output) {
-        setMissingCache(command)
-        return null
+        setMissingCache(command);
+        return null;
       }
-      return output.split(/\r?\n/)[0] || null
+      return output.split(/\r?\n/)[0] || null;
     } catch {
-      setMissingCache(command)
-      return null
+      setMissingCache(command);
+      return null;
     }
   }
 
@@ -82,23 +82,20 @@ function whichNodeSync(command: string): string | null {
     const result = execSync_DEPRECATED(`which ${command}`, {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'ignore'],
-    })
-    const output = result.toString().trim()
+    });
+    const output = result.toString().trim();
     if (!output) {
-      setMissingCache(command)
-      return null
+      setMissingCache(command);
+      return null;
     }
-    return output || null
+    return output || null;
   } catch {
-    setMissingCache(command)
-    return null
+    setMissingCache(command);
+    return null;
   }
 }
 
-const bunWhich =
-  typeof Bun !== 'undefined' && typeof Bun.which === 'function'
-    ? Bun.which
-    : null
+const bunWhich = typeof Bun !== 'undefined' && typeof Bun.which === 'function' ? Bun.which : null;
 
 /**
  * Finds the full path to a command executable.
@@ -114,12 +111,12 @@ const bunWhich =
  */
 export const which: (command: string) => Promise<string | null> = bunWhich
   ? async command => {
-      if (isMissingCached(command)) return null
-      const result = bunWhich(command)
-      if (!result) setMissingCache(command)
-      return result
+      if (isMissingCached(command)) return null;
+      const result = bunWhich(command);
+      if (!result) setMissingCache(command);
+      return result;
     }
-  : whichNodeAsync
+  : whichNodeAsync;
 
 /**
  * Synchronous version of `which`.
@@ -131,12 +128,11 @@ export const which: (command: string) => Promise<string | null> = bunWhich
  * @param command - The command name to look up
  * @returns The full path to the command, or null if not found
  */
-export const whichSync: (command: string) => string | null =
-  bunWhich
-    ? (command: string) => {
-        if (isMissingCached(command)) return null
-        const result = bunWhich(command)
-        if (!result) setMissingCache(command)
-        return result
-      }
-    : whichNodeSync
+export const whichSync: (command: string) => string | null = bunWhich
+  ? (command: string) => {
+      if (isMissingCached(command)) return null;
+      const result = bunWhich(command);
+      if (!result) setMissingCache(command);
+      return result;
+    }
+  : whichNodeSync;

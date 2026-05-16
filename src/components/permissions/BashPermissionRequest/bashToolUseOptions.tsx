@@ -6,7 +6,12 @@ import type { PermissionUpdate } from '../../../utils/permissions/PermissionUpda
 import { shouldShowAlwaysAllowOptions } from '../../../utils/permissions/permissionsLoader.js';
 import type { OptionWithDescription } from '../../CustomSelect/select.js';
 import { generateShellSuggestionsLabel } from '../shellPermissionHelpers.js';
-export type BashToolUseOption = 'yes' | 'yes-apply-suggestions' | 'yes-prefix-edited' | 'yes-classifier-reviewed' | 'no';
+export type BashToolUseOption =
+  | 'yes'
+  | 'yes-apply-suggestions'
+  | 'yes-prefix-edited'
+  | 'yes-classifier-reviewed'
+  | 'no';
 
 /**
  * Check if a description already exists in the allow list.
@@ -21,10 +26,7 @@ function descriptionAlreadyExists(description: string, existingDescriptions: str
  * Strip output redirections so filenames don't show as commands in the label.
  */
 function stripBashRedirections(command: string): string {
-  const {
-    commandWithoutRedirections,
-    redirections
-  } = extractOutputRedirections(command);
+  const { commandWithoutRedirections, redirections } = extractOutputRedirections(command);
   // Only use stripped version if there were actual redirections
   return redirections.length > 0 ? commandWithoutRedirections : command;
 }
@@ -40,7 +42,7 @@ export function bashToolUseOptions({
   yesInputMode = false,
   noInputMode = false,
   editablePrefix,
-  onEditablePrefixChange
+  onEditablePrefixChange,
 }: {
   suggestions?: PermissionUpdate[];
   decisionReason?: PermissionDecisionReason;
@@ -66,12 +68,12 @@ export function bashToolUseOptions({
       value: 'yes',
       placeholder: 'and tell Claude what to do next',
       onChange: onAcceptFeedbackChange,
-      allowEmptySubmitToCancel: true
+      allowEmptySubmitToCancel: true,
     });
   } else {
     options.push({
       label: 'Yes',
-      value: 'yes'
+      value: 'yes',
     });
   }
 
@@ -81,7 +83,9 @@ export function bashToolUseOptions({
     // Haiku-generated suggestion label — but only when the suggestions
     // don't contain non-Bash items (addDirectories, Read rules) that
     // the editable prefix can't represent.
-    const hasNonBashSuggestions = suggestions.some(s => s.type === 'addDirectories' || s.type === 'addRules' && s.rules?.some(r => r.toolName !== BASH_TOOL_NAME));
+    const hasNonBashSuggestions = suggestions.some(
+      s => s.type === 'addDirectories' || (s.type === 'addRules' && s.rules?.some(r => r.toolName !== BASH_TOOL_NAME)),
+    );
     if (editablePrefix !== undefined && onEditablePrefixChange && !hasNonBashSuggestions && suggestions.length > 0) {
       options.push({
         type: 'input',
@@ -93,14 +97,14 @@ export function bashToolUseOptions({
         allowEmptySubmitToCancel: true,
         showLabelWithValue: true,
         labelValueSeparator: ': ',
-        resetCursorOnUpdate: true
+        resetCursorOnUpdate: true,
       });
     } else if (suggestions.length > 0) {
       const label = generateShellSuggestionsLabel(suggestions, BASH_TOOL_NAME, stripBashRedirections);
       if (label) {
         options.push({
           label,
-          value: 'yes-apply-suggestions'
+          value: 'yes-apply-suggestions',
         });
       }
     }
@@ -112,7 +116,15 @@ export function bashToolUseOptions({
     // Skip when the editable prefix option is already shown — they serve the
     // same role and having two identical-looking "don't ask again" inputs is confusing.
     const editablePrefixShown = options.some(o => o.value === 'yes-prefix-edited');
-    if ("external" === 'ant' && !editablePrefixShown && isClassifierPermissionsEnabled() && onClassifierDescriptionChange && !initialClassifierDescriptionEmpty && !descriptionAlreadyExists(classifierDescription ?? '', existingAllowDescriptions) && decisionReason?.type !== 'classifier') {
+    if (
+      'external' === 'ant' &&
+      !editablePrefixShown &&
+      isClassifierPermissionsEnabled() &&
+      onClassifierDescriptionChange &&
+      !initialClassifierDescriptionEmpty &&
+      !descriptionAlreadyExists(classifierDescription ?? '', existingAllowDescriptions) &&
+      decisionReason?.type !== 'classifier'
+    ) {
       options.push({
         type: 'input',
         label: 'Yes, and don\u2019t ask again for',
@@ -123,7 +135,7 @@ export function bashToolUseOptions({
         allowEmptySubmitToCancel: true,
         showLabelWithValue: true,
         labelValueSeparator: ': ',
-        resetCursorOnUpdate: true
+        resetCursorOnUpdate: true,
       });
     }
   }
@@ -134,12 +146,12 @@ export function bashToolUseOptions({
       value: 'no',
       placeholder: 'and tell Claude what to do differently',
       onChange: onRejectFeedbackChange,
-      allowEmptySubmitToCancel: true
+      allowEmptySubmitToCancel: true,
     });
   } else {
     options.push({
       label: 'No',
-      value: 'no'
+      value: 'no',
     });
   }
   return options;

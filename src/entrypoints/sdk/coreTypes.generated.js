@@ -1,2 +1,2 @@
 // Generated file placeholder
-export {}
+export {};

@@ -7,37 +7,37 @@
  */
 
 export interface CodeChunk {
-  id: string
-  content: string
-  filePath: string
-  language: string
-  startLine: number
-  endLine: number
-  vector?: number[] // Optional pre-computed embedding
+  id: string;
+  content: string;
+  filePath: string;
+  language: string;
+  startLine: number;
+  endLine: number;
+  vector?: number[]; // Optional pre-computed embedding
   metadata: {
-    functionName?: string
-    className?: string
-    scope?: string
-  }
+    functionName?: string;
+    className?: string;
+    scope?: string;
+  };
 }
 
 export interface CodeIndexConfig {
   /** Maximum chunks to index (default: 5000) */
-  maxChunks: number
+  maxChunks: number;
   /** Chunk size in lines (default: 50) */
-  chunkSize: number
+  chunkSize: number;
   /** File patterns to exclude */
-  excludePatterns: string[]
+  excludePatterns: string[];
   /** Enable real embeddings (requires Ollama/OpenAI) */
-  useEmbeddings: boolean
+  useEmbeddings: boolean;
   /** Embedding model to use */
-  embeddingModel: string
+  embeddingModel: string;
 }
 
 export interface SearchResult {
-  chunk: CodeChunk
-  score: number
-  matchedTerms: string[]
+  chunk: CodeChunk;
+  score: number;
+  matchedTerms: string[];
 }
 
 export const DEFAULT_INDEX_CONFIG: CodeIndexConfig = {
@@ -54,4 +54,4 @@ export const DEFAULT_INDEX_CONFIG: CodeIndexConfig = {
   ],
   useEmbeddings: false, // Default to Fuse.js
   embeddingModel: 'nomic-embed-text', // Ollama default
-}
+};

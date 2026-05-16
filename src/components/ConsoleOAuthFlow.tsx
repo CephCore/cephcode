@@ -1,31 +1,32 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import type React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
-} from 'src/services/analytics/index.js'
-import { installOAuthTokens } from '../cli/handlers/auth.js'
-import { useTerminalSize } from '../hooks/useTerminalSize.js'
-import { setClipboard } from '../ink/termio/osc.js'
-import { useTerminalNotification } from '../ink/useTerminalNotification.js'
-import { Box, Link, Text } from '../ink.js'
-import { useKeybinding } from '../keybindings/useKeybinding.js'
-import { getSSLErrorHint } from '../services/api/errorUtils.js'
-import { sendNotification } from '../services/notifier.js'
-import { OAuthService } from '../services/oauth/index.js'
-import { getOauthAccountInfo, validateForceLoginOrg } from '../utils/auth.js'
-import { logError } from '../utils/log.js'
-import { getSettings_DEPRECATED } from '../utils/settings/settings.js'
-import { Select } from './CustomSelect/select.js'
-import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js'
-import { Spinner } from './Spinner.js'
-import TextInput from './TextInput.js'
+} from 'src/services/analytics/index.js';
+import { installOAuthTokens } from '../cli/handlers/auth.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { setClipboard } from '../ink/termio/osc.js';
+import { useTerminalNotification } from '../ink/useTerminalNotification.js';
+import { Box, Link, Text } from '../ink.js';
+import { useKeybinding } from '../keybindings/useKeybinding.js';
+import { getSSLErrorHint } from '../services/api/errorUtils.js';
+import { sendNotification } from '../services/notifier.js';
+import { OAuthService } from '../services/oauth/index.js';
+import { getOauthAccountInfo, validateForceLoginOrg } from '../utils/auth.js';
+import { logError } from '../utils/log.js';
+import { getSettings_DEPRECATED } from '../utils/settings/settings.js';
+import { Select } from './CustomSelect/select.js';
+import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js';
+import { Spinner } from './Spinner.js';
+import TextInput from './TextInput.js';
 
 type Props = {
-  onDone(): void
-  startingMessage?: string
-  mode?: 'login' | 'setup-token'
-  forceLoginMethod?: 'claudeai' | 'console'
-}
+  onDone(): void;
+  startingMessage?: string;
+  mode?: 'login' | 'setup-token';
+  forceLoginMethod?: 'claudeai' | 'console';
+};
 
 type OAuthStatus =
   | { state: 'idle' } // Initial state, waiting to select login method
@@ -36,12 +37,12 @@ type OAuthStatus =
   | { state: 'about_to_retry'; nextState: OAuthStatus }
   | { state: 'success'; token?: string }
   | {
-      state: 'error'
-      message: string
-      toRetry?: OAuthStatus
-    }
+      state: 'error';
+      message: string;
+      toRetry?: OAuthStatus;
+    };
 
-const PASTE_HERE_MSG = 'Paste code here if prompted > '
+const PASTE_HERE_MSG = 'Paste code here if prompted > ';
 
 export function ConsoleOAuthFlow({
   onDone,
@@ -49,158 +50,153 @@ export function ConsoleOAuthFlow({
   mode = 'login',
   forceLoginMethod: forceLoginMethodProp,
 }: Props): React.ReactNode {
-  const settings = getSettings_DEPRECATED() || {}
-  const forceLoginMethod = forceLoginMethodProp ?? settings.forceLoginMethod
-  const orgUUID = settings.forceLoginOrgUUID
+  const settings = getSettings_DEPRECATED() || {};
+  const forceLoginMethod = forceLoginMethodProp ?? settings.forceLoginMethod;
+  const orgUUID = settings.forceLoginOrgUUID;
   const forcedMethodMessage =
     forceLoginMethod === 'claudeai'
       ? 'Login method pre-selected: Subscription Plan (Claude Pro/Max)'
       : forceLoginMethod === 'console'
         ? 'Login method pre-selected: API Usage Billing (Anthropic Console)'
-        : null
+        : null;
 
-  const terminal = useTerminalNotification()
+  const terminal = useTerminalNotification();
 
   const [oauthStatus, setOAuthStatus] = useState<OAuthStatus>(() => {
     if (mode === 'setup-token') {
-      return { state: 'ready_to_start' }
+      return { state: 'ready_to_start' };
     }
     if (forceLoginMethod === 'claudeai' || forceLoginMethod === 'console') {
-      return { state: 'ready_to_start' }
+      return { state: 'ready_to_start' };
     }
-    return { state: 'idle' }
-  })
+    return { state: 'idle' };
+  });
 
-  const [pastedCode, setPastedCode] = useState('')
-  const [cursorOffset, setCursorOffset] = useState(0)
-  const [oauthService] = useState(() => new OAuthService())
+  const [pastedCode, setPastedCode] = useState('');
+  const [cursorOffset, setCursorOffset] = useState(0);
+  const [oauthService] = useState(() => new OAuthService());
   const [loginWithClaudeAi, setLoginWithClaudeAi] = useState(() => {
     // Use Claude AI auth for setup-token mode to support user:inference scope
-    return mode === 'setup-token' || forceLoginMethod === 'claudeai'
-  })
+    return mode === 'setup-token' || forceLoginMethod === 'claudeai';
+  });
   // After a few seconds we suggest the user to copy/paste url if the
   // browser did not open automatically. In this flow we expect the user to
   // copy the code from the browser and paste it in the terminal
-  const [showPastePrompt, setShowPastePrompt] = useState(false)
-  const [urlCopied, setUrlCopied] = useState(false)
+  const [showPastePrompt, setShowPastePrompt] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
 
-  const textInputColumns = useTerminalSize().columns - PASTE_HERE_MSG.length - 1
+  const textInputColumns = useTerminalSize().columns - PASTE_HERE_MSG.length - 1;
 
   // Log forced login method on mount
   useEffect(() => {
     if (forceLoginMethod === 'claudeai') {
-      logEvent('tengu_oauth_claudeai_forced', {})
+      logEvent('tengu_oauth_claudeai_forced', {});
     } else if (forceLoginMethod === 'console') {
-      logEvent('tengu_oauth_console_forced', {})
+      logEvent('tengu_oauth_console_forced', {});
     }
-  }, [forceLoginMethod])
+  }, [forceLoginMethod]);
 
   // Retry logic
   useEffect(() => {
     if (oauthStatus.state === 'about_to_retry') {
-      const timer = setTimeout(setOAuthStatus, 1000, oauthStatus.nextState)
-      return () => clearTimeout(timer)
+      const timer = setTimeout(setOAuthStatus, 1000, oauthStatus.nextState);
+      return () => clearTimeout(timer);
     }
-  }, [oauthStatus])
+  }, [oauthStatus]);
 
   // Handle Enter to continue on success state
   useKeybinding(
     'confirm:yes',
     () => {
-      logEvent('tengu_oauth_success', { loginWithClaudeAi })
-      onDone()
+      logEvent('tengu_oauth_success', { loginWithClaudeAi });
+      onDone();
     },
     {
       context: 'Confirmation',
       isActive: oauthStatus.state === 'success' && mode !== 'setup-token',
     },
-  )
+  );
 
   // Handle Enter to continue from platform setup
   useKeybinding(
     'confirm:yes',
     () => {
-      setOAuthStatus({ state: 'idle' })
+      setOAuthStatus({ state: 'idle' });
     },
     {
       context: 'Confirmation',
       isActive: oauthStatus.state === 'platform_setup',
     },
-  )
+  );
 
   // Handle Enter to retry on error state
   useKeybinding(
     'confirm:yes',
     () => {
       if (oauthStatus.state === 'error' && oauthStatus.toRetry) {
-        setPastedCode('')
+        setPastedCode('');
         setOAuthStatus({
           state: 'about_to_retry',
           nextState: oauthStatus.toRetry,
-        })
+        });
       }
     },
     {
       context: 'Confirmation',
       isActive: oauthStatus.state === 'error' && !!oauthStatus.toRetry,
     },
-  )
+  );
 
   useEffect(() => {
-    if (
-      pastedCode === 'c' &&
-      oauthStatus.state === 'waiting_for_login' &&
-      showPastePrompt &&
-      !urlCopied
-    ) {
+    if (pastedCode === 'c' && oauthStatus.state === 'waiting_for_login' && showPastePrompt && !urlCopied) {
       void setClipboard(oauthStatus.url).then(raw => {
-        if (raw) process.stdout.write(raw)
-        setUrlCopied(true)
-        setTimeout(setUrlCopied, 2000, false)
-      })
-      setPastedCode('')
+        if (raw) process.stdout.write(raw);
+        setUrlCopied(true);
+        setTimeout(setUrlCopied, 2000, false);
+      });
+      setPastedCode('');
     }
-  }, [pastedCode, oauthStatus, showPastePrompt, urlCopied])
+  }, [pastedCode, oauthStatus, showPastePrompt, urlCopied]);
 
   async function handleSubmitCode(value: string, url: string) {
     try {
       // Expecting format "authorizationCode#state" from the authorization callback URL
-      const [authorizationCode, state] = value.split('#')
+      const [authorizationCode, state] = value.split('#');
 
       if (!authorizationCode || !state) {
         setOAuthStatus({
           state: 'error',
           message: 'Invalid code. Please make sure the full code was copied',
           toRetry: { state: 'waiting_for_login', url },
-        })
-        return
+        });
+        return;
       }
 
       // Track which path the user is taking (manual code entry)
-      logEvent('tengu_oauth_manual_entry', {})
+      logEvent('tengu_oauth_manual_entry', {});
       oauthService.handleManualAuthCodeInput({
         authorizationCode,
         state,
-      })
+      });
     } catch (err: unknown) {
-      logError(err)
+      logError(err);
       setOAuthStatus({
         state: 'error',
         message: (err as Error).message,
         toRetry: { state: 'waiting_for_login', url },
-      })
+      });
     }
   }
 
   const startOAuth = useCallback(async () => {
     try {
-      logEvent('tengu_oauth_flow_start', { loginWithClaudeAi })
+      logEvent('tengu_oauth_flow_start', { loginWithClaudeAi });
 
       const result = await oauthService
         .startOAuthFlow(
           async url => {
-            setOAuthStatus({ state: 'waiting_for_login', url })
-            setTimeout(setShowPastePrompt, 3000, true)
+            setOAuthStatus({ state: 'waiting_for_login', url });
+            setTimeout(setShowPastePrompt, 3000, true);
           },
           {
             loginWithClaudeAi,
@@ -210,13 +206,11 @@ export function ConsoleOAuthFlow({
           },
         )
         .catch(err => {
-          const isTokenExchangeError = err.message.includes(
-            'Token exchange failed',
-          )
+          const isTokenExchangeError = err.message.includes('Token exchange failed');
           // Enterprise TLS proxies (Zscaler et al.) intercept the token
           // exchange POST and cause cryptic SSL errors. Surface an
           // actionable hint so the user isn't stuck in a login loop.
-          const sslHint = getSSLErrorHint(err)
+          const sslHint = getSSLErrorHint(err);
           setOAuthStatus({
             state: 'error',
             message:
@@ -224,78 +218,68 @@ export function ConsoleOAuthFlow({
               (isTokenExchangeError
                 ? 'Failed to exchange authorization code for access token. Please try again.'
                 : err.message),
-            toRetry:
-              mode === 'setup-token'
-                ? { state: 'ready_to_start' }
-                : { state: 'idle' },
-          })
+            toRetry: mode === 'setup-token' ? { state: 'ready_to_start' } : { state: 'idle' },
+          });
           logEvent('tengu_oauth_token_exchange_error', {
             error: err.message,
             ssl_error: sslHint !== null,
-          })
-          throw err
-        })
+          });
+          throw err;
+        });
 
       if (mode === 'setup-token') {
         // For setup-token mode, return the OAuth access token directly (it can be used as an API key)
         // Don't save to keychain - the token is displayed for manual use with CLAUDE_CODE_OAUTH_TOKEN
-        setOAuthStatus({ state: 'success', token: result.accessToken })
+        setOAuthStatus({ state: 'success', token: result.accessToken });
       } else {
-        await installOAuthTokens(result)
+        await installOAuthTokens(result);
 
-        const orgResult = await validateForceLoginOrg()
+        const orgResult = await validateForceLoginOrg();
         if (!orgResult.valid) {
-          throw new Error(orgResult.message)
+          throw new Error(orgResult.message);
         }
 
-        setOAuthStatus({ state: 'success' })
+        setOAuthStatus({ state: 'success' });
         void sendNotification(
           {
             message: 'Claude Code login successful',
             notificationType: 'auth_success',
           },
           terminal,
-        )
+        );
       }
     } catch (err) {
-      const errorMessage = (err as Error).message
-      const sslHint = getSSLErrorHint(err)
+      const errorMessage = (err as Error).message;
+      const sslHint = getSSLErrorHint(err);
       setOAuthStatus({
         state: 'error',
         message: sslHint ?? errorMessage,
         toRetry: {
           state: mode === 'setup-token' ? 'ready_to_start' : 'idle',
         },
-      })
+      });
       logEvent('tengu_oauth_error', {
-        error:
-          errorMessage as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        error: errorMessage as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         ssl_error: sslHint !== null,
-      })
+      });
     }
-  }, [oauthService, setShowPastePrompt, loginWithClaudeAi, mode, orgUUID])
+  }, [oauthService, setShowPastePrompt, loginWithClaudeAi, mode, orgUUID]);
 
-  const pendingOAuthStartRef = useRef(false)
+  const pendingOAuthStartRef = useRef(false);
 
   useEffect(() => {
-    if (
-      oauthStatus.state === 'ready_to_start' &&
-      !pendingOAuthStartRef.current
-    ) {
-      pendingOAuthStartRef.current = true
+    if (oauthStatus.state === 'ready_to_start' && !pendingOAuthStartRef.current) {
+      pendingOAuthStartRef.current = true;
       process.nextTick(
-        (
-          startOAuth: () => Promise<void>,
-          pendingOAuthStartRef: React.MutableRefObject<boolean>,
-        ) => {
-          void startOAuth()
-          pendingOAuthStartRef.current = false
+        (startOAuth: () => Promise<void>, pendingOAuthStartRef: React.MutableRefObject<boolean>) => {
+          void startOAuth();
+          pendingOAuthStartRef.current = false;
         },
         startOAuth,
         pendingOAuthStartRef,
-      )
+      );
     }
-  }, [oauthStatus.state, startOAuth])
+  }, [oauthStatus.state, startOAuth]);
 
   // Auto-exit for setup-token mode
   useEffect(() => {
@@ -303,33 +287,31 @@ export function ConsoleOAuthFlow({
       // Delay to ensure static content is fully rendered before exiting
       const timer = setTimeout(
         (loginWithClaudeAi, onDone) => {
-          logEvent('tengu_oauth_success', { loginWithClaudeAi })
+          logEvent('tengu_oauth_success', { loginWithClaudeAi });
           // Don't clear terminal so the token remains visible
-          onDone()
+          onDone();
         },
         500,
         loginWithClaudeAi,
         onDone,
-      )
-      return () => clearTimeout(timer)
+      );
+      return () => clearTimeout(timer);
     }
-  }, [mode, oauthStatus, loginWithClaudeAi, onDone])
+  }, [mode, oauthStatus, loginWithClaudeAi, onDone]);
 
   // Cleanup OAuth service when component unmounts
   useEffect(() => {
     return () => {
-      oauthService.cleanup()
-    }
-  }, [oauthService])
+      oauthService.cleanup();
+    };
+  }, [oauthService]);
 
   return (
     <Box flexDirection="column" gap={1}>
       {oauthStatus.state === 'waiting_for_login' && showPastePrompt && (
         <Box flexDirection="column" key="urlToCopy" gap={1} paddingBottom={1}>
           <Box paddingX={1}>
-            <Text dimColor>
-              Browser didn&apos;t open? Use the url below to sign in{' '}
-            </Text>
+            <Text dimColor>Browser didn&apos;t open? Use the url below to sign in </Text>
             {urlCopied ? (
               <Text color="success">(Copied!)</Text>
             ) : (
@@ -343,27 +325,17 @@ export function ConsoleOAuthFlow({
           </Link>
         </Box>
       )}
-      {mode === 'setup-token' &&
-        oauthStatus.state === 'success' &&
-        oauthStatus.token && (
-          <Box key="tokenOutput" flexDirection="column" gap={1} paddingTop={1}>
-            <Text color="success">
-              ✓ Long-lived authentication token created successfully!
-            </Text>
-            <Box flexDirection="column" gap={1}>
-              <Text>Your OAuth token (valid for 1 year):</Text>
-              <Text color="warning">{oauthStatus.token}</Text>
-              <Text dimColor>
-                Store this token securely. You won&apos;t be able to see it
-                again.
-              </Text>
-              <Text dimColor>
-                Use this token by setting: export
-                CLAUDE_CODE_OAUTH_TOKEN=&lt;token&gt;
-              </Text>
-            </Box>
+      {mode === 'setup-token' && oauthStatus.state === 'success' && oauthStatus.token && (
+        <Box key="tokenOutput" flexDirection="column" gap={1} paddingTop={1}>
+          <Text color="success">✓ Long-lived authentication token created successfully!</Text>
+          <Box flexDirection="column" gap={1}>
+            <Text>Your OAuth token (valid for 1 year):</Text>
+            <Text color="warning">{oauthStatus.token}</Text>
+            <Text dimColor>Store this token securely. You won&apos;t be able to see it again.</Text>
+            <Text dimColor>Use this token by setting: export CLAUDE_CODE_OAUTH_TOKEN=&lt;token&gt;</Text>
           </Box>
-        )}
+        </Box>
+      )}
       <Box paddingLeft={1} flexDirection="column" gap={1}>
         <OAuthStatusMessage
           oauthStatus={oauthStatus}
@@ -382,24 +354,24 @@ export function ConsoleOAuthFlow({
         />
       </Box>
     </Box>
-  )
+  );
 }
 
 type OAuthStatusMessageProps = {
-  oauthStatus: OAuthStatus
-  mode: 'login' | 'setup-token'
-  startingMessage: string | undefined
-  forcedMethodMessage: string | null
-  showPastePrompt: boolean
-  pastedCode: string
-  setPastedCode: (value: string) => void
-  cursorOffset: number
-  setCursorOffset: (offset: number) => void
-  textInputColumns: number
-  handleSubmitCode: (value: string, url: string) => void
-  setOAuthStatus: (status: OAuthStatus) => void
-  setLoginWithClaudeAi: (value: boolean) => void
-}
+  oauthStatus: OAuthStatus;
+  mode: 'login' | 'setup-token';
+  startingMessage: string | undefined;
+  forcedMethodMessage: string | null;
+  showPastePrompt: boolean;
+  pastedCode: string;
+  setPastedCode: (value: string) => void;
+  cursorOffset: number;
+  setCursorOffset: (offset: number) => void;
+  textInputColumns: number;
+  handleSubmitCode: (value: string, url: string) => void;
+  setOAuthStatus: (status: OAuthStatus) => void;
+  setLoginWithClaudeAi: (value: boolean) => void;
+};
 
 function OAuthStatusMessage({
   oauthStatus,
@@ -434,16 +406,14 @@ function OAuthStatusMessage({
                 {
                   label: (
                     <Text>
-                      Claude account with subscription ·{' '}
-                      <Text dimColor>Pro, Max, Team, or Enterprise</Text>
-                      {"external" === 'ant' && (
+                      Claude account with subscription · <Text dimColor>Pro, Max, Team, or Enterprise</Text>
+                      {'external' === 'ant' && (
                         <Text>
                           {'\n'}
                           <Text color="warning">[ANT-ONLY]</Text>{' '}
                           <Text dimColor>
-                            Please use this option unless you need to login to a
-                            special org for accessing sensitive data (e.g.
-                            customer data, HIPI data) with the Console option
+                            Please use this option unless you need to login to a special org for accessing sensitive
+                            data (e.g. customer data, HIPI data) with the Console option
                           </Text>
                         </Text>
                       )}
@@ -455,8 +425,7 @@ function OAuthStatusMessage({
                 {
                   label: (
                     <Text>
-                      Anthropic Console account ·{' '}
-                      <Text dimColor>API usage billing</Text>
+                      Anthropic Console account · <Text dimColor>API usage billing</Text>
                       {'\n'}
                     </Text>
                   ),
@@ -465,10 +434,7 @@ function OAuthStatusMessage({
                 {
                   label: (
                     <Text>
-                      3rd-party platform ·{' '}
-                      <Text dimColor>
-                        Amazon Bedrock, Microsoft Foundry, or Vertex AI
-                      </Text>
+                      3rd-party platform · <Text dimColor>Amazon Bedrock, Microsoft Foundry, or Vertex AI</Text>
                       {'\n'}
                     </Text>
                   ),
@@ -477,23 +443,23 @@ function OAuthStatusMessage({
               ]}
               onChange={value => {
                 if (value === 'platform') {
-                  logEvent('tengu_oauth_platform_selected', {})
-                  setOAuthStatus({ state: 'platform_setup' })
+                  logEvent('tengu_oauth_platform_selected', {});
+                  setOAuthStatus({ state: 'platform_setup' });
                 } else {
-                  setOAuthStatus({ state: 'ready_to_start' })
+                  setOAuthStatus({ state: 'ready_to_start' });
                   if (value === 'claudeai') {
-                    logEvent('tengu_oauth_claudeai_selected', {})
-                    setLoginWithClaudeAi(true)
+                    logEvent('tengu_oauth_claudeai_selected', {});
+                    setLoginWithClaudeAi(true);
                   } else {
-                    logEvent('tengu_oauth_console_selected', {})
-                    setLoginWithClaudeAi(false)
+                    logEvent('tengu_oauth_console_selected', {});
+                    setLoginWithClaudeAi(false);
                   }
                 }
               }}
             />
           </Box>
         </Box>
-      )
+      );
 
     case 'platform_setup':
       return (
@@ -502,14 +468,12 @@ function OAuthStatusMessage({
 
           <Box flexDirection="column" gap={1}>
             <Text>
-              Claude Code supports Amazon Bedrock, Microsoft Foundry, and Vertex
-              AI. Set the required environment variables, then restart Claude
-              Code.
+              Claude Code supports Amazon Bedrock, Microsoft Foundry, and Vertex AI. Set the required environment
+              variables, then restart Claude Code.
             </Text>
 
             <Text>
-              If you are part of an enterprise organization, contact your
-              administrator for setup instructions.
+              If you are part of an enterprise organization, contact your administrator for setup instructions.
             </Text>
 
             <Box flexDirection="column" marginTop={1}>
@@ -541,7 +505,7 @@ function OAuthStatusMessage({
             </Box>
           </Box>
         </Box>
-      )
+      );
 
     case 'waiting_for_login':
       return (
@@ -565,9 +529,7 @@ function OAuthStatusMessage({
               <TextInput
                 value={pastedCode}
                 onChange={setPastedCode}
-                onSubmit={(value: string) =>
-                  handleSubmitCode(value, oauthStatus.url)
-                }
+                onSubmit={(value: string) => handleSubmitCode(value, oauthStatus.url)}
                 cursorOffset={cursorOffset}
                 onChangeCursorOffset={setCursorOffset}
                 columns={textInputColumns}
@@ -576,7 +538,7 @@ function OAuthStatusMessage({
             </Box>
           )}
         </Box>
-      )
+      );
 
     case 'creating_api_key':
       return (
@@ -586,14 +548,14 @@ function OAuthStatusMessage({
             <Text>Creating API key for Claude Code…</Text>
           </Box>
         </Box>
-      )
+      );
 
     case 'about_to_retry':
       return (
         <Box flexDirection="column" gap={1}>
           <Text color="permission">Retrying…</Text>
         </Box>
-      )
+      );
 
     case 'success':
       return (
@@ -602,8 +564,7 @@ function OAuthStatusMessage({
             <>
               {getOauthAccountInfo()?.emailAddress ? (
                 <Text dimColor>
-                  Logged in as{' '}
-                  <Text>{getOauthAccountInfo()?.emailAddress}</Text>
+                  Logged in as <Text>{getOauthAccountInfo()?.emailAddress}</Text>
                 </Text>
               ) : null}
               <Text color="success">
@@ -612,7 +573,7 @@ function OAuthStatusMessage({
             </>
           )}
         </Box>
-      )
+      );
 
     case 'error':
       return (
@@ -627,9 +588,9 @@ function OAuthStatusMessage({
             </Box>
           )}
         </Box>
-      )
+      );
 
     default:
-      return null
+      return null;
   }
 }

@@ -3,11 +3,11 @@
  * Shown when pressing '?' in agent view.
  */
 
-import * as React from 'react'
-import { Box, Text } from '../../ink.js'
-import { Dialog } from '../design-system/Dialog.js'
+import * as React from 'react';
+import { Box, Text } from '../../ink.js';
+import { Dialog } from '../design-system/Dialog.js';
 
-type ShortcutEntry = { keys: string; action: string }
+type ShortcutEntry = { keys: string; action: string };
 
 const SHORTCUTS: ShortcutEntry[] = [
   { keys: '↑ / ↓', action: 'Move between rows' },
@@ -28,7 +28,7 @@ const SHORTCUTS: ShortcutEntry[] = [
   { keys: '/', action: 'Start dispatch (filter mode)' },
   { keys: 'f', action: 'Toggle filter text' },
   { keys: '?', action: 'Show/hide this help' },
-]
+];
 
 export function AgentViewShortcutsHelp({ onClose }: { onClose: () => void }) {
   return (
@@ -37,7 +37,9 @@ export function AgentViewShortcutsHelp({ onClose }: { onClose: () => void }) {
         {SHORTCUTS.map(({ keys, action }) => (
           <Box key={keys} flexDirection="row" gap={2} height={1}>
             <Box width={20} flexShrink={0}>
-              <Text bold color="suggestion">{keys}</Text>
+              <Text bold color="suggestion">
+                {keys}
+              </Text>
             </Box>
             <Text dimColor>{action}</Text>
           </Box>
@@ -47,5 +49,5 @@ export function AgentViewShortcutsHelp({ onClose }: { onClose: () => void }) {
         </Box>
       </Box>
     </Dialog>
-  )
+  );
 }

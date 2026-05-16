@@ -1,26 +1,23 @@
-import React, { useCallback, useState } from 'react'
-import { logEvent } from '../services/analytics/index.js'
-import { useTerminalSize } from '../hooks/useTerminalSize.js'
-import { useTerminalNotification } from '../ink/useTerminalNotification.js'
-import { Box, Link, Text } from '../ink.js'
-import { useKeybinding } from '../keybindings/useKeybinding.js'
-import { sendNotification } from '../services/notifier.js'
-import { OpenAIOAuthService, type OpenAIOAuthTokens } from '../services/openaiOAuth/index.js'
-import { saveGlobalConfig } from '../utils/config.js'
-import { logEvent } from '../services/analytics/index.js'
-import { sendNotification } from '../services/notifier.js'
-import { saveGlobalConfig } from '../utils/config.js'
-import { Select } from './CustomSelect/select.js'
-import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js'
-import { Spinner } from './Spinner.js'
-import TextInput from './TextInput.js'
+import React, { useCallback, useState } from 'react';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { useTerminalNotification } from '../ink/useTerminalNotification.js';
+import { Box, Link, Text } from '../ink.js';
+import { useKeybinding } from '../keybindings/useKeybinding.js';
+import { logEvent, logEvent } from '../services/analytics/index.js';
+import { sendNotification, sendNotification } from '../services/notifier.js';
+import { OpenAIOAuthService, type OpenAIOAuthTokens } from '../services/openaiOAuth/index.js';
+import { saveGlobalConfig, saveGlobalConfig } from '../utils/config.js';
+import { Select } from './CustomSelect/select.js';
+import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js';
+import { Spinner } from './Spinner.js';
+import TextInput from './TextInput.js';
 
 type Props = {
-  onDone(tokens: OpenAIOAuthTokens | null): void
-  onCancel?(): void
-}
+  onDone(tokens: OpenAIOAuthTokens | null): void;
+  onCancel?(): void;
+};
 
-type LoginMethod = 'browser' | 'headless' | 'manual'
+type LoginMethod = 'browser' | 'headless' | 'manual';
 
 type OAuthStatus =
   | { state: 'select_method' }
@@ -28,9 +25,9 @@ type OAuthStatus =
   | { state: 'enter_session_token' }
   | { state: 'exchanging_token' }
   | { state: 'success'; tokens: OpenAIOAuthTokens }
-  | { state: 'error'; message: string }
+  | { state: 'error'; message: string };
 
-const PASTE_HERE_MSG = 'Paste session token here > '
+const PASTE_HERE_MSG = 'Paste session token here > ';
 
 // Sub-components to avoid hooks issues with switch statement
 function SelectMethod({ onSelect, onCancel }: { onSelect: (method: LoginMethod) => void; onCancel?: () => void }) {
@@ -56,7 +53,7 @@ function SelectMethod({ onSelect, onCancel }: { onSelect: (method: LoginMethod) 
           },
         ]}
         visibleOptionCount={3}
-        onChange={(value) => onSelect(value as LoginMethod)}
+        onChange={value => onSelect(value as LoginMethod)}
         onCancel={onCancel}
       />
       <Box marginTop={1}>
@@ -65,11 +62,11 @@ function SelectMethod({ onSelect, onCancel }: { onSelect: (method: LoginMethod) 
         <Text dimColor> to cancel</Text>
       </Box>
     </Box>
-  )
+  );
 }
 
 function WaitingForLogin({ url, method }: { url: string; method: LoginMethod }) {
-  const [urlCopied, setUrlCopied] = useState(false)
+  const [urlCopied, setUrlCopied] = useState(false);
 
   return (
     <Box flexDirection="column">
@@ -89,9 +86,7 @@ function WaitingForLogin({ url, method }: { url: string; method: LoginMethod }) 
             <Link url={url}>{url}</Link>
           </Box>
           <Box>
-            <Text dimColor>
-              {urlCopied ? 'URL copied to clipboard!' : 'Press '}
-            </Text>
+            <Text dimColor>{urlCopied ? 'URL copied to clipboard!' : 'Press '}</Text>
             {!urlCopied && <KeyboardShortcutHint shortcut="c" />}
             {!urlCopied && <Text dimColor> to copy URL</Text>}
           </Box>
@@ -101,14 +96,14 @@ function WaitingForLogin({ url, method }: { url: string; method: LoginMethod }) 
         <Spinner label="Waiting for authorization" />
       </Box>
     </Box>
-  )
+  );
 }
 
 function EnterSessionToken({ onSubmit, onCancel }: { onSubmit: (token: string) => void; onCancel?: () => void }) {
-  const [sessionToken, setSessionToken] = useState('')
-  const [cursorOffset, setCursorOffset] = useState(0)
-  const terminalSize = useTerminalSize()
-  const textInputColumns = terminalSize.columns - PASTE_HERE_MSG.length - 1
+  const [sessionToken, setSessionToken] = useState('');
+  const [cursorOffset, setCursorOffset] = useState(0);
+  const terminalSize = useTerminalSize();
+  const textInputColumns = terminalSize.columns - PASTE_HERE_MSG.length - 1;
 
   return (
     <Box flexDirection="column">
@@ -118,9 +113,9 @@ function EnterSessionToken({ onSubmit, onCancel }: { onSubmit: (token: string) =
       </Text>
       <TextInput
         value={sessionToken}
-        onChange={(value) => {
-          setSessionToken(value)
-          setCursorOffset(value.length)
+        onChange={value => {
+          setSessionToken(value);
+          setCursorOffset(value.length);
         }}
         onSubmit={onSubmit}
         onExit={onCancel}
@@ -140,7 +135,7 @@ function EnterSessionToken({ onSubmit, onCancel }: { onSubmit: (token: string) =
         <Text dimColor> to cancel</Text>
       </Box>
     </Box>
-  )
+  );
 }
 
 function ExchangingToken() {
@@ -148,7 +143,7 @@ function ExchangingToken() {
     <Box>
       <Spinner label="Authenticating with OpenAI..." />
     </Box>
-  )
+  );
 }
 
 function SuccessState() {
@@ -161,7 +156,7 @@ function SuccessState() {
         <Text dimColor> to continue</Text>
       </Box>
     </Box>
-  )
+  );
 }
 
 function ErrorState({ message }: { message: string }) {
@@ -176,157 +171,157 @@ function ErrorState({ message }: { message: string }) {
         <Text dimColor> to cancel</Text>
       </Box>
     </Box>
-  )
+  );
 }
 
 export function OpenAIOAuthFlow({ onDone, onCancel }: Props): React.ReactNode {
-  const terminal = useTerminalNotification()
-  const [oauthStatus, setOAuthStatus] = useState<OAuthStatus>({ state: 'select_method' })
-  const [oauthService] = useState(() => new OpenAIOAuthService())
+  const terminal = useTerminalNotification();
+  const [oauthStatus, setOAuthStatus] = useState<OAuthStatus>({ state: 'select_method' });
+  const [oauthService] = useState(() => new OpenAIOAuthService());
 
   const handleSuccess = useCallback(
     (tokens: OpenAIOAuthTokens) => {
-      saveGlobalConfig((current) => ({
+      saveGlobalConfig(current => ({
         ...current,
         openaiOAuthTokens: tokens,
-      }))
+      }));
 
       if (tokens.accessToken) {
-        process.env.CHATGPT_SESSION_TOKEN = tokens.accessToken
+        process.env.CHATGPT_SESSION_TOKEN = tokens.accessToken;
       }
 
-      logEvent('openai_oauth_success', {})
-      sendNotification('OpenAI Login Successful', 'ChatGPT Pro/Plus session authenticated')
-      onDone(tokens)
+      logEvent('openai_oauth_success', {});
+      sendNotification('OpenAI Login Successful', 'ChatGPT Pro/Plus session authenticated');
+      onDone(tokens);
     },
     [onDone],
-  )
+  );
 
   // Try to load existing Codex auth on mount
   React.useEffect(() => {
-    const codexAuth = OpenAIOAuthService.tryLoadFromCodex()
+    const codexAuth = OpenAIOAuthService.tryLoadFromCodex();
     if (codexAuth?.accessToken) {
-      handleSuccess(codexAuth)
+      handleSuccess(codexAuth);
     }
-  }, [handleSuccess])
+  }, [handleSuccess]);
 
   const handleManualTokenSubmit = useCallback(
     async (token: string) => {
-      const trimmed = token.trim()
+      const trimmed = token.trim();
       if (!trimmed) {
-        setOAuthStatus({ state: 'error', message: 'Session token is required' })
-        return
+        setOAuthStatus({ state: 'error', message: 'Session token is required' });
+        return;
       }
 
-      setOAuthStatus({ state: 'exchanging_token' })
+      setOAuthStatus({ state: 'exchanging_token' });
 
       try {
         const tokens: OpenAIOAuthTokens = {
           accessToken: trimmed,
-        }
-        handleSuccess(tokens)
+        };
+        handleSuccess(tokens);
       } catch (error) {
         setOAuthStatus({
           state: 'error',
           message: `Failed to authenticate: ${(error as Error).message}`,
-        })
+        });
       }
     },
     [handleSuccess],
-  )
+  );
 
-const startOAuthFlow = useCallback(
+  const startOAuthFlow = useCallback(
     async (method: LoginMethod) => {
       if (method === 'manual') {
-        setOAuthStatus({ state: 'enter_session_token' })
-        return
+        setOAuthStatus({ state: 'enter_session_token' });
+        return;
       }
 
       // Try to use Codex CLI auth
       if (method === 'codex') {
-        const codexAuth = OpenAIOAuthService.tryLoadFromCodex()
+        const codexAuth = OpenAIOAuthService.tryLoadFromCodex();
         if (codexAuth?.accessToken) {
-          handleSuccess(codexAuth)
-          return
+          handleSuccess(codexAuth);
+          return;
         }
-        
-        setOAuthStatus({ 
-          state: 'waiting_for_login', 
-          url: 'Run: codex login', 
-          method: 'headless' 
-        })
-        
+
+        setOAuthStatus({
+          state: 'waiting_for_login',
+          url: 'Run: codex login',
+          method: 'headless',
+        });
+
         setOAuthStatus({
           state: 'error',
           message: 'No Codex auth found. Run "npx codex login" or "codex login" first, then come back.',
-        })
-        return
+        });
+        return;
       }
 
       try {
         // Show waiting state immediately
-        setOAuthStatus({ 
-          state: 'waiting_for_login', 
-          url: 'https://chat.openai.com/', 
-          method 
-        })
+        setOAuthStatus({
+          state: 'waiting_for_login',
+          url: 'https://chat.openai.com/',
+          method,
+        });
 
         const tokens = await oauthService.startOAuthFlow(
-          async (url) => {
-            setOAuthStatus({ state: 'waiting_for_login', url, method })
+          async url => {
+            setOAuthStatus({ state: 'waiting_for_login', url, method });
           },
           { skipBrowserOpen: method === 'headless' },
-        )
-        handleSuccess(tokens)
+        );
+        handleSuccess(tokens);
       } catch (error) {
-        console.error('OAuth error:', error)
+        console.error('OAuth error:', error);
         setOAuthStatus({
           state: 'error',
           message: `OAuth failed: ${(error as Error).message}. Try selecting 'Manually enter Session Token' instead.`,
-        })
+        });
       } finally {
-        oauthService.cleanup()
+        oauthService.cleanup();
       }
     },
     [handleSuccess, oauthService],
-  )
+  );
 
   useKeybinding(
     'confirm:no',
     () => {
-      oauthService.cleanup()
-      onCancel?.()
+      oauthService.cleanup();
+      onCancel?.();
     },
     {
       context: 'Confirmation',
       isActive: oauthStatus.state !== 'exchanging_token',
     },
-  )
+  );
 
   // Render based on state using separate components to avoid hooks issues
   if (oauthStatus.state === 'select_method') {
-    return <SelectMethod onSelect={startOAuthFlow} onCancel={onCancel} />
+    return <SelectMethod onSelect={startOAuthFlow} onCancel={onCancel} />;
   }
 
   if (oauthStatus.state === 'waiting_for_login') {
-    return <WaitingForLogin url={oauthStatus.url} method={oauthStatus.method} />
+    return <WaitingForLogin url={oauthStatus.url} method={oauthStatus.method} />;
   }
 
   if (oauthStatus.state === 'enter_session_token') {
-    return <EnterSessionToken onSubmit={handleManualTokenSubmit} onCancel={onCancel} />
+    return <EnterSessionToken onSubmit={handleManualTokenSubmit} onCancel={onCancel} />;
   }
 
   if (oauthStatus.state === 'exchanging_token') {
-    return <ExchangingToken />
+    return <ExchangingToken />;
   }
 
   if (oauthStatus.state === 'success') {
-    return <SuccessState />
+    return <SuccessState />;
   }
 
   if (oauthStatus.state === 'error') {
-    return <ErrorState message={oauthStatus.message} />
+    return <ErrorState message={oauthStatus.message} />;
   }
 
-  return null
+  return null;
 }

@@ -1,4 +1,4 @@
-import type { Command } from '../../commands.js'
+import type { Command } from '../../commands.js';
 
 const explorer: Command = {
   type: 'local',
@@ -6,6 +6,6 @@ const explorer: Command = {
   description: 'Toggle file explorer sidebar',
   supportsNonInteractive: true,
   load: () => import('./explorer.js'),
-}
+};
 
-export default explorer
+export default explorer;

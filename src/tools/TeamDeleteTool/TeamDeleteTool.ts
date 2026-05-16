@@ -1,33 +1,33 @@
-import { z } from 'zod/v4'
-import { logEvent } from '../../services/analytics/index.js'
-import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../../services/analytics/metadata.js'
-import type { Tool } from '../../Tool.js'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import { isAgentSwarmsEnabled } from '../../utils/agentSwarmsEnabled.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import { jsonStringify } from '../../utils/slowOperations.js'
-import { TEAM_LEAD_NAME } from '../../utils/swarm/constants.js'
+import { z } from 'zod/v4';
+import { logEvent } from '../../services/analytics/index.js';
+import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../../services/analytics/metadata.js';
+import type { Tool } from '../../Tool.js';
+import { buildTool, type ToolDef } from '../../Tool.js';
+import { isAgentSwarmsEnabled } from '../../utils/agentSwarmsEnabled.js';
+import { lazySchema } from '../../utils/lazySchema.js';
+import { jsonStringify } from '../../utils/slowOperations.js';
+import { TEAM_LEAD_NAME } from '../../utils/swarm/constants.js';
 import {
   cleanupTeamDirectories,
   readTeamFile,
   unregisterTeamForSessionCleanup,
-} from '../../utils/swarm/teamHelpers.js'
-import { clearTeammateColors } from '../../utils/swarm/teammateLayoutManager.js'
-import { clearLeaderTeamName } from '../../utils/tasks.js'
-import { TEAM_DELETE_TOOL_NAME } from './constants.js'
-import { getPrompt } from './prompt.js'
-import { renderToolResultMessage, renderToolUseMessage } from './UI.js'
+} from '../../utils/swarm/teamHelpers.js';
+import { clearTeammateColors } from '../../utils/swarm/teammateLayoutManager.js';
+import { clearLeaderTeamName } from '../../utils/tasks.js';
+import { TEAM_DELETE_TOOL_NAME } from './constants.js';
+import { getPrompt } from './prompt.js';
+import { renderToolResultMessage, renderToolUseMessage } from './UI.js';
 
-const inputSchema = lazySchema(() => z.strictObject({}))
-type InputSchema = ReturnType<typeof inputSchema>
+const inputSchema = lazySchema(() => z.strictObject({}));
+type InputSchema = ReturnType<typeof inputSchema>;
 
 export type Output = {
-  success: boolean
-  message: string
-  team_name?: string
-}
+  success: boolean;
+  message: string;
+  team_name?: string;
+};
 
-export type Input = z.infer<InputSchema>
+export type Input = z.infer<InputSchema>;
 
 export const TeamDeleteTool: Tool<InputSchema, Output> = buildTool({
   name: TEAM_DELETE_TOOL_NAME,
@@ -36,23 +36,23 @@ export const TeamDeleteTool: Tool<InputSchema, Output> = buildTool({
   shouldDefer: true,
 
   userFacingName() {
-    return ''
+    return '';
   },
 
   get inputSchema(): InputSchema {
-    return inputSchema()
+    return inputSchema();
   },
 
   isEnabled() {
-    return isAgentSwarmsEnabled()
+    return isAgentSwarmsEnabled();
   },
 
   async description() {
-    return 'Clean up team and task directories when the swarm is complete'
+    return 'Clean up team and task directories when the swarm is complete';
   },
 
   async prompt() {
-    return getPrompt()
+    return getPrompt();
   },
 
   mapToolResultToToolResultBlockParam(data, toolUseID) {
@@ -65,57 +65,54 @@ export const TeamDeleteTool: Tool<InputSchema, Output> = buildTool({
           text: jsonStringify(data),
         },
       ],
-    }
+    };
   },
 
   async call(_input, context) {
-    const { setAppState, getAppState } = context
-    const appState = getAppState()
-    const teamName = appState.teamContext?.teamName
+    const { setAppState, getAppState } = context;
+    const appState = getAppState();
+    const teamName = appState.teamContext?.teamName;
 
     if (teamName) {
       // Read team config to check for active members
-      const teamFile = readTeamFile(teamName)
+      const teamFile = readTeamFile(teamName);
       if (teamFile) {
         // Filter out the team lead - only count non-lead members
-        const nonLeadMembers = teamFile.members.filter(
-          m => m.name !== TEAM_LEAD_NAME,
-        )
+        const nonLeadMembers = teamFile.members.filter(m => m.name !== TEAM_LEAD_NAME);
 
         // Separate truly active members from idle/dead ones
         // Members with isActive === false are idle (finished their turn or crashed)
-        const activeMembers = nonLeadMembers.filter(m => m.isActive !== false)
+        const activeMembers = nonLeadMembers.filter(m => m.isActive !== false);
 
         if (activeMembers.length > 0) {
-          const memberNames = activeMembers.map(m => m.name).join(', ')
+          const memberNames = activeMembers.map(m => m.name).join(', ');
           return {
             data: {
               success: false,
               message: `Cannot cleanup team with ${activeMembers.length} active member(s): ${memberNames}. Use requestShutdown to gracefully terminate teammates first.`,
               team_name: teamName,
             },
-          }
+          };
         }
       }
 
-      await cleanupTeamDirectories(teamName)
+      await cleanupTeamDirectories(teamName);
       // Already cleaned — don't try again on gracefulShutdown.
-      unregisterTeamForSessionCleanup(teamName)
+      unregisterTeamForSessionCleanup(teamName);
 
       // Clear color assignments so new teams start fresh
-      clearTeammateColors()
+      clearTeammateColors();
 
       // Clear leader team name so getTaskListId() falls back to session ID
-      clearLeaderTeamName()
+      clearLeaderTeamName();
 
       logEvent('tengu_team_deleted', {
-        team_name:
-          teamName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      })
+        team_name: teamName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      });
     }
 
     // Clear coordinator mode since the team is dissolved
-    delete process.env.CLAUDE_CODE_COORDINATOR_MODE
+    delete process.env.CLAUDE_CODE_COORDINATOR_MODE;
 
     // Clear team context and inbox from app state
     setAppState(prev => ({
@@ -124,7 +121,7 @@ export const TeamDeleteTool: Tool<InputSchema, Output> = buildTool({
       inbox: {
         messages: [], // Clear any queued messages
       },
-    }))
+    }));
 
     return {
       data: {
@@ -134,9 +131,9 @@ export const TeamDeleteTool: Tool<InputSchema, Output> = buildTool({
           : 'No team name found, nothing to clean up',
         team_name: teamName,
       },
-    }
+    };
   },
 
   renderToolUseMessage,
   renderToolResultMessage,
-} satisfies ToolDef<InputSchema, Output>)
+} satisfies ToolDef<InputSchema, Output>);

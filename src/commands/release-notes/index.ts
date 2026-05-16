@@ -1,10 +1,10 @@
-import type { Command } from '../../commands.js'
+import type { Command } from '../../commands.js';
 
 const releaseNotes: Command = {
   description: 'View release notes',
   name: 'release-notes',
   type: 'local-jsx',
   load: () => import('./release-notes-picker.js'),
-}
+};
 
-export default releaseNotes
+export default releaseNotes;

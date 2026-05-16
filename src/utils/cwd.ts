@@ -1,7 +1,7 @@
-import { AsyncLocalStorage } from 'async_hooks'
-import { getCwdState, getOriginalCwd, getProjectRoot as getProjectRootBase } from '../bootstrap/state.js'
+import { AsyncLocalStorage } from 'async_hooks';
+import { getCwdState, getOriginalCwd, getProjectRoot as getProjectRootBase } from '../bootstrap/state.js';
 
-const cwdOverrideStorage = new AsyncLocalStorage<string>()
+const cwdOverrideStorage = new AsyncLocalStorage<string>();
 
 /**
  * Run a function with an overridden working directory for the current async context.
@@ -10,14 +10,14 @@ const cwdOverrideStorage = new AsyncLocalStorage<string>()
  * agents to each see their own working directory without affecting each other.
  */
 export function runWithCwdOverride<T>(cwd: string, fn: () => T): T {
-  return cwdOverrideStorage.run(cwd, fn)
+  return cwdOverrideStorage.run(cwd, fn);
 }
 
 /**
  * Get the current working directory (respects runWithCwdOverride).
  */
 export function pwd(): string {
-  return cwdOverrideStorage.getStore() ?? getCwdState()
+  return cwdOverrideStorage.getStore() ?? getCwdState();
 }
 
 /**
@@ -26,7 +26,7 @@ export function pwd(): string {
  * stable project root.
  */
 export function getProjectRoot(): string {
-  return cwdOverrideStorage.getStore() ?? getProjectRootBase()
+  return cwdOverrideStorage.getStore() ?? getProjectRootBase();
 }
 
 /**
@@ -35,8 +35,8 @@ export function getProjectRoot(): string {
  */
 export function getCwd(): string {
   try {
-    return pwd()
+    return pwd();
   } catch {
-    return getOriginalCwd()
+    return getOriginalCwd();
   }
 }

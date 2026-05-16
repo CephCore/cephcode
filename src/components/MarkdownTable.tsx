@@ -1,5 +1,5 @@
 import type { Token, Tokens } from 'marked';
-import React from 'react';
+import type React from 'react';
 import stripAnsi from 'strip-ansi';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { stringWidth } from '../ink/stringWidth.js';
@@ -43,9 +43,13 @@ type Props = {
  * @param hard - If true, break words that exceed width (needed when columns
  *               are narrower than the longest word). Default false.
  */
-function wrapText(text: string, width: number, options?: {
-  hard?: boolean;
-}): string[] {
+function wrapText(
+  text: string,
+  width: number,
+  options?: {
+    hard?: boolean;
+  },
+): string[] {
   if (width <= 0) return [text];
   // Strip trailing whitespace/newlines before wrapping.
   // formatToken() adds EOL to paragraphs and other token types,
@@ -54,7 +58,7 @@ function wrapText(text: string, width: number, options?: {
   const wrapped = wrapAnsi(trimmedText, width, {
     hard: options?.hard ?? false,
     trim: false,
-    wordWrap: true
+    wordWrap: true,
   });
   // Filter out empty lines that result from trailing newlines or
   // multiple consecutive newlines in the source content.
@@ -71,15 +75,9 @@ function wrapText(text: string, width: number, options?: {
  * 3. Wrapping text within cells (no truncation)
  * 4. Properly aligning multi-line rows with borders
  */
-export function MarkdownTable({
-  token,
-  highlight,
-  forceWidth
-}: Props): React.ReactNode {
+export function MarkdownTable({ token, highlight, forceWidth }: Props): React.ReactNode {
   const [theme] = useTheme();
-  const {
-    columns: actualTerminalWidth
-  } = useTerminalSize();
+  const { columns: actualTerminalWidth } = useTerminalSize();
   const terminalWidth = forceWidth ?? actualTerminalWidth;
 
   // Format cell content to ANSI string
@@ -146,7 +144,7 @@ export function MarkdownTable({
     const totalOverflow = overflows.reduce((sum_1, o) => sum_1 + o, 0);
     columnWidths = minWidths.map((min, i_0) => {
       if (totalOverflow === 0) return min;
-      const extra = Math.floor(overflows[i_0]! / totalOverflow * extraSpace);
+      const extra = Math.floor((overflows[i_0]! / totalOverflow) * extraSpace);
       return min + extra;
     });
   } else {
@@ -164,7 +162,7 @@ export function MarkdownTable({
     for (let i_1 = 0; i_1 < token.header.length; i_1++) {
       const content = formatCell(token.header[i_1]!.tokens);
       const wrapped = wrapText(content, columnWidths[i_1]!, {
-        hard: needsHardWrap
+        hard: needsHardWrap,
       });
       maxLines = Math.max(maxLines, wrapped.length);
     }
@@ -173,7 +171,7 @@ export function MarkdownTable({
       for (let i_2 = 0; i_2 < row_1.length; i_2++) {
         const content_0 = formatCell(row_1[i_2]?.tokens);
         const wrapped_0 = wrapText(content_0, columnWidths[i_2]!, {
-          hard: needsHardWrap
+          hard: needsHardWrap,
         });
         maxLines = Math.max(maxLines, wrapped_0.length);
       }
@@ -187,15 +185,18 @@ export function MarkdownTable({
 
   // Render a single row with potential multi-line cells
   // Returns an array of strings, one per line of the row
-  function renderRowLines(cells: Array<{
-    tokens?: Token[];
-  }>, isHeader: boolean): string[] {
+  function renderRowLines(
+    cells: Array<{
+      tokens?: Token[];
+    }>,
+    isHeader: boolean,
+  ): string[] {
     // Get wrapped lines for each cell (preserving ANSI formatting)
     const cellLines = cells.map((cell, colIndex_1) => {
       const formattedText = formatCell(cell.tokens);
       const width = columnWidths[colIndex_1]!;
       return wrapText(formattedText, width, {
-        hard: needsHardWrap
+        hard: needsHardWrap,
       });
     });
 
@@ -216,7 +217,7 @@ export function MarkdownTable({
         const lineText = contentLineIdx >= 0 && contentLineIdx < lines_1.length ? lines_1[contentLineIdx]! : '';
         const width_0 = columnWidths[colIndex_2]!;
         // Headers always centered; data uses table alignment
-        const align = isHeader ? 'center' : token.align?.[colIndex_2] ?? 'left';
+        const align = isHeader ? 'center' : (token.align?.[colIndex_2] ?? 'left');
         line += ' ' + padAligned(lineText, stringWidth(lineText), width_0, align) + ' │';
       }
       result.push(line);
@@ -229,7 +230,7 @@ export function MarkdownTable({
     const [left, mid, cross, right] = {
       top: ['┌', '─', '┬', '┐'],
       middle: ['├', '─', '┼', '┤'],
-      bottom: ['└', '─', '┴', '┘']
+      bottom: ['└', '─', '┴', '┘'],
     }[type] as [string, string, string, string];
     let line_0 = left;
     columnWidths.forEach((width_1, colIndex_3) => {
@@ -270,7 +271,10 @@ export function MarkdownTable({
           wrappedValue = firstPassLines;
         } else {
           // Re-join remaining text and re-wrap to the wider continuation width
-          const remainingText = firstPassLines.slice(1).map(l => l.trim()).join(' ');
+          const remainingText = firstPassLines
+            .slice(1)
+            .map(l => l.trim())
+            .join(' ');
           const rewrapped = wrapText(remainingText, subsequentLineWidth);
           wrappedValue = [firstLine, ...rewrapped];
         }

@@ -12,15 +12,15 @@
  * Built from scratch by Dek1MillionToken. No @ant/* dependencies.
  */
 
-import type { DisplayConfig } from './types.js'
+import type { DisplayConfig } from './types.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
 /** Maximum pixels on the longest edge (API constraint) */
-const MAX_LONG_EDGE = 1568
+const MAX_LONG_EDGE = 1568;
 
 /** Maximum total pixels (~1.15 megapixels) */
-const MAX_TOTAL_PIXELS = 1_150_000
+const MAX_TOTAL_PIXELS = 1_150_000;
 
 // ── Scale Factor ─────────────────────────────────────────────────────────────
 
@@ -36,13 +36,13 @@ const MAX_TOTAL_PIXELS = 1_150_000
  * ```
  */
 export function getScaleFactor(width: number, height: number): number {
-  const longEdge = Math.max(width, height)
-  const totalPixels = width * height
+  const longEdge = Math.max(width, height);
+  const totalPixels = width * height;
 
-  const longEdgeScale = MAX_LONG_EDGE / longEdge
-  const totalPixelsScale = Math.sqrt(MAX_TOTAL_PIXELS / totalPixels)
+  const longEdgeScale = MAX_LONG_EDGE / longEdge;
+  const totalPixelsScale = Math.sqrt(MAX_TOTAL_PIXELS / totalPixels);
 
-  return Math.min(1.0, longEdgeScale, totalPixelsScale)
+  return Math.min(1.0, longEdgeScale, totalPixelsScale);
 }
 
 /**
@@ -53,12 +53,12 @@ export function getScaledDimensions(
   screenWidth: number,
   screenHeight: number,
 ): { width: number; height: number; scaleFactor: number } {
-  const scaleFactor = getScaleFactor(screenWidth, screenHeight)
+  const scaleFactor = getScaleFactor(screenWidth, screenHeight);
   return {
     width: Math.round(screenWidth * scaleFactor),
     height: Math.round(screenHeight * scaleFactor),
     scaleFactor,
-  }
+  };
 }
 
 // ── Coordinate Transformation ────────────────────────────────────────────────
@@ -71,30 +71,22 @@ export function getScaledDimensions(
  * Example: Screen is 1920x1080, scaled to 1024x576 (scale=0.533)
  *   Claude clicks at (512, 288) → actual screen position (960, 540)
  */
-export function scaleToScreen(
-  x: number,
-  y: number,
-  scaleFactor: number,
-): { x: number; y: number } {
+export function scaleToScreen(x: number, y: number, scaleFactor: number): { x: number; y: number } {
   return {
     x: Math.round(x / scaleFactor),
     y: Math.round(y / scaleFactor),
-  }
+  };
 }
 
 /**
  * Scale coordinates from screen space to API space.
  * Used when we need to report positions back to Claude.
  */
-export function scaleToApi(
-  x: number,
-  y: number,
-  scaleFactor: number,
-): { x: number; y: number } {
+export function scaleToApi(x: number, y: number, scaleFactor: number): { x: number; y: number } {
   return {
     x: Math.round(x * scaleFactor),
     y: Math.round(y * scaleFactor),
-  }
+  };
 }
 
 // ── Display Config Builder ───────────────────────────────────────────────────
@@ -103,19 +95,13 @@ export function scaleToApi(
  * Build a DisplayConfig from raw screen dimensions.
  * This is the main entry point — call once at startup.
  */
-export function buildDisplayConfig(
-  screenWidth: number,
-  screenHeight: number,
-): DisplayConfig {
-  const { width, height, scaleFactor } = getScaledDimensions(
-    screenWidth,
-    screenHeight,
-  )
+export function buildDisplayConfig(screenWidth: number, screenHeight: number): DisplayConfig {
+  const { width, height, scaleFactor } = getScaledDimensions(screenWidth, screenHeight);
   return {
     screenWidth,
     screenHeight,
     scaleFactor,
     apiWidth: width,
     apiHeight: height,
-  }
+  };
 }

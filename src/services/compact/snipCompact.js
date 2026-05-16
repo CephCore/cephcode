@@ -1,1 +1,3 @@
-export function snipCompact() { return '' }
+export function snipCompact() {
+  return '';
+}

@@ -1,16 +1,16 @@
-import { PROVIDER_REGISTRY } from './providerRegistry.js'
-import type { ProviderId } from './providers/ProviderInterface.js'
-import type { ProviderCapabilities } from './providerRegistry.js'
+import type { ProviderCapabilities } from './providerRegistry.js';
+import { PROVIDER_REGISTRY } from './providerRegistry.js';
+import type { ProviderId } from './providers/ProviderInterface.js';
 
 export type ProviderMetadata = {
-  label: string
-  envKey: string
-  baseUrl: string
-  defaultModel?: string
-  defaultModelVerified?: boolean
-  note?: string
-  capabilities: ProviderCapabilities
-}
+  label: string;
+  envKey: string;
+  baseUrl: string;
+  defaultModel?: string;
+  defaultModelVerified?: boolean;
+  note?: string;
+  capabilities: ProviderCapabilities;
+};
 
 export const PROVIDER_METADATA: Record<ProviderId, ProviderMetadata> = Object.fromEntries(
   Object.entries(PROVIDER_REGISTRY).map(([providerId, entry]) => [
@@ -25,4 +25,4 @@ export const PROVIDER_METADATA: Record<ProviderId, ProviderMetadata> = Object.fr
       capabilities: entry.capabilities,
     },
   ]),
-) as Record<ProviderId, ProviderMetadata>
+) as Record<ProviderId, ProviderMetadata>;

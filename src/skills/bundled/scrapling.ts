@@ -1,4 +1,4 @@
-import { registerBundledSkill } from '../bundledSkills.js'
+import { registerBundledSkill } from '../bundledSkills.js';
 
 const SCRAPLING_PROMPT = `# Scrapling Web Scraping Skill
 
@@ -51,36 +51,36 @@ Use CSS selectors or XPath to extract the desired content.
 Present the scraped data in a usable format (JSON, CSV, markdown table, etc.).
 
 **Important**: Always respect robots.txt and the website's terms of service.
-`
+`;
 
 function parseScraplingArgs(args) {
-  const parts = args.trim().split(/\s+/)
+  const parts = args.trim().split(/\s+/);
   const result = {
     url: '',
     mode: 'quick',
     fetchMode: 'get',
     selector: '',
     fetcherClass: 'Fetcher',
-    script: ''
-  }
+    script: '',
+  };
 
   if (parts[0]?.startsWith('http')) {
-    result.url = parts[0]
+    result.url = parts[0];
   }
 
   if (args.includes('--stealth') || args.includes('-s')) {
-    result.mode = 'stealth'
-    result.fetchMode = 'stealth-fetch'
-    result.fetcherClass = 'StealthyFetcher'
+    result.mode = 'stealth';
+    result.fetchMode = 'stealth-fetch';
+    result.fetcherClass = 'StealthyFetcher';
   }
   if (args.includes('--dynamic') || args.includes('-d')) {
-    result.mode = 'dynamic'
-    result.fetchMode = 'fetch'
-    result.fetcherClass = 'DynamicFetcher'
+    result.mode = 'dynamic';
+    result.fetchMode = 'fetch';
+    result.fetcherClass = 'DynamicFetcher';
   }
   if (args.includes('css:')) {
-    const cssMatch = args.match(/css:\s*(\S+)/)
-    if (cssMatch) result.selector = cssMatch[1]
+    const cssMatch = args.match(/css:\s*(\S+)/);
+    if (cssMatch) result.selector = cssMatch[1];
   }
 
   if (result.mode !== 'quick') {
@@ -91,10 +91,10 @@ page = ${result.fetcherClass}.${result.fetchMode === 'get' ? 'get' : 'fetch'}('$
 
 results = page.css('${result.selector || 'body'}')
 for item in results:
-    print(item.text())`
+    print(item.text())`;
   }
 
-  return result
+  return result;
 }
 
 export function registerScraplingSkill() {
@@ -105,22 +105,21 @@ export function registerScraplingSkill() {
     allowedTools: ['Bash', 'Read'],
     argumentHint: '<URL> [options: --stealth, --dynamic, css:<selector>]',
     async getPromptForCommand(args) {
-      const { url, mode, fetchMode, selector, fetcherClass, script } =
-        parseScraplingArgs(args)
+      const { url, mode, fetchMode, selector, fetcherClass, script } = parseScraplingArgs(args);
 
-      const fullArgs = url || args || 'the target URL'
+      const fullArgs = url || args || 'the target URL';
 
-      const prompt = SCRAPLING_PROMPT
-        .replace('{{url}}', fullArgs)
-        .replace('{{mode}}', mode === 'quick'
-          ? 'Using quick extract mode (no code needed)'
-          : `Using ${mode} mode (${fetcherClass})`)
+      const prompt = SCRAPLING_PROMPT.replace('{{url}}', fullArgs)
+        .replace(
+          '{{mode}}',
+          mode === 'quick' ? 'Using quick extract mode (no code needed)' : `Using ${mode} mode (${fetcherClass})`,
+        )
         .replace('{{fetchMode}}', fetchMode)
         .replace('{{selector}}', selector || 'body')
         .replace('{{fetcherClass}}', fetcherClass)
-        .replace('{{script}}', script || '')
+        .replace('{{script}}', script || '');
 
-      return [{ type: 'text', text: prompt }]
+      return [{ type: 'text', text: prompt }];
     },
-  })
+  });
 }

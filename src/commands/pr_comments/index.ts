@@ -1,4 +1,4 @@
-import { createMovedToPluginCommand } from '../createMovedToPluginCommand.js'
+import { createMovedToPluginCommand } from '../createMovedToPluginCommand.js';
 
 export default createMovedToPluginCommand({
   name: 'pr-comments',
@@ -45,6 +45,6 @@ Remember:
 ${args ? 'Additional user input: ' + args : ''}
 `,
       },
-    ]
+    ];
   },
-})
+});

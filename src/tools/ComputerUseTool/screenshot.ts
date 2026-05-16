@@ -7,9 +7,9 @@
  * Built from scratch by Dek1MillionToken. No @ant/* dependencies.
  */
 
-import { execFileNoThrow } from '../../utils/execFileNoThrow.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { getScaledDimensions } from './scaling.js'
+import { logForDebugging } from '../../utils/debug.js';
+import { execFileNoThrow } from '../../utils/execFileNoThrow.js';
+import { getScaledDimensions } from './scaling.js';
 
 // ── Screenshot ───────────────────────────────────────────────────────────────
 
@@ -20,14 +20,14 @@ import { getScaledDimensions } from './scaling.js'
  * @param region - Optional [x1, y1, x2, y2] region to capture. If omitted, captures full screen.
  */
 export async function captureScreenshot(region?: [number, number, number, number]): Promise<{
-  base64: string
-  width: number
-  height: number
-  originalWidth: number
-  originalHeight: number
+  base64: string;
+  width: number;
+  height: number;
+  originalWidth: number;
+  originalHeight: number;
 }> {
-  const isRegion = !!region
-  const [rx1, ry1, rx2, ry2] = region || [0, 0, 0, 0]
+  const isRegion = !!region;
+  const [rx1, ry1, rx2, ry2] = region || [0, 0, 0, 0];
 
   // PowerShell script that captures, resizes, and base64-encodes the screen
   const psScript = `
@@ -88,34 +88,32 @@ Write-Output "{\\"w\\":$tw,\\"h\\":$th,\\"ow\\":$sw,\\"oh\\":$sh}"
 Write-Output "---BASE64START---"
 Write-Output $b64
 Write-Output "---BASE64END---"
-`
+`;
 
   const { stdout, code } = await execFileNoThrow(
     'powershell.exe',
     ['-NoProfile', '-NonInteractive', '-Command', psScript],
     { useCwd: false },
-  )
+  );
 
   if (code !== 0) {
-    throw new Error(`Screenshot capture failed (exit code ${code})`)
+    throw new Error(`Screenshot capture failed (exit code ${code})`);
   }
 
   // Parse output
-  const lines = stdout.split('\n').map((l: string) => l.trim())
-  const metaLine = lines.find((l: string) => l.startsWith('{'))
-  const b64Start = lines.indexOf('---BASE64START---')
-  const b64End = lines.indexOf('---BASE64END---')
+  const lines = stdout.split('\n').map((l: string) => l.trim());
+  const metaLine = lines.find((l: string) => l.startsWith('{'));
+  const b64Start = lines.indexOf('---BASE64START---');
+  const b64End = lines.indexOf('---BASE64END---');
 
   if (!metaLine || b64Start === -1 || b64End === -1) {
-    throw new Error('Failed to parse screenshot output')
+    throw new Error('Failed to parse screenshot output');
   }
 
-  const meta = JSON.parse(metaLine)
-  const base64 = lines.slice(b64Start + 1, b64End).join('')
+  const meta = JSON.parse(metaLine);
+  const base64 = lines.slice(b64Start + 1, b64End).join('');
 
-  logForDebugging(
-    `[ComputerUse] Screenshot captured: ${meta.ow}x${meta.oh} → ${meta.w}x${meta.h}`,
-  )
+  logForDebugging(`[ComputerUse] Screenshot captured: ${meta.ow}x${meta.oh} → ${meta.w}x${meta.h}`);
 
   return {
     base64,
@@ -123,7 +121,7 @@ Write-Output "---BASE64END---"
     height: meta.h,
     originalWidth: meta.ow,
     originalHeight: meta.oh,
-  }
+  };
 }
 
 // ── Display Info ─────────────────────────────────────────────────────────────
@@ -133,33 +131,33 @@ Write-Output "---BASE64END---"
  * Returns raw screen size (before scaling).
  */
 export async function getScreenDimensions(): Promise<{
-  width: number
-  height: number
+  width: number;
+  height: number;
 }> {
   const psScript = `
 Add-Type -AssemblyName System.Windows.Forms
 $s = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
 Write-Output "$($s.Width)x$($s.Height)"
-`
+`;
 
   const { stdout, code } = await execFileNoThrow(
     'powershell.exe',
     ['-NoProfile', '-NonInteractive', '-Command', psScript],
     { useCwd: false },
-  )
+  );
 
   if (code !== 0) {
     // Fallback to common resolution
-    return { width: 1920, height: 1080 }
+    return { width: 1920, height: 1080 };
   }
 
-  const match = stdout.trim().match(/(\d+)x(\d+)/)
+  const match = stdout.trim().match(/(\d+)x(\d+)/);
   if (!match) {
-    return { width: 1920, height: 1080 }
+    return { width: 1920, height: 1080 };
   }
 
   return {
     width: parseInt(match[1]!, 10),
     height: parseInt(match[2]!, 10),
-  }
+  };
 }

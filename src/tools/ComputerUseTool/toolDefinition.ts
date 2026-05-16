@@ -14,20 +14,20 @@
  * Built from scratch by Dek1MillionToken. No @ant/* dependencies.
  */
 
-import type { ProviderId } from '../../services/ai/providers/ProviderInterface.js'
-import type { ComputerUseMode } from './types.js'
+import type { ProviderId } from '../../services/ai/providers/ProviderInterface.js';
+import type { ComputerUseMode } from './types.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface ComputerUseToolConfig {
   /** Which mode we're operating in */
-  mode: ComputerUseMode
+  mode: ComputerUseMode;
   /** Tool name that Claude will use (differs per mode) */
-  toolName: string
+  toolName: string;
   /** Tool definitions to inject into the API call */
-  tools: Record<string, unknown>[]
+  tools: Record<string, unknown>[];
   /** Beta headers to add (Anthropic mode only) */
-  betas: string[]
+  betas: string[];
 }
 
 // ── Tool Definition Builder ──────────────────────────────────────────────────
@@ -46,9 +46,9 @@ export function getComputerUseToolConfig(
   apiHeight: number,
 ): ComputerUseToolConfig {
   if (provider === 'anthropic') {
-    return buildAnthropicConfig(apiWidth, apiHeight)
+    return buildAnthropicConfig(apiWidth, apiHeight);
   }
-  return buildGenericConfig()
+  return buildGenericConfig();
 }
 
 // ── Anthropic Mode ───────────────────────────────────────────────────────────
@@ -60,10 +60,7 @@ export function getComputerUseToolConfig(
  *
  * Ref: https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool
  */
-function buildAnthropicConfig(
-  apiWidth: number,
-  apiHeight: number,
-): ComputerUseToolConfig {
+function buildAnthropicConfig(apiWidth: number, apiHeight: number): ComputerUseToolConfig {
   return {
     mode: 'anthropic',
     toolName: 'computer',
@@ -77,7 +74,7 @@ function buildAnthropicConfig(
       },
     ],
     betas: ['computer-use-2025-11-24'],
-  }
+  };
 }
 
 // ── Generic Mode ─────────────────────────────────────────────────────────────
@@ -146,8 +143,7 @@ function buildGenericConfig(): ComputerUseToolConfig {
                 items: { type: 'number' },
                 minItems: 2,
                 maxItems: 2,
-                description:
-                  'Target [x, y] screen coordinates for click, move, and scroll actions',
+                description: 'Target [x, y] screen coordinates for click, move, and scroll actions',
               },
               text: {
                 type: 'string',
@@ -165,26 +161,22 @@ function buildGenericConfig(): ComputerUseToolConfig {
               },
               scroll_amount: {
                 type: 'number',
-                description:
-                  'Number of scroll clicks, default 3 (for "scroll" action)',
+                description: 'Number of scroll clicks, default 3 (for "scroll" action)',
               },
               start_coordinate: {
                 type: 'array',
                 items: { type: 'number' },
                 minItems: 2,
                 maxItems: 2,
-                description:
-                  'Starting [x, y] coordinates for drag (for "left_click_drag" action)',
+                description: 'Starting [x, y] coordinates for drag (for "left_click_drag" action)',
               },
               duration: {
                 type: 'number',
-                description:
-                  'Duration in seconds for "hold_key" or "wait" actions',
+                description: 'Duration in seconds for "hold_key" or "wait" actions',
               },
               window_query: {
                 type: 'string',
-                description:
-                  'Window title or ID to focus (for "focus_window" action)',
+                description: 'Window title or ID to focus (for "focus_window" action)',
               },
             },
             required: ['action'],
@@ -193,7 +185,7 @@ function buildGenericConfig(): ComputerUseToolConfig {
       },
     ],
     betas: [],
-  }
+  };
 }
 
 // ── Helper ───────────────────────────────────────────────────────────────────
@@ -215,6 +207,6 @@ export function isComputerUseCapable(provider: ProviderId): boolean {
     'mistral',
     'copilot',
     'deepseek',
-  ]
-  return visionProviders.includes(provider)
+  ];
+  return visionProviders.includes(provider);
 }

@@ -1,23 +1,23 @@
-import type { ProviderClient, ProviderInitOptions, ProviderInterface } from './ProviderInterface.js'
-import { createAnthropicClient } from '../../api/anthropicClient.js'
+import { createAnthropicClient } from '../../api/anthropicClient.js';
+import type { ProviderClient, ProviderInitOptions, ProviderInterface } from './ProviderInterface.js';
 
 export class AnthropicProvider implements ProviderInterface {
-  readonly providerId = 'anthropic' as const
-  readonly label = 'Anthropic'
+  readonly providerId = 'anthropic' as const;
+  readonly label = 'Anthropic';
 
   getProviderId() {
-    return this.providerId
+    return this.providerId;
   }
 
   getProviderLabel() {
-    return this.label
+    return this.label;
   }
 
   getProviderApiKeyEnvVar() {
-    return 'ANTHROPIC_API_KEY'
+    return 'ANTHROPIC_API_KEY';
   }
 
   async createClient(options: ProviderInitOptions): Promise<ProviderClient> {
-    return createAnthropicClient(options)
+    return createAnthropicClient(options);
   }
 }

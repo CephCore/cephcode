@@ -11,5 +11,5 @@ The teammate will receive the request as a message and can approve or reject it.
 - \`reason\` (optional): Human-readable explanation for why shutdown is requested
 
 Use this to gracefully wind down a teammate before calling TeamDelete. It sends the request and returns immediately — the teammate's response arrives asynchronously via the inbox.
-`.trim()
+`.trim();
 }

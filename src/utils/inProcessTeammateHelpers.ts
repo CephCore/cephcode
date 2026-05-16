@@ -9,19 +9,16 @@
  * - Detect permission-related messages
  */
 
-import type { AppState } from '../state/AppState.js'
-import {
-  type InProcessTeammateTaskState,
-  isInProcessTeammateTask,
-} from '../tasks/InProcessTeammateTask/types.js'
-import { updateTaskState } from './task/framework.js'
+import type { AppState } from '../state/AppState.js';
+import { type InProcessTeammateTaskState, isInProcessTeammateTask } from '../tasks/InProcessTeammateTask/types.js';
+import { updateTaskState } from './task/framework.js';
 import {
   isPermissionResponse,
   isSandboxPermissionResponse,
   type PlanApprovalResponseMessage,
-} from './teammateMailbox.js'
+} from './teammateMailbox.js';
 
-type SetAppState = (updater: (prev: AppState) => AppState) => void
+type SetAppState = (updater: (prev: AppState) => AppState) => void;
 
 /**
  * Find the task ID for an in-process teammate by agent name.
@@ -30,19 +27,13 @@ type SetAppState = (updater: (prev: AppState) => AppState) => void
  * @param appState - Current AppState
  * @returns Task ID if found, undefined otherwise
  */
-export function findInProcessTeammateTaskId(
-  agentName: string,
-  appState: AppState,
-): string | undefined {
+export function findInProcessTeammateTaskId(agentName: string, appState: AppState): string | undefined {
   for (const task of Object.values(appState.tasks)) {
-    if (
-      isInProcessTeammateTask(task) &&
-      task.identity.agentName === agentName
-    ) {
-      return task.id
+    if (isInProcessTeammateTask(task) && task.identity.agentName === agentName) {
+      return task.id;
     }
   }
-  return undefined
+  return undefined;
 }
 
 /**
@@ -52,15 +43,11 @@ export function findInProcessTeammateTaskId(
  * @param setAppState - AppState setter
  * @param awaiting - Whether teammate is awaiting plan approval
  */
-export function setAwaitingPlanApproval(
-  taskId: string,
-  setAppState: SetAppState,
-  awaiting: boolean,
-): void {
+export function setAwaitingPlanApproval(taskId: string, setAppState: SetAppState, awaiting: boolean): void {
   updateTaskState<InProcessTeammateTaskState>(taskId, setAppState, task => ({
     ...task,
     awaitingPlanApproval: awaiting,
-  }))
+  }));
 }
 
 /**
@@ -79,7 +66,7 @@ export function handlePlanApprovalResponse(
   _response: PlanApprovalResponseMessage,
   setAppState: SetAppState,
 ): void {
-  setAwaitingPlanApproval(taskId, setAppState, false)
+  setAwaitingPlanApproval(taskId, setAppState, false);
 }
 
 // ============ Permission Delegation Helpers ============
@@ -95,8 +82,5 @@ export function handlePlanApprovalResponse(
  * @returns true if the message is a permission response
  */
 export function isPermissionRelatedResponse(messageText: string): boolean {
-  return (
-    !!isPermissionResponse(messageText) ||
-    !!isSandboxPermissionResponse(messageText)
-  )
+  return !!isPermissionResponse(messageText) || !!isSandboxPermissionResponse(messageText);
 }

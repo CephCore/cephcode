@@ -13,16 +13,13 @@
  * and disconnect detection for non-Anthropic streaming paths.
  */
 
-import type { BetaMessageStreamParams, BetaMessage } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
-import type { ProviderContentBlock } from '../../../types/common.js'
-import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
-import {
-  getProviderModelInfo,
-  getProviderRegistryEntry,
-} from '../providerRegistry.js'
+import type { BetaMessage, BetaMessageStreamParams } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs';
+import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/index.mjs';
+import type { ProviderContentBlock } from '../../../types/common.js';
+import { getProviderModelInfo, getProviderRegistryEntry } from '../providerRegistry.js';
 
 /** Per-provider stream watchdog defaults (seconds). Override per adapter. */
-const DEFAULT_STREAM_TIMEOUT_MS = 30_000
+const DEFAULT_STREAM_TIMEOUT_MS = 30_000;
 
 // ── Provider Adapter Interface ───────────────────────────────────────────────
 
@@ -32,29 +29,32 @@ const DEFAULT_STREAM_TIMEOUT_MS = 30_000
  */
 export interface ProviderAdapter {
   /** Human-readable label (e.g. "OpenAI", "Google Gemini"). */
-  readonly label: string
+  readonly label: string;
 
   /**
    * Perform a non-streaming chat completion and return the result as an
    * Anthropic-compatible `BetaMessage`.
    */
-  createMessage(params: BetaMessageStreamParams, options?: { signal?: AbortSignal }): Promise<BetaMessage>
+  createMessage(params: BetaMessageStreamParams, options?: { signal?: AbortSignal }): Promise<BetaMessage>;
 
   /**
    * Perform a streaming chat completion. Returns an async iterable of
    * Anthropic-compatible `BetaRawMessageStreamEvent` values.
    */
-  streamMessage(params: BetaMessageStreamParams, options?: { signal?: AbortSignal }): AsyncGenerator<unknown, void, undefined>
+  streamMessage(
+    params: BetaMessageStreamParams,
+    options?: { signal?: AbortSignal },
+  ): AsyncGenerator<unknown, void, undefined>;
 
   /** Convert a provider error into a standardised Error object. */
-  normalizeError(error: unknown): Error
+  normalizeError(error: unknown): Error;
 
   /**
    * Per-provider stream watchdog timeout (ms). When no chunk arrives within
    * this window, the stream is considered stalled and an error is thrown.
    * Return 0 or negative to disable the watchdog for this provider.
    */
-  streamTimeoutMs?: number
+  streamTimeoutMs?: number;
 
   /**
    * @[MULTI_PROVIDER] Convert a provider-specific content block to the
@@ -62,14 +62,14 @@ export interface ProviderAdapter {
    * Optional — if not provided, the generic conversion in contentBlockUtils.ts
    * is used as fallback.
    */
-  toProviderContentBlock?(block: unknown): ProviderContentBlock | null
+  toProviderContentBlock?(block: unknown): ProviderContentBlock | null;
 
   /**
    * @[MULTI_PROVIDER] Convert a ProviderContentBlock back to the provider's
    * native content block format.
    * Optional — if not provided, the generic `toAnthropicContentBlock` is used.
    */
-  fromProviderContentBlock?(block: ProviderContentBlock): unknown
+  fromProviderContentBlock?(block: ProviderContentBlock): unknown;
 }
 
 /** Helper: race a stream generator against a timeout watchdog. */
@@ -79,65 +79,69 @@ export async function* withStreamWatchdog<T>(
   label: string,
 ): AsyncGenerator<T, void, undefined> {
   if (timeoutMs <= 0) {
-    yield* stream
-    return
+    yield* stream;
+    return;
   }
 
-  let lastChunkTime = Date.now()
-  let watchdog: ReturnType<typeof setTimeout> | undefined
+  let lastChunkTime = Date.now();
+  let watchdog: ReturnType<typeof setTimeout> | undefined;
 
   const resetWatchdog = (): void => {
-    if (watchdog) clearTimeout(watchdog)
-    lastChunkTime = Date.now()
-  }
+    if (watchdog) clearTimeout(watchdog);
+    lastChunkTime = Date.now();
+  };
 
   const startWatchdog = (): Promise<never> =>
     new Promise((_, reject) => {
       const check = (): void => {
-        const elapsed = Date.now() - lastChunkTime
+        const elapsed = Date.now() - lastChunkTime;
         if (elapsed >= timeoutMs) {
-          reject(new Error(`[${label}] Stream stalled — no chunk received for ${Math.round(elapsed / 1000)}s`))
-          return
+          reject(new Error(`[${label}] Stream stalled — no chunk received for ${Math.round(elapsed / 1000)}s`));
+          return;
         }
         // Re-check after the remaining time
-        watchdog = setTimeout(check, Math.min(timeoutMs - elapsed, 5_000))
+        watchdog = setTimeout(check, Math.min(timeoutMs - elapsed, 5_000));
         if (typeof watchdog === 'object' && 'unref' in watchdog) {
-          ;(watchdog as any).unref?.()
+          (watchdog as any).unref?.();
         }
-      }
-      watchdog = setTimeout(check, timeoutMs)
+      };
+      watchdog = setTimeout(check, timeoutMs);
       if (typeof watchdog === 'object' && 'unref' in watchdog) {
-        ;(watchdog as any).unref?.()
+        (watchdog as any).unref?.();
       }
-    })
+    });
 
-  const iterator = stream[Symbol.asyncIterator]()
-  let done = false
+  const iterator = stream[Symbol.asyncIterator]();
+  let done = false;
 
   while (!done) {
-    resetWatchdog()
+    resetWatchdog();
     const raceResult = await Promise.race([
       iterator.next().then(r => ({ type: 'next' as const, value: r })),
       startWatchdog().catch(e => ({ type: 'error' as const, error: e })),
-    ])
+    ]);
 
-    if (watchdog) clearTimeout(watchdog)
+    if (watchdog) clearTimeout(watchdog);
 
     if (raceResult.type === 'error') {
       // Best-effort: try to return the iterator so upstream cleanup can run.
-      try { await iterator.return?.() } catch { /* swallow */ }
-      throw (raceResult as any).error
+      try {
+        await iterator.return?.();
+      } catch {
+        /* swallow */
+      }
+      throw (raceResult as any).error;
     }
 
-    const next = (raceResult as any).value
+    const next = (raceResult as any).value;
     if (next.done) {
-      done = true
-      break
+      done = true;
+      break;
     }
-    yield next.value as T
+    yield next.value as T;
   }
 
-  if (watchdog) clearTimeout(watchdog)
+  if (watchdog) clearTimeout(watchdog);
 }
 
 // ── Provider Adapter Interface ───────────────────────────────────────────────
@@ -148,27 +152,30 @@ export async function* withStreamWatchdog<T>(
  */
 export interface ProviderAdapter {
   /** Human-readable label (e.g. "OpenAI", "Google Gemini"). */
-  readonly label: string
+  readonly label: string;
 
   /**
    * Perform a non-streaming chat completion and return the result as an
    * Anthropic-compatible `BetaMessage`.
    */
-  createMessage(params: BetaMessageStreamParams, options?: { signal?: AbortSignal }): Promise<BetaMessage>
+  createMessage(params: BetaMessageStreamParams, options?: { signal?: AbortSignal }): Promise<BetaMessage>;
 
   /**
    * Perform a streaming chat completion. Returns an async iterable of
    * Anthropic-compatible `BetaRawMessageStreamEvent` values.
    */
-  streamMessage(params: BetaMessageStreamParams, options?: { signal?: AbortSignal }): AsyncGenerator<unknown, void, undefined>
+  streamMessage(
+    params: BetaMessageStreamParams,
+    options?: { signal?: AbortSignal },
+  ): AsyncGenerator<unknown, void, undefined>;
 
   /** Convert a provider error into a standardised Error object. */
-  normalizeError(error: unknown): Error
+  normalizeError(error: unknown): Error;
 }
 
 // ── Adapter registry ─────────────────────────────────────────────────────────
 
-const adapterRegistry = new Map<string, (client: any, providerId: string) => ProviderAdapter>()
+const adapterRegistry = new Map<string, (client: any, providerId: string) => ProviderAdapter>();
 
 /**
  * Register a factory for a given provider id.
@@ -178,7 +185,7 @@ export function registerAdapter(
   providerId: string,
   factory: (client: any, providerId: string) => ProviderAdapter,
 ): void {
-  adapterRegistry.set(providerId, factory)
+  adapterRegistry.set(providerId, factory);
 }
 
 /**
@@ -187,50 +194,50 @@ export function registerAdapter(
  * OpenAI-compatible adapter).
  */
 export function getAdapter(providerId: string): ((client: any, providerId: string) => ProviderAdapter) | undefined {
-  return adapterRegistry.get(providerId)
+  return adapterRegistry.get(providerId);
 }
 
 // ── Generic OpenAI-compatible adapter (the default) ──────────────────────────
 
 function normalizeOpenAIToolInputSchema(inputSchema: unknown): Record<string, unknown> {
   if (!inputSchema || typeof inputSchema !== 'object') {
-    return { type: 'object', properties: {}, additionalProperties: true }
+    return { type: 'object', properties: {}, additionalProperties: true };
   }
-  const schema = { ...(inputSchema as Record<string, unknown>) } as Record<string, unknown>
+  const schema = { ...(inputSchema as Record<string, unknown>) } as Record<string, unknown>;
   if (schema.type !== 'object') {
-    schema.type = 'object'
+    schema.type = 'object';
   }
-  return schema
+  return schema;
 }
 
 function stringifyReasoningContent(value: unknown): string {
-  if (typeof value === 'string') return value
+  if (typeof value === 'string') return value;
   if (Array.isArray(value)) {
     return value
       .map(item => {
-        if (typeof item === 'string') return item
+        if (typeof item === 'string') return item;
         if (item && typeof item === 'object') {
-          const text = (item as Record<string, unknown>).text
-          if (typeof text === 'string') return text
+          const text = (item as Record<string, unknown>).text;
+          if (typeof text === 'string') return text;
         }
-        return ''
+        return '';
       })
-      .join('')
+      .join('');
   }
-  return ''
+  return '';
 }
 
 class OpenAICompatibleAdapter implements ProviderAdapter {
-  readonly label: string
-  private client: any
-  private providerId: string
+  readonly label: string;
+  private client: any;
+  private providerId: string;
   /** OpenAI/OpenRouter rate-limit constantly — shorter watchdog avoids noise. */
-  readonly streamTimeoutMs = 45_000
+  readonly streamTimeoutMs = 45_000;
 
   constructor(client: any, providerId: string, label = 'OpenAI-Compatible') {
-    this.client = client
-    this.providerId = providerId
-    this.label = label
+    this.client = client;
+    this.providerId = providerId;
+    this.label = label;
   }
 
   /**
@@ -239,147 +246,143 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
    */
   private modelSupportsVision(modelId: string): boolean {
     try {
-      const entry = getProviderRegistryEntry(this.providerId as any)
-      if (!entry.capabilities.vision) return false
+      const entry = getProviderRegistryEntry(this.providerId as any);
+      if (!entry.capabilities.vision) return false;
 
-      const modelInfo = getProviderModelInfo(this.providerId as any, modelId)
-      if (modelInfo) return modelInfo.capabilities.vision
+      const modelInfo = getProviderModelInfo(this.providerId as any, modelId);
+      if (modelInfo) return modelInfo.capabilities.vision;
 
-      return entry.capabilities.vision
+      return entry.capabilities.vision;
     } catch {
       // If registry lookup fails, assume yes — let the provider reject if needed
-      return true
+      return true;
     }
   }
 
-  async createMessage(
-    params: BetaMessageStreamParams,
-    options?: { signal?: AbortSignal },
-  ): Promise<BetaMessage> {
-    const openAIParams = this.convertToOpenAI(params)
+  async createMessage(params: BetaMessageStreamParams, options?: { signal?: AbortSignal }): Promise<BetaMessage> {
+    const openAIParams = this.convertToOpenAI(params);
     const response = await this.client.chat.completions.create(
       { ...openAIParams, stream: false },
       { signal: options?.signal },
-    )
-    return this.convertToAnthropic(response) as BetaMessage
+    );
+    return this.convertToAnthropic(response) as BetaMessage;
   }
 
   async *streamMessage(
     params: BetaMessageStreamParams,
     options?: { signal?: AbortSignal },
   ): AsyncGenerator<unknown, void, undefined> {
-    const openAIParams = this.convertToOpenAI(params)
+    const openAIParams = this.convertToOpenAI(params);
     const stream = await this.client.chat.completions.create(
       { ...openAIParams, stream: true, stream_options: { include_usage: true } },
       { signal: options?.signal },
-    )
-    yield* withStreamWatchdog(this.wrapStream(stream), this.streamTimeoutMs, this.label)
+    );
+    yield* withStreamWatchdog(this.wrapStream(stream), this.streamTimeoutMs, this.label);
   }
 
   normalizeError(error: unknown): Error {
     // Extract structured error info from OpenAI/OpenRouter error shapes
     if (error && typeof error === 'object') {
-      const e = error as any
-      const status = e.status ?? e.statusCode
-      const code = e.code ?? e.type
-      const message = e.message ?? String(error)
+      const e = error as any;
+      const status = e.status ?? e.statusCode;
+      const code = e.code ?? e.type;
+      const message = e.message ?? String(error);
 
       // Rate limit
       if (status === 429 || code === 'rate_limit_exceeded' || code === 'insufficient_quota') {
-        const retryAfter = e.headers?.['retry-after'] ?? e.retryAfter
-        const err = new Error(`[${this.label}] Rate limited: ${message}`) as any
-        err._providerError = { category: 'rate_limit', retryAfter, status }
-        return err
+        const retryAfter = e.headers?.['retry-after'] ?? e.retryAfter;
+        const err = new Error(`[${this.label}] Rate limited: ${message}`) as any;
+        err._providerError = { category: 'rate_limit', retryAfter, status };
+        return err;
       }
 
       // Content filtered / safety
       if (status === 400 && (code === 'content_filter' || code === 'content_policy_violation')) {
-        const err = new Error(`[${this.label}] Content blocked by safety filter`) as any
-        err._providerError = { category: 'content_filter', status }
-        return err
+        const err = new Error(`[${this.label}] Content blocked by safety filter`) as any;
+        err._providerError = { category: 'content_filter', status };
+        return err;
       }
 
       // Image not supported — catch provider errors about image_url or vision
       if (
         status === 400 &&
         (message.includes('unknown variant `image_url`') ||
-         message.includes('does not support image input') ||
-         message.includes('No endpoints found that support image') ||
-         message.includes('image_url') && message.includes('not supported'))
+          message.includes('does not support image input') ||
+          message.includes('No endpoints found that support image') ||
+          (message.includes('image_url') && message.includes('not supported')))
       ) {
         const err = new Error(
           `[${this.label}] Image input is not supported by this model. Remove images or switch to a vision-capable model.`,
-        ) as any
-        err._providerError = { category: 'invalid_request', status }
-        return err
+        ) as any;
+        err._providerError = { category: 'invalid_request', status };
+        return err;
       }
 
       // Auth
       if (status === 401 || status === 403) {
-        const err = new Error(`[${this.label}] Authentication failed: ${message}`) as any
-        err._providerError = { category: 'auth', status }
-        return err
+        const err = new Error(`[${this.label}] Authentication failed: ${message}`) as any;
+        err._providerError = { category: 'auth', status };
+        return err;
       }
 
       // Server error
       if (status >= 500) {
-        const err = new Error(`[${this.label}] Server error ${status}: ${message}`) as any
-        err._providerError = { category: 'server_error', status }
-        return err
+        const err = new Error(`[${this.label}] Server error ${status}: ${message}`) as any;
+        err._providerError = { category: 'server_error', status };
+        return err;
       }
     }
 
     if (error instanceof Error) {
       // If the error already has _providerError (from a nested call), keep it
-      const enriched = new Error(`[${this.label}] ${error.message}`) as any
-      if ((error as any)._providerError) enriched._providerError = (error as any)._providerError
-      return enriched
+      const enriched = new Error(`[${this.label}] ${error.message}`) as any;
+      if ((error as any)._providerError) enriched._providerError = (error as any)._providerError;
+      return enriched;
     }
 
-    const message = typeof error === 'object' && error !== null
-      ? String((error as any).message ?? error)
-      : String(error)
-    return new Error(`[${this.label}] ${message}`)
+    const message =
+      typeof error === 'object' && error !== null ? String((error as any).message ?? error) : String(error);
+    return new Error(`[${this.label}] ${message}`);
   }
 
   /**
    * Convert Anthropic-format params to an OpenAI chat.completions.create payload.
    */
   private convertToOpenAI(params: BetaMessageStreamParams): Record<string, unknown> {
-    const messages: any[] = []
+    const messages: any[] = [];
 
     for (const m of params.messages) {
-      const openAIMessage: any = { role: m.role, content: '' }
+      const openAIMessage: any = { role: m.role, content: '' };
 
       if (typeof m.content === 'string') {
-        openAIMessage.content = m.content
+        openAIMessage.content = m.content;
       } else if (Array.isArray(m.content)) {
-        const textParts: string[] = []
-        const imageParts: any[] = []
-        const toolCalls: any[] = []
-        const reasoningParts: string[] = []
+        const textParts: string[] = [];
+        const imageParts: any[] = [];
+        const toolCalls: any[] = [];
+        const reasoningParts: string[] = [];
 
         for (const c of m.content) {
           if (c.type === 'text') {
-            textParts.push(c.text)
+            textParts.push(c.text);
           } else if (c.type === 'image') {
             // Skip image if model doesn't support vision
             if (!this.modelSupportsVision(params.model)) {
-              textParts.push(`[Image not sent — ${params.model} does not support vision]`)
-              continue
+              textParts.push(`[Image not sent — ${params.model} does not support vision]`);
+              continue;
             }
             // Convert Anthropic image block to OpenAI image content part
-            const source = c.source
+            const source = c.source;
             if (source?.type === 'base64') {
               imageParts.push({
                 type: 'image_url',
                 image_url: {
                   url: `data:${source.media_type};base64,${source.data}`,
                 },
-              })
+              });
             }
           } else if (c.type === 'thinking') {
-            reasoningParts.push(c.thinking)
+            reasoningParts.push(c.thinking);
           } else if (c.type === 'tool_use') {
             toolCalls.push({
               id: c.id,
@@ -388,18 +391,22 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
                 name: c.name,
                 arguments: JSON.stringify(c.input),
               },
-            })
+            });
           } else if (c.type === 'tool_result') {
             // Tool results become a separate tool message in OpenAI format.
             messages.push({
               role: 'tool',
               tool_call_id: c.tool_use_id,
-              content: typeof c.content === 'string'
-                ? c.content
-                : Array.isArray(c.content)
-                  ? c.content.map((b: any) => b.type === 'text' ? b.text : '').filter(Boolean).join('\n')
-                  : JSON.stringify(c.content),
-            })
+              content:
+                typeof c.content === 'string'
+                  ? c.content
+                  : Array.isArray(c.content)
+                    ? c.content
+                        .map((b: any) => (b.type === 'text' ? b.text : ''))
+                        .filter(Boolean)
+                        .join('\n')
+                    : JSON.stringify(c.content),
+            });
           }
         }
 
@@ -409,23 +416,23 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
           openAIMessage.content = [
             ...(textParts.length > 0 ? [{ type: 'text' as const, text: textParts.join('\n') }] : []),
             ...imageParts,
-          ]
+          ];
         } else if (textParts.length > 0) {
-          openAIMessage.content = textParts.join('\n')
+          openAIMessage.content = textParts.join('\n');
         } else if (toolCalls.length > 0) {
-          openAIMessage.content = null
+          openAIMessage.content = null;
         }
 
         if (toolCalls.length > 0) {
-          openAIMessage.tool_calls = toolCalls
+          openAIMessage.tool_calls = toolCalls;
         }
         // Prefer raw reasoning_content preserved from prior API responses
         // (some providers like Xiaomi require it passed back unchanged)
-        const rawReasoning = (m as any).reasoning_content
+        const rawReasoning = (m as any).reasoning_content;
         if (typeof rawReasoning === 'string' && rawReasoning.length > 0) {
-          openAIMessage.reasoning_content = rawReasoning
+          openAIMessage.reasoning_content = rawReasoning;
         } else if (reasoningParts.length > 0) {
-          openAIMessage.reasoning_content = reasoningParts.join('')
+          openAIMessage.reasoning_content = reasoningParts.join('');
         }
       }
 
@@ -435,18 +442,18 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
         openAIMessage.content !== null &&
         !(Array.isArray(openAIMessage.content) && openAIMessage.content.length === 0)
       ) {
-        messages.push(openAIMessage)
+        messages.push(openAIMessage);
       } else if (openAIMessage.tool_calls || openAIMessage.reasoning_content) {
-        messages.push(openAIMessage)
+        messages.push(openAIMessage);
       }
     }
 
     // System prompt → first system message
     if (params.system) {
       const systemContent = Array.isArray(params.system)
-        ? params.system.map((s: any) => (typeof s === 'string' ? s : s.text ?? '')).join('\n')
-        : params.system
-      messages.unshift({ role: 'system', content: systemContent })
+        ? params.system.map((s: any) => (typeof s === 'string' ? s : (s.text ?? ''))).join('\n')
+        : params.system;
+      messages.unshift({ role: 'system', content: systemContent });
     }
 
     // Map tools
@@ -459,7 +466,7 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
             parameters: normalizeOpenAIToolInputSchema(t.input_schema),
           },
         }))
-      : undefined
+      : undefined;
 
     return {
       model: params.model,
@@ -469,25 +476,23 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
       top_p: params.top_p,
       stop: params.stop_sequences,
       ...(tools ? { tools } : {}),
-    }
+    };
   }
 
   /**
    * Convert an OpenAI chat completion response back to Anthropic BetaMessage.
    */
   private convertToAnthropic(openAIResponse: any): BetaMessage {
-    const choice = openAIResponse.choices?.[0]
-    const message = choice?.message ?? {}
+    const choice = openAIResponse.choices?.[0];
+    const message = choice?.message ?? {};
 
-    const content: any[] = []
-    const reasoningContent = stringifyReasoningContent(
-      message.reasoning_content ?? message.reasoning,
-    )
+    const content: any[] = [];
+    const reasoningContent = stringifyReasoningContent(message.reasoning_content ?? message.reasoning);
     if (reasoningContent) {
-      content.push({ type: 'thinking', thinking: reasoningContent, signature: '' })
+      content.push({ type: 'thinking', thinking: reasoningContent, signature: '' });
     }
     if (message.content) {
-      content.push({ type: 'text', text: message.content })
+      content.push({ type: 'text', text: message.content });
     }
     if (message.tool_calls) {
       for (const tc of message.tool_calls) {
@@ -496,9 +501,13 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
           id: tc.id,
           name: tc.function.name,
           input: (() => {
-            try { return JSON.parse(tc.function.arguments) } catch { return tc.function.arguments }
+            try {
+              return JSON.parse(tc.function.arguments);
+            } catch {
+              return tc.function.arguments;
+            }
           })(),
-        })
+        });
       }
     }
 
@@ -514,7 +523,7 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
         input_tokens: openAIResponse.usage?.prompt_tokens ?? 0,
         output_tokens: openAIResponse.usage?.completion_tokens ?? 0,
       },
-    } as any
+    } as any;
   }
 
   /**
@@ -536,131 +545,129 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
         content: [],
         usage: { input_tokens: 0, output_tokens: 0 },
       },
-    }
+    };
 
-    let activeIndex: number | null = null
-    let sentMessageDelta = false
-    let hasStartedThinkingBlock = false
-    let streamUsage: { prompt_tokens?: number; completion_tokens?: number } | null = null
+    let activeIndex: number | null = null;
+    const sentMessageDelta = false;
+    let hasStartedThinkingBlock = false;
+    let streamUsage: { prompt_tokens?: number; completion_tokens?: number } | null = null;
 
     try {
-    for await (const chunk of stream) {
-      // Check finish_reason on every chunk — content_filter can arrive mid-stream
-      const finishReason = chunk.choices?.[0]?.finish_reason
-      if (finishReason === 'content_filter') {
-        // Emit a content_block_stop for the active block so the downstream
-        // message builder sees a clean boundary, then throw to surface the
-        // content filter to error handling.
-        if (activeIndex !== null) {
-          yield { type: 'content_block_stop', index: activeIndex }
-        }
-        const err = new Error(`[${this.label}] Content filtered by provider's safety system`) as any
-        err._providerError = { category: 'content_filter', status: 400 }
-        throw err
-      }
-
-      // Tool calls arrived as full array (non-streaming tool mode) — emit start/delta/stop
-      if (finishReason === 'tool_calls' && !chunk.choices?.[0]?.delta?.tool_calls) {
-        // Handled below via usage / message_delta
-      }
-
-      // Capture usage from the final streaming chunk (emitted by
-      // stream_options: { include_usage: true })
-      if (chunk.usage) {
-        streamUsage = chunk.usage
-      }
-
-      if (!chunk.choices?.[0]?.delta) continue
-      const delta = chunk.choices[0].delta
-
-      // Reasoning / thinking content
-      const reasoningContent = stringifyReasoningContent(
-        delta.reasoning_content ?? delta.reasoning,
-      )
-      if (reasoningContent) {
-        if (activeIndex !== 0 || !hasStartedThinkingBlock) {
-          if (activeIndex !== null) yield { type: 'content_block_stop', index: activeIndex }
-          yield {
-            type: 'content_block_start',
-            index: 0,
-            content_block: { type: 'thinking', thinking: '', signature: '' },
+      for await (const chunk of stream) {
+        // Check finish_reason on every chunk — content_filter can arrive mid-stream
+        const finishReason = chunk.choices?.[0]?.finish_reason;
+        if (finishReason === 'content_filter') {
+          // Emit a content_block_stop for the active block so the downstream
+          // message builder sees a clean boundary, then throw to surface the
+          // content filter to error handling.
+          if (activeIndex !== null) {
+            yield { type: 'content_block_stop', index: activeIndex };
           }
-          activeIndex = 0
-          hasStartedThinkingBlock = true
+          const err = new Error(`[${this.label}] Content filtered by provider's safety system`) as any;
+          err._providerError = { category: 'content_filter', status: 400 };
+          throw err;
         }
-        yield {
-          type: 'content_block_delta',
-          index: 0,
-          delta: { type: 'thinking_delta', thinking: reasoningContent },
-        }
-        continue
-      }
 
-      // Text content
-      if (delta.content) {
-        const textIndex = hasStartedThinkingBlock ? 1 : 0
-        if (activeIndex !== textIndex) {
-          if (activeIndex !== null) yield { type: 'content_block_stop', index: activeIndex }
-          yield {
-            type: 'content_block_start',
-            index: textIndex,
-            content_block: { type: 'text', text: '' },
-          }
-          activeIndex = textIndex
+        // Tool calls arrived as full array (non-streaming tool mode) — emit start/delta/stop
+        if (finishReason === 'tool_calls' && !chunk.choices?.[0]?.delta?.tool_calls) {
+          // Handled below via usage / message_delta
         }
-        yield {
-          type: 'content_block_delta',
-          index: textIndex,
-          delta: { type: 'text_delta', text: delta.content },
-        }
-        continue
-      }
 
-      // Tool calls
-      if (delta.tool_calls) {
-        for (const tc of delta.tool_calls) {
-          const index = (tc.index ?? 0) + (hasStartedThinkingBlock ? 2 : 1)
-          if (tc.function?.name) {
-            if (activeIndex !== null && activeIndex !== index) {
-              yield { type: 'content_block_stop', index: activeIndex }
-            }
+        // Capture usage from the final streaming chunk (emitted by
+        // stream_options: { include_usage: true })
+        if (chunk.usage) {
+          streamUsage = chunk.usage;
+        }
+
+        if (!chunk.choices?.[0]?.delta) continue;
+        const delta = chunk.choices[0].delta;
+
+        // Reasoning / thinking content
+        const reasoningContent = stringifyReasoningContent(delta.reasoning_content ?? delta.reasoning);
+        if (reasoningContent) {
+          if (activeIndex !== 0 || !hasStartedThinkingBlock) {
+            if (activeIndex !== null) yield { type: 'content_block_stop', index: activeIndex };
             yield {
               type: 'content_block_start',
-              index,
-              content_block: {
-                type: 'tool_use',
-                id: tc.id ?? `call_${index}`,
-                name: tc.function.name,
-                input: '',
-              },
-            }
-            activeIndex = index
+              index: 0,
+              content_block: { type: 'thinking', thinking: '', signature: '' },
+            };
+            activeIndex = 0;
+            hasStartedThinkingBlock = true;
           }
-          if (tc.function?.arguments) {
+          yield {
+            type: 'content_block_delta',
+            index: 0,
+            delta: { type: 'thinking_delta', thinking: reasoningContent },
+          };
+          continue;
+        }
+
+        // Text content
+        if (delta.content) {
+          const textIndex = hasStartedThinkingBlock ? 1 : 0;
+          if (activeIndex !== textIndex) {
+            if (activeIndex !== null) yield { type: 'content_block_stop', index: activeIndex };
             yield {
-              type: 'content_block_delta',
-              index,
-              delta: { type: 'input_json_delta', partial_json: tc.function.arguments },
+              type: 'content_block_start',
+              index: textIndex,
+              content_block: { type: 'text', text: '' },
+            };
+            activeIndex = textIndex;
+          }
+          yield {
+            type: 'content_block_delta',
+            index: textIndex,
+            delta: { type: 'text_delta', text: delta.content },
+          };
+          continue;
+        }
+
+        // Tool calls
+        if (delta.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const index = (tc.index ?? 0) + (hasStartedThinkingBlock ? 2 : 1);
+            if (tc.function?.name) {
+              if (activeIndex !== null && activeIndex !== index) {
+                yield { type: 'content_block_stop', index: activeIndex };
+              }
+              yield {
+                type: 'content_block_start',
+                index,
+                content_block: {
+                  type: 'tool_use',
+                  id: tc.id ?? `call_${index}`,
+                  name: tc.function.name,
+                  input: '',
+                },
+              };
+              activeIndex = index;
+            }
+            if (tc.function?.arguments) {
+              yield {
+                type: 'content_block_delta',
+                index,
+                delta: { type: 'input_json_delta', partial_json: tc.function.arguments },
+              };
             }
           }
         }
       }
-    }
     } catch (err) {
       // If this is already a structured provider error (e.g. content_filter),
       // re-throw so it reaches the error handler. Otherwise, wrap for clarity.
-      if ((err as any)?._providerError) throw err
+      if ((err as any)?._providerError) throw err;
 
       // Abrupt disconnect / network error during streaming
       const wrapped = new Error(
         `[${this.label}] Stream interrupted: ${err instanceof Error ? err.message : String(err)}`,
-      )
-      ;(wrapped as any)._providerError = { category: 'network', status: undefined }
-      throw wrapped
+      );
+      (wrapped as any)._providerError = { category: 'network', status: undefined };
+      throw wrapped;
     }
 
     // Close last block
-    if (activeIndex !== null) yield { type: 'content_block_stop', index: activeIndex }
+    if (activeIndex !== null) yield { type: 'content_block_stop', index: activeIndex };
 
     if (!sentMessageDelta) {
       yield {
@@ -670,18 +677,23 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
           input_tokens: streamUsage?.prompt_tokens ?? 0,
           output_tokens: streamUsage?.completion_tokens ?? 0,
         },
-      }
+      };
     }
-    yield { type: 'message_stop' }
+    yield { type: 'message_stop' };
   }
 
   private mapFinishReason(reason: string | null | undefined): string {
     switch (reason) {
-      case 'stop': return 'end_turn'
-      case 'tool_calls': return 'tool_use'
-      case 'length': return 'max_tokens'
-      case 'content_filter': return 'stop_sequence'
-      default: return 'end_turn'
+      case 'stop':
+        return 'end_turn';
+      case 'tool_calls':
+        return 'tool_use';
+      case 'length':
+        return 'max_tokens';
+      case 'content_filter':
+        return 'stop_sequence';
+      default:
+        return 'end_turn';
     }
   }
 }
@@ -690,7 +702,7 @@ class OpenAICompatibleAdapter implements ProviderAdapter {
 
 // Register the generic OpenAI-compatible adapter so every provider gets a
 // sensible default unless they register their own specialised adapter.
-registerAdapter('__default__', (client: any, providerId: string) => new OpenAICompatibleAdapter(client, providerId))
+registerAdapter('__default__', (client: any, providerId: string) => new OpenAICompatibleAdapter(client, providerId));
 
 // ── AnthropicAdapter (legacy wrapper) ─────────────────────────────────────────
 
@@ -702,62 +714,60 @@ registerAdapter('__default__', (client: any, providerId: string) => new OpenAICo
  * falling back to the generic OpenAI-compatible adapter.
  */
 export class AnthropicAdapter {
-  private client: any
-  private providerId: string
-  private adapter: ProviderAdapter
+  private client: any;
+  private providerId: string;
+  private adapter: ProviderAdapter;
 
   constructor(client: any, providerId: string) {
-    this.client = client
-    this.providerId = providerId
-    const factory = getAdapter(providerId) ?? getAdapter('__default__')!
-    this.adapter = factory(client, this.providerId)
+    this.client = client;
+    this.providerId = providerId;
+    const factory = getAdapter(providerId) ?? getAdapter('__default__')!;
+    this.adapter = factory(client, this.providerId);
   }
 
   get beta() {
-    return { messages: this.messages }
+    return { messages: this.messages };
   }
 
   get messages() {
     return {
       create: (params: BetaMessageStreamParams, options?: any) => {
-        if (params.stream) return this.handleStreaming(params, options)
-        return this.handleNonStreaming(params, options)
+        if (params.stream) return this.handleStreaming(params, options);
+        return this.handleNonStreaming(params, options);
       },
-    }
+    };
   }
 
   private handleNonStreaming(params: BetaMessageStreamParams, options?: any): any {
     const promise = this.adapter.createMessage(params, options).catch(err => {
-      throw this.adapter.normalizeError(err)
-    })
+      throw this.adapter.normalizeError(err);
+    });
 
     return Object.assign(promise, {
       withResponse: async () => {
-        const data = await promise
+        const data = await promise;
         return {
           data,
           response: { headers: new Headers() },
           request_id: `adapter-${Date.now()}`,
-        }
+        };
       },
-    })
+    });
   }
 
   private handleStreaming(params: BetaMessageStreamParams, options?: any): any {
     return {
       withResponse: async () => {
-        const rawStream = this.adapter.streamMessage(params, options)
+        const rawStream = this.adapter.streamMessage(params, options);
         // Wrap with stream watchdog (J8) — auto-fail stalled streams.
-        const timeoutMs = this.adapter.streamTimeoutMs ?? DEFAULT_STREAM_TIMEOUT_MS
-        const stream = timeoutMs > 0
-          ? withStreamWatchdog(rawStream, timeoutMs, this.adapter.label)
-          : rawStream
+        const timeoutMs = this.adapter.streamTimeoutMs ?? DEFAULT_STREAM_TIMEOUT_MS;
+        const stream = timeoutMs > 0 ? withStreamWatchdog(rawStream, timeoutMs, this.adapter.label) : rawStream;
         return {
           data: stream,
           response: { headers: new Headers() },
           request_id: `adapter-${Date.now()}`,
-        }
+        };
       },
-    }
+    };
   }
 }

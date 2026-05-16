@@ -1,2 +1,2 @@
 // Runtime types placeholder
-export {}
+export {};

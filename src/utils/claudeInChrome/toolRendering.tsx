@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type * as React from 'react';
 import { MessageResponse } from '../../components/MessageResponse.js';
 import { supportsHyperlinks } from '../../ink/supports-hyperlinks.js';
 import { Link, Text } from '../../ink.js';
@@ -6,15 +6,37 @@ import { renderToolResultMessage as renderDefaultMCPToolResultMessage } from '..
 import type { MCPToolResult } from '../../utils/mcpValidation.js';
 import { truncateToWidth } from '../format.js';
 import { trackClaudeInChromeTabId } from './common.js';
+
 export type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 /**
  * All tool names from BROWSER_TOOLS in @ant/claude-for-chrome-mcp.
  * Keep in sync with the package's BROWSER_TOOLS array.
  */
-export type ChromeToolName = 'javascript_tool' | 'read_page' | 'find' | 'form_input' | 'computer' | 'navigate' | 'resize_window' | 'gif_creator' | 'upload_image' | 'get_page_text' | 'tabs_context_mcp' | 'tabs_create_mcp' | 'update_plan' | 'read_console_messages' | 'read_network_requests' | 'shortcuts_list' | 'shortcuts_execute';
+export type ChromeToolName =
+  | 'javascript_tool'
+  | 'read_page'
+  | 'find'
+  | 'form_input'
+  | 'computer'
+  | 'navigate'
+  | 'resize_window'
+  | 'gif_creator'
+  | 'upload_image'
+  | 'get_page_text'
+  | 'tabs_context_mcp'
+  | 'tabs_create_mcp'
+  | 'update_plan'
+  | 'read_console_messages'
+  | 'read_network_requests'
+  | 'shortcuts_list'
+  | 'shortcuts_execute';
 const CHROME_EXTENSION_FOCUS_TAB_URL_BASE = 'https://clau.de/chrome/tab/';
-function renderChromeToolUseMessage(input: Record<string, unknown>, toolName: ChromeToolName, verbose: boolean): React.ReactNode {
+function renderChromeToolUseMessage(
+  input: Record<string, unknown>,
+  toolName: ChromeToolName,
+  verbose: boolean,
+): React.ReactNode {
   const tabId = input.tabId;
   if (typeof tabId === 'number') {
     trackClaudeInChromeTabId(tabId);
@@ -41,7 +63,12 @@ function renderChromeToolUseMessage(input: Record<string, unknown>, toolName: Ch
     case 'computer':
       if (typeof input.action === 'string') {
         const action = input.action;
-        if (action === 'left_click' || action === 'right_click' || action === 'double_click' || action === 'middle_click') {
+        if (
+          action === 'left_click' ||
+          action === 'right_click' ||
+          action === 'double_click' ||
+          action === 'middle_click'
+        ) {
           if (typeof input.ref === 'string') {
             secondaryInfo.push(`${action} on ${input.ref}`);
           } else if (Array.isArray(input.coordinate)) {
@@ -128,17 +155,20 @@ function renderChromeViewTabLink(input: unknown): React.ReactNode {
   if (typeof input !== 'object' || input === null || !('tabId' in input)) {
     return null;
   }
-  const tabId = typeof input.tabId === 'number' ? input.tabId : typeof input.tabId === 'string' ? parseInt(input.tabId, 10) : NaN;
+  const tabId =
+    typeof input.tabId === 'number' ? input.tabId : typeof input.tabId === 'string' ? parseInt(input.tabId, 10) : NaN;
   if (isNaN(tabId)) {
     return null;
   }
   const linkUrl = `${CHROME_EXTENSION_FOCUS_TAB_URL_BASE}${tabId}`;
-  return <Text>
+  return (
+    <Text>
       {' '}
       <Link url={linkUrl}>
         <Text color="subtle">[View Tab]</Text>
       </Link>
-    </Text>;
+    </Text>
+  );
 }
 
 /**
@@ -146,10 +176,14 @@ function renderChromeViewTabLink(input: unknown): React.ReactNode {
  * Shows a brief summary for successful results. Errors are handled by
  * the default renderToolUseErrorMessage when is_error is set.
  */
-export function renderChromeToolResultMessage(output: MCPToolResult, toolName: ChromeToolName, verbose: boolean): React.ReactNode {
+export function renderChromeToolResultMessage(
+  output: MCPToolResult,
+  toolName: ChromeToolName,
+  verbose: boolean,
+): React.ReactNode {
   if (verbose) {
     return renderDefaultMCPToolResultMessage(output, [], {
-      verbose
+      verbose,
     });
   }
   let summary: string | null = null;
@@ -207,9 +241,11 @@ export function renderChromeToolResultMessage(output: MCPToolResult, toolName: C
       break;
   }
   if (summary) {
-    return <MessageResponse height={1}>
+    return (
+      <MessageResponse height={1}>
         <Text dimColor>{summary}</Text>
-      </MessageResponse>;
+      </MessageResponse>
+    );
   }
   return null;
 }
@@ -220,13 +256,20 @@ export function renderChromeToolResultMessage(output: MCPToolResult, toolName: C
  */
 export function getClaudeInChromeMCPToolOverrides(toolName: string): {
   userFacingName: (input?: Record<string, unknown>) => string;
-  renderToolUseMessage: (input: Record<string, unknown>, options: {
-    verbose: boolean;
-  }) => React.ReactNode;
+  renderToolUseMessage: (
+    input: Record<string, unknown>,
+    options: {
+      verbose: boolean;
+    },
+  ) => React.ReactNode;
   renderToolUseTag: (input: Partial<Record<string, unknown>>) => React.ReactNode;
-  renderToolResultMessage: (output: string | MCPToolResult, progressMessagesForMessage: unknown[], options: {
-    verbose: boolean;
-  }) => React.ReactNode;
+  renderToolResultMessage: (
+    output: string | MCPToolResult,
+    progressMessagesForMessage: unknown[],
+    options: {
+      verbose: boolean;
+    },
+  ) => React.ReactNode;
 } {
   return {
     userFacingName(_input?: Record<string, unknown>) {
@@ -234,26 +277,33 @@ export function getClaudeInChromeMCPToolOverrides(toolName: string): {
       const displayName = toolName.replace(/_mcp$/, '');
       return `Claude in Chrome[${displayName}]`;
     },
-    renderToolUseMessage(input: Record<string, unknown>, {
-      verbose
-    }: {
-      verbose: boolean;
-    }): React.ReactNode {
+    renderToolUseMessage(
+      input: Record<string, unknown>,
+      {
+        verbose,
+      }: {
+        verbose: boolean;
+      },
+    ): React.ReactNode {
       return renderChromeToolUseMessage(input, toolName as ChromeToolName, verbose);
     },
     renderToolUseTag(input: Partial<Record<string, unknown>>): React.ReactNode {
       return renderChromeViewTabLink(input);
     },
-    renderToolResultMessage(output: string | MCPToolResult, _progressMessagesForMessage: unknown[], {
-      verbose
-    }: {
-      verbose: boolean;
-    }): React.ReactNode {
+    renderToolResultMessage(
+      output: string | MCPToolResult,
+      _progressMessagesForMessage: unknown[],
+      {
+        verbose,
+      }: {
+        verbose: boolean;
+      },
+    ): React.ReactNode {
       if (!isMCPToolResult(output)) {
         return null;
       }
       return renderChromeToolResultMessage(output, toolName as ChromeToolName, verbose);
-    }
+    },
   };
 }
 function isMCPToolResult(output: string | MCPToolResult): output is MCPToolResult {

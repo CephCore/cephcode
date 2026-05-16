@@ -1,4 +1,4 @@
-import { registerBundledSkill } from '../bundledSkills.js'
+import { registerBundledSkill } from '../bundledSkills.js';
 
 const SKILL_BODY = `Create a clear, concise git commit that captures the intent of the changes.
 
@@ -9,7 +9,7 @@ const SKILL_BODY = `Create a clear, concise git commit that captures the intent 
    - Include a body for non-obvious changes
 3. Push if the user asks
 
-Do NOT commit if the user hasn't reviewed the changes. Ask first.`
+Do NOT commit if the user hasn't reviewed the changes. Ask first.`;
 
 export function registerCommitSkill(): void {
   registerBundledSkill({
@@ -18,5 +18,5 @@ export function registerCommitSkill(): void {
     userInvocable: true,
     content: [{ type: 'text', text: SKILL_BODY }],
     source: 'bundled',
-  })
+  });
 }

@@ -1,8 +1,12 @@
-import * as React from 'react';
+import type * as React from 'react';
 import { type GroveDecision, GroveDialog, PrivacySettingsDialog } from '../../components/grove/Grove.js';
-import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from '../../services/analytics/index.js';
+import {
+  type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+  logEvent,
+} from '../../services/analytics/index.js';
 import { getGroveNoticeConfig, getGroveSettings, isQualifiedForGrove } from '../../services/api/grove.js';
 import type { LocalJSXCommandOnDone } from '../../types/command.js';
+
 const FALLBACK_MESSAGE = 'Review and manage your privacy settings at https://claude.ai/settings/data-privacy-controls';
 export async function call(onDone: LocalJSXCommandOnDone): Promise<React.ReactNode | null> {
   const qualified = await isQualifiedForGrove();
@@ -21,7 +25,7 @@ export async function call(onDone: LocalJSXCommandOnDone): Promise<React.ReactNo
   async function onDoneWithDecision(decision: GroveDecision) {
     if (decision === 'escape' || decision === 'defer') {
       onDone('Privacy settings dialog dismissed', {
-        display: 'system'
+        display: 'system',
       });
       return;
     }
@@ -31,7 +35,7 @@ export async function call(onDone: LocalJSXCommandOnDone): Promise<React.ReactNo
     const updatedSettingsResult = await getGroveSettings();
     if (!updatedSettingsResult.success) {
       onDone('Unable to retrieve updated privacy settings', {
-        display: 'system'
+        display: 'system',
       });
       return;
     }
@@ -41,7 +45,7 @@ export async function call(onDone: LocalJSXCommandOnDone): Promise<React.ReactNo
     if (settings.grove_enabled !== null && settings.grove_enabled !== updatedSettings.grove_enabled) {
       logEvent('tengu_grove_policy_toggled', {
         state: updatedSettings.grove_enabled as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        location: 'settings' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
+        location: 'settings' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       });
     }
   }
@@ -49,7 +53,13 @@ export async function call(onDone: LocalJSXCommandOnDone): Promise<React.ReactNo
   // Show privacy settings directly if the user has already accepted the
   // terms.
   if (settings.grove_enabled !== null) {
-    return <PrivacySettingsDialog settings={settings} domainExcluded={config?.domain_excluded} onDone={onDoneWithSettingsCheck}></PrivacySettingsDialog>;
+    return (
+      <PrivacySettingsDialog
+        settings={settings}
+        domainExcluded={config?.domain_excluded}
+        onDone={onDoneWithSettingsCheck}
+      ></PrivacySettingsDialog>
+    );
   }
 
   // Show the GroveDialog for users who haven't accepted terms yet

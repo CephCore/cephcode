@@ -45,38 +45,38 @@ export type BrowserAction =
   | 'evaluate'
   | 'search'
   | 'request_help'
-  | 'vision_map'
+  | 'vision_map';
 
 export interface BrowserActionInput {
-  action: BrowserAction
-  url?: string
-  selector?: string
-  text?: string
-  key?: string
-  direction?: 'up' | 'down'
-  amount?: number
+  action: BrowserAction;
+  url?: string;
+  selector?: string;
+  text?: string;
+  key?: string;
+  direction?: 'up' | 'down';
+  amount?: number;
   // Extended fields
-  role?: string         // ARIA role (button, link, textbox, checkbox, etc.)
-  name?: string         // Accessible name for getByRole
-  label?: string        // Label text for getByLabel
-  value?: string        // For select/attribute
-  attribute?: string    // Attribute name to get
-  filePath?: string     // For file upload
-  checked?: boolean     // For check/uncheck
-  frameSelector?: string // For iframe targeting
-  dialogAction?: 'accept' | 'dismiss' // For dialog handling
-  dialogText?: string   // Text to input in prompt dialog
-  expression?: string   // JS expression for evaluate
-  engine?: 'google' | 'bing' | 'duckduckgo' | 'twitter' | 'reddit' | 'github' // Search engine
-  query?: string        // Search query
-  timeout?: number      // Custom timeout in ms
-  headless?: boolean    // Override browser headless mode for this session
+  role?: string; // ARIA role (button, link, textbox, checkbox, etc.)
+  name?: string; // Accessible name for getByRole
+  label?: string; // Label text for getByLabel
+  value?: string; // For select/attribute
+  attribute?: string; // Attribute name to get
+  filePath?: string; // For file upload
+  checked?: boolean; // For check/uncheck
+  frameSelector?: string; // For iframe targeting
+  dialogAction?: 'accept' | 'dismiss'; // For dialog handling
+  dialogText?: string; // Text to input in prompt dialog
+  expression?: string; // JS expression for evaluate
+  engine?: 'google' | 'bing' | 'duckduckgo' | 'twitter' | 'reddit' | 'github'; // Search engine
+  query?: string; // Search query
+  timeout?: number; // Custom timeout in ms
+  headless?: boolean; // Override browser headless mode for this session
 }
 
 export interface BrowserResult {
-  url: string
-  title: string
-  content?: string
-  screenshot?: string
-  error?: string
+  url: string;
+  title: string;
+  content?: string;
+  screenshot?: string;
+  error?: string;
 }

@@ -1,2 +1,2 @@
 // Tool types placeholder
-export {}
+export {};

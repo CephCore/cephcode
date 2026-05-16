@@ -7,17 +7,31 @@ import * as React from 'react';
 import { memo, useCallback, useEffect, useRef } from 'react';
 import { logEvent } from 'src/services/analytics/index.js';
 import { useAppState, useSetAppState } from 'src/state/AppState.js';
-import { getClaudeConfigHomeDir } from '../utils/envUtils.js';
 import type { PermissionMode } from 'src/utils/permissions/PermissionMode.js';
-import { getKairosActive, getMainThreadAgentType, getOriginalCwd, getSdkBetas, getSessionId } from '../bootstrap/state.js';
+import {
+  getKairosActive,
+  getMainThreadAgentType,
+  getOriginalCwd,
+  getSdkBetas,
+  getSessionId,
+} from '../bootstrap/state.js';
 import { DEFAULT_OUTPUT_STYLE_NAME } from '../constants/outputStyles.js';
 import { useNotifications } from '../context/notifications.js';
-import { getTotalAPIDuration, getTotalDuration, getTotalInputTokens, getTotalLinesAdded, getTotalLinesRemoved, getTotalOutputTokens } from '../cost-tracker.js';
+import {
+  getTotalAPIDuration,
+  getTotalDuration,
+  getTotalInputTokens,
+  getTotalLinesAdded,
+  getTotalLinesRemoved,
+  getTotalOutputTokens,
+} from '../cost-tracker.js';
 import { useMainLoopModel } from '../hooks/useMainLoopModel.js';
 import { type ReadonlySettings, useSettings } from '../hooks/useSettings.js';
 import { Ansi, Box, Text } from '../ink.js';
+import { Spinner } from './Spinner.js';
 import { ProviderManager } from '../services/ai/ProviderManager.js';
 import { getRawUtilization } from '../services/claudeAiLimits.js';
+import { roughTokenCountEstimationForMessages } from '../services/tokenEstimation.js';
 import type { Message } from '../types/message.js';
 import type { StatusLineCommandInput } from '../types/statusLine.js';
 import type { VimMode } from '../types/textInputTypes.js';
@@ -25,19 +39,20 @@ import { checkHasTrustDialogAccepted } from '../utils/config.js';
 import { calculateContextPercentages, getContextWindowForModel } from '../utils/context.js';
 import { getCwd } from '../utils/cwd.js';
 import { logForDebugging } from '../utils/debug.js';
+import { getClaudeConfigHomeDir } from '../utils/envUtils.js';
 import { isFullscreenEnvEnabled } from '../utils/fullscreen.js';
 import { createBaseHookInput, executeStatusLineCommand } from '../utils/hooks.js';
+import { decodeHtmlEntities } from '../utils/htmlEntities.js';
 import { getLastAssistantMessage } from '../utils/messages.js';
 import { getRuntimeMainLoopModel, type ModelName, renderModelName } from '../utils/model/model.js';
 import { getCurrentSessionTitle } from '../utils/sessionStorage.js';
-import { decodeHtmlEntities } from '../utils/htmlEntities.js';
 import { doesMostRecentAssistantMessageExceed200k, getCurrentUsage } from '../utils/tokens.js';
-import { roughTokenCountEstimationForMessages } from '../services/tokenEstimation.js';
 import { getCurrentWorktreeSession } from '../utils/worktree.js';
 import { isVimModeEnabled } from './PromptInput/utils.js';
 
 export function statusLineShouldDisplay(settings: ReadonlySettings): boolean {
   if (feature('KAIROS') && getKairosActive()) return false;
+  if (settings.statusLine?.enabled === false) return false;
   return true;
 }
 
@@ -49,14 +64,14 @@ function buildStatusLineCommandInput(
   addedDirs: string[],
   mainLoopModel: ModelName,
   vimMode?: VimMode,
-  providerOverride?: string
+  providerOverride?: string,
 ): StatusLineCommandInput {
   const agentType = getMainThreadAgentType();
   const worktreeSession = getCurrentWorktreeSession();
   const runtimeModel = getRuntimeMainLoopModel({
     permissionMode,
     mainLoopModel,
-    exceeds200kTokens
+    exceeds200kTokens,
   });
   const outputStyleName = settings?.outputStyle || DEFAULT_OUTPUT_STYLE_NAME;
   const currentUsage = getCurrentUsage(messages);
@@ -69,41 +84,41 @@ function buildStatusLineCommandInput(
     ...(rawUtil.five_hour && {
       five_hour: {
         used_percentage: rawUtil.five_hour.utilization * 100,
-        resets_at: rawUtil.five_hour.resets_at
-      }
+        resets_at: rawUtil.five_hour.resets_at,
+      },
     }),
     ...(rawUtil.seven_day && {
       seven_day: {
         used_percentage: rawUtil.seven_day.utilization * 100,
-        resets_at: rawUtil.seven_day.resets_at
-      }
-    })
+        resets_at: rawUtil.seven_day.resets_at,
+      },
+    }),
   };
   return {
     ...createBaseHookInput(),
     ...(sessionName && {
-      session_name: sessionName
+      session_name: sessionName,
     }),
     model: {
       id: runtimeModel,
-      display_name: renderModelName(runtimeModel, providerOverride).replace(/^[^:]+:\s*/, '')
+      display_name: renderModelName(runtimeModel, providerOverride).replace(/^[^:]+:\s*/, ''),
     },
     workspace: {
       current_dir: getCwd(),
       project_dir: getOriginalCwd(),
       added_dirs: addedDirs,
-      git_worktree: getCurrentWorktreeSession() !== null
+      git_worktree: getCurrentWorktreeSession() !== null,
     },
     version: MACRO.VERSION,
     output_style: {
-      name: outputStyleName
+      name: outputStyleName,
     },
     cost: {
       total_cost_usd: getTotalCost(),
       total_duration_ms: getTotalDuration(),
       total_api_duration_ms: getTotalAPIDuration(),
       total_lines_added: getTotalLinesAdded(),
-      total_lines_removed: getTotalLinesRemoved()
+      total_lines_removed: getTotalLinesRemoved(),
     },
     context_window: {
       total_input_tokens: getTotalInputTokens(),
@@ -111,21 +126,21 @@ function buildStatusLineCommandInput(
       context_window_size: contextWindowSize,
       current_usage: currentUsage,
       used_percentage: contextPercentages.used,
-      remaining_percentage: contextPercentages.remaining
+      remaining_percentage: contextPercentages.remaining,
     },
     exceeds_200k_tokens: exceeds200kTokens,
     ...((rateLimits.five_hour || rateLimits.seven_day) && {
-      rate_limits: rateLimits
+      rate_limits: rateLimits,
     }),
     ...(isVimModeEnabled() && {
       vim: {
-        mode: vimMode ?? 'INSERT'
-      }
+        mode: vimMode ?? 'INSERT',
+      },
     }),
     ...(agentType && {
       agent: {
-        name: agentType
-      }
+        name: agentType,
+      },
     }),
     ...(worktreeSession && {
       worktree: {
@@ -133,9 +148,9 @@ function buildStatusLineCommandInput(
         path: worktreeSession.worktreePath,
         branch: worktreeSession.worktreeBranch,
         original_cwd: worktreeSession.originalCwd,
-        original_branch: worktreeSession.originalBranch
-      }
-    })
+        original_branch: worktreeSession.originalBranch,
+      },
+    }),
   };
 }
 
@@ -162,10 +177,13 @@ function coloredBar(percent: number, width: number = 10): string {
   const emptyWidth = width - fullBlocks - (partialChar.trim() ? 1 : 0);
 
   let color: string;
-  if (percent > 90) color = '#FF0055';      // Neon Red (Critical)
-  else if (percent > 75) color = '#FFCC00'; // Cyber Amber (Warning)
-  else if (percent > 50) color = '#00CCFF'; // Sky Blue (Moderate)
-  else color = '#00FFCC';                    // Electric Teal (Healthy)
+  if (percent > 90)
+    color = '#FF0055'; // Neon Red (Critical)
+  else if (percent > 75)
+    color = '#FFCC00'; // Cyber Amber (Warning)
+  else if (percent > 50)
+    color = '#00CCFF'; // Sky Blue (Moderate)
+  else color = '#00FFCC'; // Electric Teal (Healthy)
 
   const filledPart = '█'.repeat(fullBlocks) + (fullBlocks < width ? partialChar : '');
   const emptyPart = '░'.repeat(Math.max(0, emptyWidth));
@@ -273,18 +291,20 @@ function countHooks(settings: ReadonlySettings): number {
   if (!hooks) return 0;
   return Object.values(hooks).reduce((total, matchers) => {
     if (!Array.isArray(matchers)) return total;
-    return total + matchers.reduce((sum, matcher) => sum + (Array.isArray((matcher as any).hooks) ? (matcher as any).hooks.length : 0), 0);
+    return (
+      total +
+      matchers.reduce(
+        (sum, matcher) => sum + (Array.isArray((matcher as any).hooks) ? (matcher as any).hooks.length : 0),
+        0,
+      )
+    );
   }, 0);
 }
 
 function countPermissionRules(settings: ReadonlySettings): number {
   const permissions = settings?.permissions;
   if (!permissions) return 0;
-  return (
-    (permissions.allow?.length ?? 0) +
-    (permissions.deny?.length ?? 0) +
-    (permissions.ask?.length ?? 0)
-  );
+  return (permissions.allow?.length ?? 0) + (permissions.deny?.length ?? 0) + (permissions.ask?.length ?? 0);
 }
 
 function countClaudeFiles(cwd: string): number {
@@ -370,8 +390,8 @@ function extractActivity(messages: Message[]): {
           const subject = typeof input.subject === 'string' ? input.subject : '';
           const desc = typeof input.description === 'string' ? input.description : '';
           const todoContent = subject || desc || 'Untitled task';
-          const status = input.status === 'in_progress' ? 'in_progress' :
-            input.status === 'completed' ? 'completed' : 'pending';
+          const status =
+            input.status === 'in_progress' ? 'in_progress' : input.status === 'completed' ? 'completed' : 'pending';
           latestTodos.push({ content: todoContent, status });
           const taskId = input.taskId ?? block.id;
           if (taskId) taskIdToIndex.set(String(taskId), latestTodos.length - 1);
@@ -390,8 +410,8 @@ function extractActivity(messages: Message[]): {
           if (idx !== null && idx < latestTodos.length) {
             if (input.status) {
               const s = String(input.status);
-              latestTodos[idx].status = s === 'completed' ? 'completed' :
-                s === 'in_progress' ? 'in_progress' : 'pending';
+              latestTodos[idx].status =
+                s === 'completed' ? 'completed' : s === 'in_progress' ? 'in_progress' : 'pending';
             }
             const newSubject = typeof input.subject === 'string' ? input.subject : '';
             const newDesc = typeof input.description === 'string' ? input.description : '';
@@ -443,11 +463,7 @@ function truncate(str: string, maxLen: number = 40): string {
 
 // ─── StatusLine component ──────────────────────────────────────────────────
 
-function StatusLineInner({
-  messagesRef,
-  lastAssistantMessageId,
-  vimMode
-}: Props): React.ReactNode {
+function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props): React.ReactNode {
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
   const permissionMode = useAppState(s => s.toolPermissionContext.mode);
   const additionalWorkingDirectories = useAppState(s => s.toolPermissionContext.additionalWorkingDirectories);
@@ -469,7 +485,7 @@ function StatusLineInner({
   React.useEffect(() => {
     const checkCwd = () => {
       const newCwd = getCwd();
-      setCurrentCwd(prev => prev !== newCwd ? newCwd : prev);
+      setCurrentCwd(prev => (prev !== newCwd ? newCwd : prev));
     };
     const timer = setInterval(checkCwd, 500);
     return () => clearInterval(timer);
@@ -499,7 +515,7 @@ function StatusLineInner({
     permissionMode,
     vimMode,
     mainLoopModel,
-    provider: mainLoopProviderForSession ?? mainLoopProvider
+    provider: mainLoopProviderForSession ?? mainLoopProvider,
   });
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -522,7 +538,16 @@ function StatusLineInner({
         previousStateRef.current.exceeds200kTokens = exceeds200kTokens;
       }
       const activeProvider = mainLoopProviderForSession ?? mainLoopProvider;
-      const statusInput = buildStatusLineCommandInput(permissionModeRef.current, exceeds200kTokens, settingsRef.current, msgs, Array.from(addedDirsRef.current.keys()), mainLoopModelRef.current, vimModeRef.current, activeProvider);
+      const statusInput = buildStatusLineCommandInput(
+        permissionModeRef.current,
+        exceeds200kTokens,
+        settingsRef.current,
+        msgs,
+        Array.from(addedDirsRef.current.keys()),
+        mainLoopModelRef.current,
+        vimModeRef.current,
+        activeProvider,
+      );
       const text = await executeStatusLineCommand(statusInput, controller.signal, undefined, logResult);
       if (!controller.signal.aborted) {
         setAppState(prev => {
@@ -530,7 +555,9 @@ function StatusLineInner({
           return { ...prev, statusLineText: text };
         });
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [messagesRef, setAppState]);
 
   const scheduleUpdate = useCallback(() => {
@@ -543,21 +570,35 @@ function StatusLineInner({
 
   useEffect(() => {
     const activeProvider = mainLoopProviderForSession ?? mainLoopProvider;
-    if (lastAssistantMessageId !== previousStateRef.current.messageId || permissionMode !== previousStateRef.current.permissionMode || vimMode !== previousStateRef.current.vimMode || mainLoopModel !== previousStateRef.current.mainLoopModel || activeProvider !== previousStateRef.current.provider) {
+    if (
+      lastAssistantMessageId !== previousStateRef.current.messageId ||
+      permissionMode !== previousStateRef.current.permissionMode ||
+      vimMode !== previousStateRef.current.vimMode ||
+      mainLoopModel !== previousStateRef.current.mainLoopModel ||
+      activeProvider !== previousStateRef.current.provider
+    ) {
       previousStateRef.current.permissionMode = permissionMode;
       previousStateRef.current.vimMode = vimMode;
       previousStateRef.current.mainLoopModel = mainLoopModel;
       previousStateRef.current.provider = activeProvider;
       scheduleUpdate();
     }
-  }, [lastAssistantMessageId, permissionMode, vimMode, mainLoopModel, mainLoopProvider, mainLoopProviderForSession, scheduleUpdate]);
+  }, [
+    lastAssistantMessageId,
+    permissionMode,
+    vimMode,
+    mainLoopModel,
+    mainLoopProvider,
+    mainLoopProviderForSession,
+    scheduleUpdate,
+  ]);
 
   useEffect(() => {
     const statusLine = settings?.statusLine;
     if (statusLine) {
       logEvent('tengu_status_line_mount', {
         command_length: statusLine.command.length,
-        padding: statusLine.padding
+        padding: statusLine.padding,
       });
       if (settings.disableAllHooks === true) {
         logForDebugging('Status line is configured but disableAllHooks is true', { level: 'warn' });
@@ -567,7 +608,7 @@ function StatusLineInner({
           key: 'statusline-trust-blocked',
           text: 'statusline skipped · restart to fix',
           color: 'warning',
-          priority: 'low'
+          priority: 'low',
         });
       }
     }
@@ -583,13 +624,14 @@ function StatusLineInner({
 
   const paddingX = settings?.statusLine?.padding ?? 0;
   const decodedStatusLineText = statusLineText ? decodeHtmlEntities(statusLineText) : statusLineText;
-  const filteredStatusLineText = decodedStatusLineText && /mode on \([^)]*cycle\)/i.test(decodedStatusLineText) ? undefined : decodedStatusLineText;
+  const filteredStatusLineText =
+    decodedStatusLineText && /mode on \([^)]*cycle\)/i.test(decodedStatusLineText) ? undefined : decodedStatusLineText;
 
   const defaultStatusLine = (() => {
     const runtimeModel = getRuntimeMainLoopModel({
       permissionMode,
       mainLoopModel,
-      exceeds200kTokens: previousStateRef.current.exceeds200kTokens
+      exceeds200kTokens: previousStateRef.current.exceeds200kTokens,
     });
     const currentUsage = getCurrentUsage(messagesRef.current);
     let inputTokens = currentUsage?.input_tokens ?? 0;
@@ -653,86 +695,97 @@ function StatusLineInner({
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5);
 
-    const claudeCount = countClaudeFiles(cwd);
     const ruleCount = countPermissionRules(settings);
     const hookCount = countHooks(settings);
-    const percentText = usedPercentage > 85
-      ? chalk.hex('#ff4444')(`${usedPercentage.toFixed(0)}%`)
-      : usedPercentage > 70
-        ? chalk.hex('#ffaa00')(`${usedPercentage.toFixed(0)}%`)
-        : chalk.green(`${usedPercentage.toFixed(0)}%`);
+    const percentText =
+      usedPercentage > 85
+        ? chalk.hex('#ff4444')(`${usedPercentage.toFixed(0)}%`)
+        : usedPercentage > 70
+          ? chalk.hex('#ffaa00')(`${usedPercentage.toFixed(0)}%`)
+          : chalk.green(`${usedPercentage.toFixed(0)}%`);
 
-    const activeProvider = mainLoopProviderForSession ?? mainLoopProvider ?? ProviderManager.getInstance().getActiveProviderName()
-    const activeProviderDisplay = activeProvider ? chalk.hex('#888888')(`[${activeProvider}]`) : ''
-    const cwdShort = cwd.length > 40 ? '...' + cwd.slice(-37) : cwd
-    const cwdDisplay = chalk.hex('#666666')(cwdShort)
+    const activeProvider =
+      mainLoopProviderForSession ?? mainLoopProvider ?? ProviderManager.getInstance().getActiveProviderName();
+    const activeProviderDisplay = activeProvider ? chalk.hex('#888888')(`[${activeProvider}]`) : '';
+    const cwdShort = cwd.length > 40 ? '...' + cwd.slice(-37) : cwd;
+    const cwdDisplay = chalk.hex('#666666')(cwdShort);
     let sessionGoalDisplay = '';
     if (sessionGoal) {
-      const elapsed = sessionGoalStartTime
-        ? Math.floor((Date.now() - sessionGoalStartTime) / 1000)
-        : 0;
-      const elapsedStr = elapsed > 0
-        ? `${Math.floor(elapsed / 60)}m${elapsed % 60}s`
-        : '0s';
+      const elapsed = sessionGoalStartTime ? Math.floor((Date.now() - sessionGoalStartTime) / 1000) : 0;
+      const elapsedStr = elapsed > 0 ? `${Math.floor(elapsed / 60)}m${elapsed % 60}s` : '0s';
       const turns = sessionGoalTurnCount ?? 0;
       sessionGoalDisplay = chalk.yellow(` [${sessionGoal} ${elapsedStr} t${turns}]`);
     }
+    // Build stats parts (only show non-zero)
+    const statsParts: string[] = [];
+    if (ruleCount > 0) statsParts.push(`${ruleCount} rules`);
+    if (mcpCount > 0) statsParts.push(`${mcpCount} MCPs`);
+    const statsStr = statsParts.length > 0 ? ' · ' + statsParts.join(' · ') : '';
+
     const line1 =
       cwdDisplay +
-      chalk.dim(' ') +
-      chalk.cyan(`[${modelName}]`) +
+      chalk.dim(' · ') +
+      chalk.cyan(modelName) +
       activeProviderDisplay +
       sessionGoalDisplay +
-      chalk.dim(' | ') +
+      chalk.dim('  ') +
       bar +
-      ' ' +
+      chalk.dim(' ') +
       percentText +
-      chalk.dim(`/${formatContextSize(contextWindowSize)}`) +
-      chalk.dim(` | ${claudeCount} CLAUDE.md | ${ruleCount} rules | ${mcpCount} MCPs | ${hookCount} hooks | `) +
-      chalk.white('◷') +
-      chalk.dim(` ${formatCompactDuration(duration)}`);
+      chalk.dim(` · ${formatContextSize(contextWindowSize)} · ◷ ${formatCompactDuration(duration)}`) +
+      chalk.dim(statsStr);
 
-    // ── Build activity line string ──
-    let activityLine = '';
-    if (runningTools.length > 0 || sortedCompletedTools.length > 0) {
+    // ── Build activity line ──
+    const hasRunningTools = runningTools.length > 0;
+    const hasCompletedTools = sortedCompletedTools.length > 0;
+    let completedToolsLine = '';
+    if (hasCompletedTools) {
       const parts: string[] = [];
-      for (const t of runningTools.slice(-3)) {
-        if (t.isMcp) {
-          parts.push(
-            chalk.hex('#AA88FF')('◈') + ' ' + chalk.hex('#CC99FF')(t.name.replace(/^mcp__/, 'mcp:')) +
-            (t.target ? chalk.dim(`: ${truncate(t.target.replace(/\\/g, '/'), 25)}`) : '')
-          );
-        } else {
-          parts.push(
-            chalk.yellow('◐') + ' ' + chalk.cyan(t.name) +
-            (t.target ? chalk.dim(`: ${truncate(t.target.replace(/\\/g, '/'), 25)}`) : '')
-          );
-        }
+      for (const [name, count] of sortedCompletedTools.slice(0, 3)) {
+        parts.push(chalk.green('✓') + name + chalk.dim(`×${count}`));
       }
-      for (const [name, count] of sortedCompletedTools) {
-        parts.push(chalk.green('✓') + ' ' + name + ' ' + chalk.dim(`×${count}`));
+      if (sortedCompletedTools.length > 3) {
+        parts.push(chalk.dim(`+${sortedCompletedTools.length - 3} more`));
       }
-      activityLine = parts.join(' | ');
+      completedToolsLine = parts.join(chalk.dim(' · '));
     }
 
-    const agentLines = [
-      ...runningAgents.slice(-2).map(a =>
-        chalk.yellow('◐') + ' ' + chalk.magenta(a.type) +
-        (a.description ? chalk.dim(`: ${truncate(a.description, 54)}`) : '')
-      ),
-      ...completedAgents.slice(-3).map(a =>
-        chalk.green('✓') + ' ' + chalk.magenta(a.type) +
-        (a.description ? chalk.dim(`: ${truncate(a.description, 54)}`) : '') +
-        formatActivityDuration(a)
-      ),
+    const agentLines: Array<{ key: string; node: React.ReactNode }> = [
+      ...runningAgents
+        .slice(-1)
+        .map(
+          a => ({
+            key: `agent-running-${a.id}`,
+            node: (
+              <Box flexDirection="row" key={`agent-running-${a.id}`}>
+                <Spinner color="yellow" />
+                <Text><Ansi>{chalk.dim(' ') + chalk.magenta(a.type) + (a.description ? chalk.dim(` ${truncate(a.description, 40)}`) : '')}</Ansi></Text>
+              </Box>
+            ),
+          }),
+        ),
+      ...completedAgents
+        .slice(-2)
+        .map(
+          a => ({
+            key: `agent-done-${a.id}`,
+            node: (
+              <Box flexDirection="row" key={`agent-done-${a.id}`}>
+                <Text><Ansi>{chalk.green('✓') + chalk.dim(' ') + chalk.magenta(a.type) + (a.description ? chalk.dim(` ${truncate(a.description, 40)}`) : '') + formatActivityDuration(a)}</Ansi></Text>
+              </Box>
+            ),
+          }),
+        ),
     ];
 
     const todoLine = todos
       ? todos.total > 0 && todos.completed === todos.total
-        ? chalk.green('✓') + ' All todos complete ' + chalk.dim(`(${todos.completed}/${todos.total})`)
+        ? chalk.green('✓') + chalk.dim(' All todos complete ') + chalk.dim(`(${todos.completed}/${todos.total})`)
         : todos.inProgress
-          ? chalk.green('✓') + ' ' + truncate(todos.inProgress, 60) + ' ' + chalk.dim(`(${todos.completed}/${todos.total})`)
-          : chalk.green('✓') + ' Todos ' + chalk.dim(`(${todos.completed}/${todos.total})`)
+          ? chalk.dim(' ') +
+            truncate(todos.inProgress, 50) +
+            chalk.dim(` (${todos.completed}/${todos.total})`)
+          : chalk.green('✓') + chalk.dim(' Todos ') + chalk.dim(`(${todos.completed}/${todos.total})`)
       : '';
 
     return (
@@ -743,23 +796,52 @@ function StatusLineInner({
           </Text>
         </Box>
 
-        {activityLine && (
+        {/* Running tools with animated spinner */}
+        {hasRunningTools && (
+          <Box overflowX="hidden" flexDirection="row">
+            {runningTools.slice(-2).map((t, i) => (
+              <React.Fragment key={t.id}>
+                {i > 0 && <Text dimColor> · </Text>}
+                {t.isMcp ? (
+                  <Text color="#AA88FF">◈ <Text color="#CC99FF">{t.name.replace(/^mcp__/, 'mcp:')}</Text>{t.target ? <Text dimColor> {truncate(t.target.replace(/\\/g, '/'), 20)}</Text> : null}</Text>
+                ) : (
+                  <>
+                    <Spinner color="yellow" />
+                    <Text><Ansi>{chalk.dim(' ') + chalk.cyan(t.name) + (t.target ? chalk.dim(` ${truncate(t.target.replace(/\\/g, '/'), 20)}`) : '')}</Ansi></Text>
+                  </>
+                )}
+              </React.Fragment>
+            ))}
+            {/* separator before completed tools */}
+            {hasCompletedTools && <Text dimColor> · </Text>}
+            {completedToolsLine && (
+              <Text><Ansi>{completedToolsLine}</Ansi></Text>
+            )}
+          </Box>
+        )}
+        {/* Completed tools only (no running tools) */}
+        {!hasRunningTools && completedToolsLine && (
           <Box overflowX="hidden">
             <Text>
-              <Ansi>{activityLine}</Ansi>
+              <Ansi>{completedToolsLine}</Ansi>
             </Text>
           </Box>
         )}
 
-        {agentLines.map((line, index) => (
-          <Box key={`agent-line-${index}`} overflowX="hidden">
-            <Text>
-              <Ansi>{line}</Ansi>
-            </Text>
+        {agentLines.map(({ key, node }) => (
+          <Box key={key} overflowX="hidden">
+            {node}
           </Box>
         ))}
 
-        {todoLine && (
+        {todos && todos.total > 0 && todos.inProgress && (
+          <Box overflowX="hidden" flexDirection="row">
+            <Text>
+              <Ansi>{chalk.green('◐') + todoLine}</Ansi>
+            </Text>
+          </Box>
+        )}
+        {todos && todos.total > 0 && !todos.inProgress && todoLine && (
           <Box overflowX="hidden">
             <Text>
               <Ansi>{todoLine}</Ansi>

@@ -1,11 +1,11 @@
-import * as React from 'react';
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Box, Text, useInput } from '../ink.js';
-import { getFsImplementation } from '../utils/fsOperations.js';
-import { join, relative, basename } from 'path';
-import { getCwd } from '../utils/cwd.js';
 import chalk from 'chalk';
 import chokidar from 'chokidar';
+import { basename, join, relative } from 'path';
+import * as React from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Box, Text, useInput } from '../ink.js';
+import { getCwd } from '../utils/cwd.js';
+import { getFsImplementation } from '../utils/fsOperations.js';
 
 export interface FileNode {
   path: string;
@@ -35,16 +35,10 @@ export function FileTree({ onFileSelect, width = 30, isFocused = true }: FileTre
   // Real-time updates using chokidar
   useEffect(() => {
     const watcher = chokidar.watch(getCwd(), {
-      ignored: [
-        '**/node_modules/**',
-        '**/.git/**',
-        '**/dist/**',
-        '**/build/**',
-        '**/.claude/cache/**'
-      ],
+      ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**', '**/.claude/cache/**'],
       persistent: true,
       ignoreInitial: true,
-      depth: 3 // Watch up to 3 levels deep for responsiveness
+      depth: 3, // Watch up to 3 levels deep for responsiveness
     });
 
     watcher.on('add', refresh);
@@ -60,7 +54,7 @@ export function FileTree({ onFileSelect, width = 30, isFocused = true }: FileTre
   // Recursively build the tree nodes for rendering as a flat list
   const buildFlatTree = useMemo(() => {
     const flatNodes: FileNode[] = [];
-    
+
     function walk(dirPath: string, level: number) {
       try {
         const entries = fs.readdirSync(dirPath);
@@ -75,16 +69,16 @@ export function FileTree({ onFileSelect, width = 30, isFocused = true }: FileTre
           const fullPath = join(dirPath, entry.name);
           // Skip hidden files/folders (except .claude if we want, but let's stick to standard)
           if (entry.name.startsWith('.') && entry.name !== '.claude') continue;
-          
+
           const node: FileNode = {
             path: fullPath,
             name: entry.name,
             isDirectory: entry.isDirectory(),
-            level
+            level,
           };
-          
+
           flatNodes.push(node);
-          
+
           if (node.isDirectory && expandedFolders.has(fullPath)) {
             walk(fullPath, level + 1);
           }
@@ -104,7 +98,7 @@ export function FileTree({ onFileSelect, width = 30, isFocused = true }: FileTre
 
   useInput((input, key) => {
     if (!isFocused) return;
-    
+
     if (key.upArrow) {
       setSelectedIndex(prev => Math.max(0, prev - 1));
     } else if (key.downArrow) {
@@ -133,9 +127,28 @@ export function FileTree({ onFileSelect, width = 30, isFocused = true }: FileTre
   });
 
   return (
-    <Box flexDirection="column" width={width} borderStyle="single" borderRight={true} borderLeft={false} borderTop={false} borderBottom={false} borderColor="dim">
-      <Box paddingX={1} borderStyle="single" borderColor="dim" borderBottom={true} borderLeft={false} borderRight={false} borderTop={false}>
-        <Text bold color={isFocused ? 'cyan' : 'dim'}>📁 EXPLORER {isFocused ? '' : '(Ctrl+B to focus)'}</Text>
+    <Box
+      flexDirection="column"
+      width={width}
+      borderStyle="single"
+      borderRight={true}
+      borderLeft={false}
+      borderTop={false}
+      borderBottom={false}
+      borderColor="dim"
+    >
+      <Box
+        paddingX={1}
+        borderStyle="single"
+        borderColor="dim"
+        borderBottom={true}
+        borderLeft={false}
+        borderRight={false}
+        borderTop={false}
+      >
+        <Text bold color={isFocused ? 'cyan' : 'dim'}>
+          📁 EXPLORER {isFocused ? '' : '(Ctrl+B to focus)'}
+        </Text>
       </Box>
       <Box flexDirection="column" paddingX={1} flexGrow={1}>
         {nodes.map((node, index) => {
@@ -143,21 +156,31 @@ export function FileTree({ onFileSelect, width = 30, isFocused = true }: FileTre
           const isExpanded = node.isDirectory && expandedFolders.has(node.path);
           const icon = node.isDirectory ? (isExpanded ? '▼ 📁' : '▶ 📁') : '  📄';
           const padding = '  '.repeat(node.level);
-          
+
           return (
             <Box key={node.path}>
-              <Text 
-                backgroundColor={isSelected ? 'white' : undefined} 
-                color={isSelected ? 'black' : (node.isDirectory ? 'blue' : undefined)}
+              <Text
+                backgroundColor={isSelected ? 'white' : undefined}
+                color={isSelected ? 'black' : node.isDirectory ? 'blue' : undefined}
                 wrap="truncate-end"
               >
-                {padding}{icon} {node.name}
+                {padding}
+                {icon} {node.name}
               </Text>
             </Box>
           );
         })}
       </Box>
-      <Box marginTop={1} paddingX={1} borderStyle="single" borderTop={true} borderBottom={false} borderLeft={false} borderRight={false} borderColor="dim">
+      <Box
+        marginTop={1}
+        paddingX={1}
+        borderStyle="single"
+        borderTop={true}
+        borderBottom={false}
+        borderLeft={false}
+        borderRight={false}
+        borderColor="dim"
+      >
         <Text dimColor>↑↓ Move • Enter Open</Text>
       </Box>
     </Box>
