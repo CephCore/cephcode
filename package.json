@@ -12,6 +12,9 @@
     "url": "https://github.com/JonusNattapong/ClaudeCode/issues"
   },
   "homepage": "https://github.com/JonusNattapong/ClaudeCode#readme",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "scripts": {
     "dev": "bun --watch run src/main.tsx",
     "start": "bun run src/main.tsx",
