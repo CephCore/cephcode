@@ -91,18 +91,25 @@
 
       <div class="hero">
         <h2>Get Started</h2>
-        <p>Install and run Claude Code in minutes:</p>
+        <p>Install Claude Code globally via npm or bun:</p>
         <div class="code-block">
-          <pre><code># Clone the repository
+          <pre><code># Via npm
+npm install -g @jonusnattapong/claudecode
+
+# Via bun
+bun install -g @jonusnattapong/claudecode
+
+# Start Claude Code
+claude</code></pre>
+        </div>
+        <p>Or clone for local development:</p>
+        <div class="code-block">
+          <pre><code># Clone and setup
 git clone https://github.com/JonusNattapong/ClaudeCode.git
 cd claudecode
-
-# Install dependencies
 bun install
-
-# Build and start a session
 bun run build
-bun run src/main.tsx session</code></pre>
+bun run start</code></pre>
         </div>
       </div>
 

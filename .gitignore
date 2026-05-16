@@ -66,6 +66,9 @@ bun-linux-x64/
 .cache/
 .eslintcache
 
+# Vendored binaries (downloaded locally, not committed)
+src/utils/vendor/ripgrep/
+
 # Temp
 tmp/
 temp/

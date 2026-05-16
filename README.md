@@ -16,23 +16,23 @@ The platform is built on [Bun](https://bun.sh) 1.3+ and supports Windows, macOS,
 
 A unified interface for seamless switching between AI providers at runtime via the `/model` command. Supported providers include:
 
-| Provider | Environment Variable |
-|----------|---------------------|
-| Anthropic Claude | `ANTHROPIC_API_KEY` |
-| OpenAI GPT | `OPENAI_API_KEY` |
-| Google Gemini | `GOOGLE_API_KEY` |
-| OpenRouter | `OPENROUTER_API_KEY` |
-| DeepSeek | `DEEPSEEK_API_KEY` |
-| Ollama (Local) | `OLLAMA_API_KEY`, `OLLAMA_HOST` |
-| xAI (Grok) | `XAI_API_KEY` |
-| Mistral | `MISTRAL_API_KEY` |
-| Groq | `GROQ_API_KEY` |
-| GitHub Copilot | `COPILOT_GITHUB_TOKEN` |
-| KiloCode | `KILOCODE_API_KEY` |
-| OpenCode | `OPENCODE_API_KEY` |
-| OpenCode Go | `OPENCODE_GO_API_KEY` |
-| Cline | `CLINE_API_KEY` |
-| ChatGPT Plus | `CHATGPT_SUBSCRIPTION_KEY` |
+| Provider          | Environment Variable            |
+| ----------------- | ------------------------------- |
+| Anthropic Claude  | `ANTHROPIC_API_KEY`             |
+| OpenAI GPT        | `OPENAI_API_KEY`                |
+| Google Gemini     | `GOOGLE_API_KEY`                |
+| OpenRouter        | `OPENROUTER_API_KEY`            |
+| DeepSeek          | `DEEPSEEK_API_KEY`              |
+| Ollama (Local)    | `OLLAMA_API_KEY`, `OLLAMA_HOST` |
+| xAI (Grok)        | `XAI_API_KEY`                   |
+| Mistral           | `MISTRAL_API_KEY`               |
+| Groq              | `GROQ_API_KEY`                  |
+| GitHub Copilot    | `COPILOT_GITHUB_TOKEN`          |
+| KiloCode          | `KILOCODE_API_KEY`              |
+| OpenCode          | `OPENCODE_API_KEY`              |
+| OpenCode Go       | `OPENCODE_GO_API_KEY`           |
+| Cline             | `CLINE_API_KEY`                 |
+| ChatGPT Plus      | `CHATGPT_SUBSCRIPTION_KEY`      |
 
 ### Adapter Architecture
 
@@ -40,20 +40,20 @@ Non-Anthropic SDK clients are transparently wrapped into a unified streaming int
 
 ### Built-in Tools (55+)
 
-| Category | Tools |
-|----------|-------|
-| File Operations | Read, Edit, Write, Glob, Grep, FileEdit, FileRead, FileWrite, NotebookEdit |
-| Shell Execution | Bash, PowerShell, Sleep |
-| Web & Browser | WebFetch, WebSearch, Browser, WebBrowser |
-| Code Intelligence | CodeIndex (fuzzy search), LSP, JsonPath |
-| AI & Task Management | Agent, Research, Supervisor, Task (Create/Get/List/Update/Output/Stop) |
-| Planning | EnterPlanMode, ExitPlanMode, VerifyPlanExecution, Workflow |
-| Meta & Configuration | Skill, ToolSearch, Config, TodoWrite, Monitor, RemoteTrigger |
-| Code Analysis | CodeGraph (dependency map), ast-grep (AST search/replace) |
-| Cross-Session | Session Bridge (save/restore context), Preloader (module context) |
-| Communication | SendMessage, AskUserQuestion |
-| MCP Integration | MCP, McpAuth, ListMcpResource, ReadMcpResource |
-| Utilities | REPL, ScheduleCron, SyntheticOutput, ComputerUse, Brief, MultiSearch, Worktree |
+| Category              | Tools                                                                                                 |
+| --------------------- | ----------------------------------------------------------------------------------------------------- |
+| File Operations       | Read, Edit, Write, Glob, Grep, FileEdit, FileRead, FileWrite, NotebookEdit                            |
+| Shell Execution       | Bash, PowerShell, Sleep                                                                               |
+| Web & Browser         | WebFetch, WebSearch, Browser, WebBrowser                                                              |
+| Code Intelligence     | CodeIndex (fuzzy search), LSP, JsonPath                                                               |
+| AI & Task Management  | Agent, Research, Supervisor, Task (Create/Get/List/Update/Output/Stop)                                |
+| Planning              | EnterPlanMode, ExitPlanMode, VerifyPlanExecution, Workflow                                            |
+| Meta & Configuration  | Skill, ToolSearch, Config, TodoWrite, Monitor, RemoteTrigger                                          |
+| Code Analysis         | CodeGraph (dependency map), ast-grep (AST search/replace)                                             |
+| Cross-Session         | Session Bridge (save/restore context), Preloader (module context)                                     |
+| Communication         | SendMessage, AskUserQuestion                                                                          |
+| MCP Integration       | MCP, McpAuth, ListMcpResource, ReadMcpResource                                                        |
+| Utilities             | REPL, ScheduleCron, SyntheticOutput, ComputerUse, Brief, MultiSearch, Worktree                        |
 
 ### Slash Commands (100+)
 
@@ -97,39 +97,65 @@ Modular capability packages with progressive disclosure. Bundled skills include 
 
 ## Technology Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Runtime | Bun 1.3+ |
-| Language | TypeScript 5.x ESM (`NodeNext` module resolution) |
-| UI Framework | React 19 + Ink 6 |
-| AI SDK | Vercel AI SDK (`@ai-sdk/*`) + `@anthropic-ai/sdk` |
-| Validation | Zod 3 + Valibot 0.42 |
-| CLI Framework | Commander.js 13 |
-| Search | fuse.js + fzf |
-| Diff | diff |
-| Markdown | marked + highlight.js + turndown |
-| Terminal | chalk + ora + ink-spinner + ink-text-input |
+| Layer          | Technology                                                                |
+| -------------- | ------------------------------------------------------------------------- |
+| Runtime        | Bun 1.3+                                                                  |
+| Language       | TypeScript 5.x ESM (`NodeNext` module resolution)                         |
+| UI Framework   | React 19 + Ink 6                                                          |
+| AI SDK         | Vercel AI SDK (`@ai-sdk/*`) + `@anthropic-ai/sdk`                         |
+| Validation     | Zod 3 + Valibot 0.42                                                      |
+| CLI Framework  | Commander.js 13                                                           |
+| Search         | fuse.js + fzf                                                             |
+| Diff           | diff                                                                      |
+| Markdown       | marked + highlight.js + turndown                                          |
+| Terminal       | chalk + ora + ink-spinner + ink-text-input                                |
 
-## Installation & Development
+### Installation
+
+#### Option 1: Global Installation (Recommended)
+
+Install Claude Code globally via npm or bun:
+
+```bash
+# Via npm
+npm install -g @jonusnattapong/claudecode
+
+# Via bun
+bun install -g @jonusnattapong/claudecode
+```
+
+Once installed, you can start Claude Code by running:
+
+```bash
+claude
+```
+
+#### Option 2: Local Development Setup (Manual)
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/JonusNattapong/ClaudeCode.git
+   cd claudecode
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   bun install
+   ```
+
+3. **Build and Run**
+
+   ```bash
+   bun run build
+   bun run start
+   ```
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) 1.3 or later
+- [Bun](https://bun.sh) 1.3 or later (for manual setup)
 - At least one AI provider API key
-
-### Setup
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd claudecode
-
-# Install dependencies
-bun install
-
-# Set environment variables (example)
-export ANTHROPIC_API_KEY=your-api-key-here
-```
 
 ### Development Commands
 
@@ -158,7 +184,7 @@ DEBUG=provider:anthropic bun run src/main.tsx  # Per-provider debug logging
 
 ### High-Level Overview
 
-```
+```text
 +-------------------------------------------+
 |       Terminal UI (Ink 6 + React 19)      |
 |  App.tsx, Screens, Components, Buddy      |
@@ -219,7 +245,7 @@ DEBUG=provider:anthropic bun run src/main.tsx  # Per-provider debug logging
 
 ## Project Structure
 
-```
+```text
 src/
 ├── main.tsx                 Main entry point and streaming loop
 ├── query.ts                 Core AI query processing

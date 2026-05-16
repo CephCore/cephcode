@@ -58,22 +58,36 @@
 
       <h2>Install Steps</h2>
 
-      <h3>1. Clone Repository</h3>
+      <h3>Option 1: Global Installation (Recommended)</h3>
+      <p>Install globally using npm or bun to access <code>claude</code> from anywhere.</p>
+      <pre><code># Via npm
+npm install -g @jonusnattapong/claudecode
+
+# Via bun
+bun install -g @jonusnattapong/claudecode
+
+# Verify
+claude --version</code></pre>
+
+      <h3>Option 2: Local Development Setup</h3>
+      <p>Clone the repository if you want to modify the source code or contribute.</p>
+
+      <h4>1. Clone Repository</h4>
       <pre><code>git clone https://github.com/JonusNattapong/ClaudeCode.git
 cd claudecode</code></pre>
 
-      <h3>2. Install Dependencies</h3>
+      <h4>2. Install Dependencies</h4>
       <pre><code>bun install</code></pre>
 
-      <h3>3. Build</h3>
+      <h4>3. Build</h4>
       <pre><code>bun run build</code></pre>
 
-      <h3>4. Run</h3>
+      <h4>4. Run</h4>
       <pre><code># Development mode (with hot reload)
 bun run dev
 
 # Or production build
-bun run src/main.tsx session</code></pre>
+bun run start</code></pre>
 
       <h2>API Key Setup</h2>
 

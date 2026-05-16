@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.144] - 2026-05-16
+
+### Added
+
+- **NPM Publication**: The package is now publicly available on npm as `@jonusnattapong/claudecode`.
+- **Global Installation**: Supports global installation via `npm install -g @jonusnattapong/claudecode` or `bun install -g @jonusnattapong/claudecode`.
+
+### Fixed
+
+- **Redundant Provider Display**: Fixed an issue where the provider name was shown twice in the welcome screen (e.g., "Provider: Model · Provider"). The provider prefix is now stripped from the model name in LogoV2 and CondensedLogo components.
+
 ## [2.1.139] - 2026-05-13
 
 ### Added
