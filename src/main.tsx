@@ -5892,26 +5892,37 @@ Examples:
   }
   // Fast-path for bg session management commands and --bg/--background.
   // Must run before Commander processes args (Commander would reject --bg).
+  // process.argv when running via `bun run src/main.tsx ps`:
+  //   [bun, /path/to/src/main.tsx, ps]
+  // So subcommand is at index 2, args start at index 3.
   const bgCmd = process.argv[2];
+  const bgArg = process.argv[3];
   if (
     bgCmd === 'ps' || bgCmd === 'logs' || bgCmd === 'attach' ||
-    bgCmd === 'kill' || bgCmd === 'respawn' || bgCmd === 'rm' ||
+    bgCmd === 'kill' || bgCmd === 'stop' || bgCmd === 'respawn' || bgCmd === 'rm' ||
     bgCmd === 'agents' ||
     process.argv.includes('--bg') || process.argv.includes('--background')
   ) {
     const bg = await import('./cli/bg.js');
     switch (bgCmd) {
-      case 'ps': await bg.psHandler(process.argv.slice(3)); break;
-      case 'logs': await bg.logsHandler(process.argv[3] || ''); break;
-      case 'attach': await bg.attachHandler(process.argv[3]); break;
-      case 'kill': await bg.killHandler(process.argv[3]); break;
+      case 'ps': await bg.psHandler(process.argv.slice(4)); break;
+      case 'logs': await bg.logsHandler(bgArg || ''); break;
+      case 'attach': {
+        if (!bgArg) { console.error('Usage: claude attach <session-id>'); process.exit(1); }
+        await bg.attachHandler(bgArg); break;
+      }
+      case 'kill':
+      case 'stop': {
+        const targetId = bgArg || '';
+        if (!targetId) { console.error('Usage: claude stop <session-id>'); process.exit(1); }
+        await bg.killHandler(targetId); break;
+      }
       case 'respawn': await (bg as any).respawnCommand(
-          process.argv[3] === '--all' ? undefined : process.argv[3],
-          process.argv[3] === '--all' || process.argv.includes('--all'),
+          bgArg === '--all' ? undefined : bgArg,
+          bgArg === '--all' || process.argv.includes('--all'),
         ); break;
-      case 'rm': await (bg as any).rmCommand(process.argv[3]); break;
+      case 'rm': await (bg as any).rmCommand(bgArg); break;
       case 'agents': {
-        const { isAgentViewDisabled } = await import('./commands/agents/index.js');
         const { getAgentViewDisabledReason } = await import('./commands/agents/index.js');
         const reason = getAgentViewDisabledReason();
         if (reason) { console.log(`Agent view is ${reason}.`); process.exit(0); }
@@ -5919,7 +5930,7 @@ Examples:
         await agentsHandler(); break;
       }
       default:
-        await bg.handleBgFlag(process.argv.slice(2));
+        await bg.handleBgFlag(process.argv.slice(3));
     }
     process.exit(0);
   }
