@@ -3131,7 +3131,14 @@ export function REPL({
       // processTextPrompt) — both pushed length past 1 on turn one, so the
       // title silently fell through to the "Claude Code" default.
       if (!titleDisabled && !sessionTitle && !agentTitle && !haikuTitleAttemptedRef.current) {
-        const firstUserMessage = newMessages.find(m => m.type === 'user' && !m.isMeta);
+        const firstUserMessage = newMessages.find(
+          m =>
+            m.type === 'user' &&
+            !m.isMeta &&
+            // Skip task-notification messages (e.g. plugin monitor output) —
+            // these are injected as user messages but aren't the user's input.
+            !('origin' in m && m.origin && m.origin.kind === 'task-notification'),
+        );
         const text = firstUserMessage?.type === 'user' ? getContentText(firstUserMessage.message.content) : null;
         // Skip synthetic breadcrumbs — slash-command output, prompt-skill
         // expansions (/commit → <command-message>), local-command headers
