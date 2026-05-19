@@ -68,11 +68,19 @@ async function createFork(customTitle?: string): Promise<{
   await mkdir(projectDir, { recursive: true, mode: 0o700 });
 
   // Read current transcript file
+  // After entering a worktree, getTranscriptPath() resolves to the worktree's
+  // project dir which may not have a transcript yet. Fall back to the original
+  // CWD's session file so /branch still works after EnterWorktree.
   let transcriptContent: Buffer;
   try {
     transcriptContent = await readFile(currentTranscriptPath);
   } catch {
-    throw new Error('No conversation to branch');
+    try {
+      const originalPath = getTranscriptPath(getOriginalCwd());
+      transcriptContent = await readFile(originalPath);
+    } catch {
+      throw new Error('No conversation to branch');
+    }
   }
 
   if (transcriptContent.length === 0) {
