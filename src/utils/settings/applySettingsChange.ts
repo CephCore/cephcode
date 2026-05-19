@@ -58,6 +58,12 @@ export function applySettingsChange(
 
     newContext = transitionPlanAutoMode(newContext);
 
+    // Sync model from settings to top-level AppState so IDE model picker
+    // changes take effect at runtime (not just on next startup).
+    const prevModel = prev.settings.model;
+    const newModel = newSettings.model;
+    const modelChanged = prevModel !== newModel && newModel !== undefined;
+
     // Sync effortLevel from settings to top-level AppState when it changes
     // (e.g. via applyFlagSettings from IDE). Only propagate if the setting
     // itself changed — otherwise unrelated settings churn (e.g. tips dismissal
@@ -68,6 +74,7 @@ export function applySettingsChange(
 
     return {
       ...prev,
+      ...(modelChanged ? { mainLoopModel: newModel, mainLoopModelForSession: null } : {}),
       settings: newSettings,
       toolPermissionContext: newContext,
       // Only propagate a defined new value — when the disk key is absent

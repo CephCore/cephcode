@@ -1225,7 +1225,7 @@ export function ManagePlugins({
               await onManageComplete();
             }
             setParentViewState({
-              type: 'menu',
+              type: 'manage-plugins',
             });
             return;
           }
@@ -1272,7 +1272,7 @@ export function ManagePlugins({
         await onManageComplete();
       }
       setParentViewState({
-        type: 'menu',
+        type: 'manage-plugins',
       });
     } catch (error_0) {
       setIsProcessing(false);
@@ -1744,7 +1744,7 @@ export function ManagePlugins({
           setResult(`${figures.tick} ${result_3.message}${suffix}`);
           if (onManageComplete) void onManageComplete();
           setParentViewState({
-            type: 'menu',
+            type: 'manage-plugins',
           });
         } catch (e_0) {
           setIsProcessing(false);
