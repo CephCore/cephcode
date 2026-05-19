@@ -328,7 +328,7 @@ async function fetchFastModeStatus(auth: { accessToken: string } | { apiKey: str
         }
       : { 'x-api-key': auth.apiKey };
 
-  const response = await axios.get<FastModeResponse>(endpoint, { headers });
+  const response = await axios.get<FastModeResponse>(endpoint, { headers, timeout: 15_000 });
   return response.data;
 }
 

@@ -192,15 +192,21 @@ async function makeTestQuery() {
   });
   const messages: MessageParam[] = [{ role: 'user', content: 'quota' }];
   const betas = getModelBetas(model);
+  // 15s timeout so startup doesn't hang for 75s when api.anthropic.com
+  // is unreachable (captive portal, firewall, VPN issues).
+  const signal = AbortSignal.timeout(15_000);
   // biome-ignore lint/plugin: quota check needs raw response access via asResponse()
   return anthropic.beta.messages
-    .create({
-      model,
-      max_tokens: 1,
-      messages,
-      metadata: getAPIMetadata(),
-      ...(betas.length > 0 ? { betas } : {}),
-    })
+    .create(
+      {
+        model,
+        max_tokens: 1,
+        messages,
+        metadata: getAPIMetadata(),
+        ...(betas.length > 0 ? { betas } : {}),
+      },
+      { signal },
+    )
     .asResponse();
 }
 
