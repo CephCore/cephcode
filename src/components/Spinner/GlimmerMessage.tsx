@@ -78,7 +78,9 @@ export function GlimmerMessage({
     const shimmerRGB = shimmerColorStr ? parseRGB(shimmerColorStr) : null;
 
     if (baseRGB && shimmerRGB) {
-      const interpolated = interpolateColor(baseRGB, shimmerRGB, flashOpacity);
+      // Quantize to 4 steps to reduce VS Code rendering glitches
+      const quantized = Math.round(flashOpacity * 4) / 4;
+      const interpolated = interpolateColor(baseRGB, shimmerRGB, quantized);
       return (
         <>
           <Text color={toRGBColor(interpolated)}>{message}</Text>

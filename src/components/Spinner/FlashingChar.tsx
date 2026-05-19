@@ -21,8 +21,11 @@ export function FlashingChar({ char, flashOpacity, messageColor, shimmerColor }:
   const shimmerRGB = shimmerColorStr ? parseRGB(shimmerColorStr) : null;
 
   if (baseRGB && shimmerRGB) {
-    // Smooth interpolation between colors
-    const interpolated = interpolateColor(baseRGB, shimmerRGB, flashOpacity);
+    // Quantize to 4 steps to reduce VS Code terminal rendering glitches
+    // from frequent color changes. Smooth interpolation at 60fps triggers
+    // costly GPU re-composition in VS Code's webview-backed terminal.
+    const quantized = Math.round(flashOpacity * 4) / 4;
+    const interpolated = interpolateColor(baseRGB, shimmerRGB, quantized);
     return <Text color={toRGBColor(interpolated)}>{char}</Text>;
   }
 
