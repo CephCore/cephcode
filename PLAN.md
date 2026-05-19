@@ -834,15 +834,14 @@
 | 6: Auth & Remote Login | 1 | ✅ |
 | 7: MCP | 2 | ✅✅ |
 | 8: Infrastructure | 6 | ✅✅✅✅✅✅ |
-| 9: Windows | 5 | ⬜⬜⬜⬜⬜ |
+| 9: Windows | 5 | ✅✅✅✅✅ |
 | 10: Agent View & BG Sessions | 9 | ⬜⬜⬜⬜✅⬜⬜⬜⬜ |
 | 11: Improvements & Polish | 12 | ✅✅✅✅✅✅✅✅⬜✅✅ |
-| **Total** | **53** | **✅ 42/53** |
+| **Total** | **53** | **✅ 47/53** |
 
-### Remaining (11)
+### Remaining (6)
 
 - **2.2** macOS bg Full Disk Access crash
 - **3.1–3.2** Terminal resize / corruption
-- **9.1–9.5** Windows scroll, crash, Ctrl+C, agents arrow, CJK ghosts
 - **10.2–10.3, 10.5–10.9** Agent view / bg session UX
 - **11.9, 11.11** Skill truncation in /doctor, MCP startup overlap
