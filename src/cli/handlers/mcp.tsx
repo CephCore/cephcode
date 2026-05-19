@@ -150,6 +150,34 @@ export async function mcpRemoveHandler(
 // mcp list (lines 4641–4688)
 export async function mcpListHandler(): Promise<void> {
   logEvent('tengu_mcp_list', {});
+
+  // Check for MCP config parsing errors before listing (e.g. "servers" key
+  // instead of "mcpServers", malformed JSON, etc.)
+  const scopes = ['user', 'project', 'local', 'enterprise'] as const;
+  const parseErrors: string[] = [];
+  for (const scope of scopes) {
+    const { errors } = getMcpConfigsByScope(scope);
+    if (errors.length > 0) {
+      const { describeMcpConfigFilePath } = await import('../../services/mcp/utils.js');
+      const { getScopeLabel } = await import('../../services/mcp/utils.js');
+      for (const err of errors) {
+        const fileHint = describeMcpConfigFilePath(scope);
+        const serverInfo = err.mcpErrorMetadata?.serverName ? `[${err.mcpErrorMetadata.serverName}] ` : '';
+        parseErrors.push(`${getScopeLabel(scope)} (${fileHint}): ${serverInfo}${err.path}: ${err.message}`);
+      }
+    }
+  }
+  if (parseErrors.length > 0) {
+    // biome-ignore lint/suspicious/noConsole:: intentional console output
+    console.log('MCP configuration errors:\n');
+    for (const err of parseErrors) {
+      // biome-ignore lint/suspicious/noConsole:: intentional console output
+      console.log(`  ✗ ${err}`);
+    }
+    // biome-ignore lint/suspicious/noConsole:: intentional console output
+    console.log('');
+  }
+
   const { servers: configs } = await getAllMcpConfigs();
   if (Object.keys(configs).length === 0) {
     // biome-ignore lint/suspicious/noConsole:: intentional console output
