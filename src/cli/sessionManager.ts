@@ -228,6 +228,7 @@ export async function bgFlagHandler(
   model?: string,
   permissionMode?: string,
   options?: {
+    name?: string;
     fallbackModel?: string;
     allowDangerouslySkipPermissions?: string;
     addDir?: string[];
@@ -246,7 +247,8 @@ export async function bgFlagHandler(
   }
   const cwd = process.cwd();
 
-  console.log(`Starting background session in ${cwd}...`);
+  const sessionName = options?.name;
+  console.log(`Starting background session${sessionName ? ` "${sessionName}"` : ''} in ${cwd}...`);
 
   // If no explicit permission mode, read from settings.json permissions.defaultMode
   if (!permissionMode) {

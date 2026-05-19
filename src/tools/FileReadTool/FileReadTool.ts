@@ -852,24 +852,29 @@ async function callInner(
   if (IMAGE_EXTENSIONS.has(ext)) {
     // Images have their own size limits (token budget + compression) —
     // don't apply the text maxSizeBytes cap.
-    const data = await readImageWithTokenBudget(resolvedFilePath, maxTokens);
-    context.nestedMemoryAttachmentTriggers?.add(fullFilePath);
+    try {
+      const data = await readImageWithTokenBudget(resolvedFilePath, maxTokens);
+      context.nestedMemoryAttachmentTriggers?.add(fullFilePath);
 
-    logFileOperation({
-      operation: 'read',
-      tool: 'FileReadTool',
-      filePath: fullFilePath,
-      content: data.file.base64,
-    });
+      logFileOperation({
+        operation: 'read',
+        tool: 'FileReadTool',
+        filePath: fullFilePath,
+        content: data.file.base64,
+      });
 
-    const metadataText = data.file.dimensions ? createImageMetadataText(data.file.dimensions) : null;
+      const metadataText = data.file.dimensions ? createImageMetadataText(data.file.dimensions) : null;
 
-    return {
-      data,
-      ...(metadataText && {
-        newMessages: [createUserMessage({ content: metadataText, isMeta: true })],
-      }),
-    };
+      return {
+        data,
+        ...(metadataText && {
+          newMessages: [createUserMessage({ content: metadataText, isMeta: true })],
+        }),
+      };
+    } catch {
+      // File has an image extension but couldn't be decoded as an image
+      // (e.g. HTML saved as .png). Fall back to reading as text.
+    }
   }
 
   // --- PDF ---

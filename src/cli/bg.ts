@@ -34,6 +34,7 @@ export async function handleBgFlag(args: string[]): Promise<void> {
   let prompt: string | undefined;
   let agent: string | undefined;
   let model: string | undefined;
+  let name: string | undefined;
   let permissionMode: string | undefined;
   let fallbackModel: string | undefined;
   let allowDangerouslySkipPermissions: string | undefined;
@@ -53,6 +54,8 @@ export async function handleBgFlag(args: string[]): Promise<void> {
       agent = trailing[++i];
     } else if (arg === '--model' && trailing[i + 1]) {
       model = trailing[++i];
+    } else if (arg === '--name' && trailing[i + 1]) {
+      name = trailing[++i];
     } else if (arg === '--permission-mode' && trailing[i + 1]) {
       permissionMode = trailing[++i];
     } else if (arg === '--fallback-model' && trailing[i + 1]) {
@@ -77,6 +80,7 @@ export async function handleBgFlag(args: string[]): Promise<void> {
   prompt = nonFlagArgs.join(' ') || undefined;
 
   const id = await createBgSession(prompt ?? '(interactive)', agent, model, permissionMode, {
+    name,
     fallbackModel,
     allowDangerouslySkipPermissions,
     addDir: addDir.length > 0 ? addDir : undefined,
