@@ -38,7 +38,7 @@ The project should be treated as a large TypeScript/Bun CLI application with a R
 
 ### Before Editing — Context Preloader
 
-ก่อนแก้ไข module ไหน ให้ preload context ของมันก่อน:
+Before editing a module, preload its context:
 
 ```bash
 bun run preload bridge          # bridge/
@@ -48,14 +48,14 @@ bun run preload services/ai     # services/ai/
 bun run preload src/bridge      # also works with src/ prefix
 ```
 
-สคริปต์จะสร้าง context ไว้ที่ `.claude/context/<module>.md`:
-- ไฟล์ทั้งหมดใน module + ขนาด
-- exports และ key types
-- internal dependencies
-- git history ล่าสุด (10 commits)
-- TODO/FIXME ที่ค้าง
+The script generates context at `.claude/context/<module>.md`:
+- All files in the module with sizes
+- Exports and key types
+- Internal dependencies
+- Recent git history (10 commits)
+- Outstanding TODO/FIXME items
 
-> จากนั้นอ่านไฟล์ context ด้วย Read tool ก่อนแก้ไขโค้ด
+> Then read the context file with the Read tool before editing code.
 
 ### After Editing
 
@@ -117,20 +117,20 @@ bun run ast-grep scan
 ### Session Bridge (cross-session context)
 
 ```bash
-# ก่อนปิด session บันทึก context
+# Save context before closing a session
 bun run session save "adding auth middleware to bridge"
 bun run session save "refactoring ProviderManager"
 
-# เปิด session ใหม่ — ดูว่า session ล่าสุดทำอะไร
+# In a new session — see what the last session was doing
 bun run session list
 
-# restore context ของ session ล่าสุดกลับมา
+# Restore context from the latest session
 bun run session restore
 
-# เมื่อเริ่ม session ใหม่:
-# 1. session restore → รู้ว่าครั้งที่แล้วค้างตรงไหน
-# 2. codegraph → รู้ structure codebase ล่าสุด
-# 3. preload <module> → context ของ module ที่จะแก้
+# When starting a new session:
+# 1. session restore → know where you left off
+# 2. codegraph → see the latest codebase structure
+# 3. preload <module> → context for the module you're editing
 ```
 
 ### CodeIndex (fuzzy code search)

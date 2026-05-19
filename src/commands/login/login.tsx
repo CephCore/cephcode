@@ -1,13 +1,17 @@
 import { feature } from 'bun:bundle';
-import type * as React from 'react';
+import * as React from 'react';
 import { resetCostState } from '../../bootstrap/state.js';
 import { clearTrustedDeviceToken, enrollTrustedDevice } from '../../bridge/trustedDevice.js';
 import type { LocalJSXCommandContext } from '../../commands.js';
 import { ConfigurableShortcutHint } from '../../components/ConfigurableShortcutHint.js';
 import { ConsoleOAuthFlow } from '../../components/ConsoleOAuthFlow.js';
 import { Dialog } from '../../components/design-system/Dialog.js';
+import { GitHubCopilotAuthFlow } from '../../components/GitHubCopilotAuthFlow.js';
+import { OpenAIOAuthFlow } from '../../components/OpenAIOAuthFlow.js';
+import TextInput from '../../components/TextInput.js';
 import { useMainLoopModel } from '../../hooks/useMainLoopModel.js';
-import { Text } from '../../ink.js';
+import { Box, Text } from '../../ink.js';
+import { ProviderManager } from '../../services/ai/ProviderManager.js';
 import { refreshGrowthBookAfterAuthChange } from '../../services/analytics/growthbook.js';
 import { refreshPolicyLimits } from '../../services/policyLimits/index.js';
 import { refreshRemoteManagedSettings } from '../../services/remoteManagedSettings/index.js';
@@ -76,10 +80,84 @@ export function Login(props: {
   startingMessage?: string;
 }): React.ReactNode {
   const mainLoopModel = useMainLoopModel();
+  const pm = ProviderManager.getInstance();
+  const provider = pm.getActiveProviderName();
+  const [apiKeyInput, setApiKeyInput] = React.useState('');
+  const [cursorOffset, setCursorOffset] = React.useState(0);
+
+  const handleApiKeySubmit = (value: string) => {
+    if (value.trim()) {
+      try {
+        const cfg = pm.getSelectedProviderConfig(true);
+        const apiKeys = { ...cfg.apiKeys, [provider]: value.trim() };
+        pm.saveSelectedProviderConfig({ ...cfg, apiKeys });
+      } catch {}
+      props.onDone(true, mainLoopModel);
+    }
+  };
+
+  const renderContent = () => {
+    if (provider === 'anthropic') {
+      return (
+        <ConsoleOAuthFlow onDone={() => props.onDone(true, mainLoopModel)} startingMessage={props.startingMessage} />
+      );
+    }
+    if (provider === 'openai') {
+      return (
+        <OpenAIOAuthFlow
+          onDone={() => props.onDone(true, mainLoopModel)}
+          onCancel={() => props.onDone(false, mainLoopModel)}
+        />
+      );
+    }
+    if (provider === 'copilot') {
+      return (
+        <GitHubCopilotAuthFlow
+          onDone={() => props.onDone(true, mainLoopModel)}
+          onCancel={() => props.onDone(false, mainLoopModel)}
+        />
+      );
+    }
+    if (provider === 'ollama') {
+      return (
+        <Box flexDirection="column" gap={1}>
+          <Text>Ollama is a local AI engine and does not require authentication.</Text>
+          <Text dimColor>Press Enter to close this screen.</Text>
+        </Box>
+      );
+    }
+
+    let envVarName = 'API_KEY';
+    try {
+      const pm = ProviderManager.getInstance();
+      const pInstance = pm.getProvider(provider);
+      envVarName = pInstance.getProviderApiKeyEnvVar();
+    } catch {
+      envVarName = `${provider.toUpperCase()}_API_KEY`;
+    }
+    return (
+      <Box flexDirection="column" gap={1}>
+        <Text>Enter your {envVarName} below:</Text>
+        <Box borderStyle="round" paddingX={1} width={60}>
+          <TextInput
+            value={apiKeyInput}
+            onChange={value => {
+              setApiKeyInput(value);
+              setCursorOffset(value.length);
+            }}
+            onSubmit={handleApiKeySubmit}
+            columns={56}
+            cursorOffset={cursorOffset}
+            onChangeCursorOffset={setCursorOffset}
+          />
+        </Box>
+      </Box>
+    );
+  };
 
   return (
     <Dialog
-      title="Login"
+      title={`Login - ${provider.toUpperCase()}`}
       onCancel={() => props.onDone(false, mainLoopModel)}
       color="permission"
       inputGuide={exitState =>
@@ -90,7 +168,7 @@ export function Login(props: {
         )
       }
     >
-      <ConsoleOAuthFlow onDone={() => props.onDone(true, mainLoopModel)} startingMessage={props.startingMessage} />
+      {renderContent()}
     </Dialog>
   );
 }

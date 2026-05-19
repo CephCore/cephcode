@@ -27,7 +27,7 @@ export * from './sdk/toolTypes.js';
 // Functions
 // ============================================================================
 
-import { type SDKMessage, type SDKResultMessage, type SDKUserMessage } from './sdk/coreTypes.js';
+import type { SDKMessage, SDKResultMessage, SDKUserMessage } from './sdk/coreTypes.js';
 // Import types needed for function signatures
 import type {
   AnyZodRawShape,

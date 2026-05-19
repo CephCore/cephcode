@@ -14,6 +14,7 @@ import { count } from '../../utils/array.js';
 import { openBrowser } from '../../utils/browser.js';
 import { logForDebugging } from '../../utils/debug.js';
 import { errorMessage } from '../../utils/errors.js';
+import { formatRelativeTimeAgo } from '../../utils/format.js';
 import { clearAllCaches } from '../../utils/plugins/cacheUtils.js';
 import { formatInstallCount, getInstallCounts } from '../../utils/plugins/installCounts.js';
 import { isPluginGloballyInstalled } from '../../utils/plugins/installedPluginsManager.js';
@@ -30,7 +31,6 @@ import { OFFICIAL_MARKETPLACE_NAME } from '../../utils/plugins/officialMarketpla
 import { installPluginFromMarketplace } from '../../utils/plugins/pluginInstallationHelpers.js';
 import { isPluginBlockedByPolicy } from '../../utils/plugins/pluginPolicy.js';
 import { plural } from '../../utils/stringUtils.js';
-import { formatRelativeTimeAgo } from '../../utils/format.js';
 import { truncateToWidth } from '../../utils/truncate.js';
 import { findPluginOptionsTarget, PluginOptionsFlow } from './PluginOptionsFlow.js';
 import { PluginTrustWarning } from './PluginTrustWarning.js';

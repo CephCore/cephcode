@@ -10,10 +10,10 @@ import type { ToolUseContext } from '../../Tool.js';
 import type { LocalJSXCommandOnDone } from '../../types/command.js';
 import { getOauthAccountInfo, getRateLimitTier, getSubscriptionType } from '../../utils/auth.js';
 import { hasClaudeAiBillingAccess } from '../../utils/billing.js';
-import { call as extraUsageCall } from '../usage-credits/usage-credits.js';
-import { usageCredits } from '../usage-credits/index.js';
 import upgrade from '../upgrade/index.js';
 import { call as upgradeCall } from '../upgrade/upgrade.js';
+import { usageCredits } from '../usage-credits/index.js';
+import { call as extraUsageCall } from '../usage-credits/usage-credits.js';
 
 type RateLimitOptionsMenuOptionType = 'upgrade' | 'extra-usage' | 'cancel';
 

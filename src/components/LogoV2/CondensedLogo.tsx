@@ -20,16 +20,24 @@ import {
   useShowOverageCreditUpsell,
 } from './OverageCreditUpsell.js';
 
+const CLAWD_LOGO_HEIGHT = 6;
+const CLAWD_LOGO_WIDTH = 10;
+const LOGO_GAP = 2;
+const LOGO_RESERVED_WIDTH = CLAWD_LOGO_WIDTH + LOGO_GAP + 3;
+
 export function CondensedLogo(): ReactNode {
   const { columns } = useTerminalSize();
   const agent = useAppState(s => s.agent);
   const effortValue = useAppState(s => s.effortValue);
   const model = useMainLoopModel();
+
   const modelDisplayName = renderModelSetting(model).replace(/^[^:]+:\s*/, '');
+
   const { version, cwd, billingType, agentName: agentNameFromSettings } = getLogoDisplayData();
 
-  // Prefer AppState.agent (set from --agent CLI flag) over settings
+  // Prefer AppState.agent (set from --agent CLI flag) over settings.
   const agentName = agent ?? agentNameFromSettings;
+
   const showGuestPassesUpsell = useShowGuestPassesUpsell();
   const showOverageCreditUpsell = useShowOverageCreditUpsell();
 
@@ -45,43 +53,43 @@ export function CondensedLogo(): ReactNode {
     }
   }, [showOverageCreditUpsell, showGuestPassesUpsell]);
 
-  // Calculate available width for text content
-  // Account for: condensed clawd width (11 chars) + gap (2) + padding (2) = 15 chars
-  const textWidth = Math.max(columns - 15, 20);
+  // Account for Clawd width + gap + safety padding.
+  const textWidth = Math.max(columns - LOGO_RESERVED_WIDTH, 20);
 
-  // Truncate version to fit within available width, accounting for "Claude Code v" prefix
   const versionPrefix = 'Claude Code v';
   const truncatedVersion = truncate(version, Math.max(textWidth - versionPrefix.length, 6));
 
   const effortSuffix = getEffortSuffix(model, effortValue);
+
   const { shouldSplit, truncatedModel, truncatedBilling } = formatModelAndBilling(
     modelDisplayName + effortSuffix,
     billingType,
     textWidth,
   );
 
-  // Truncate path, accounting for agent name if present
   const separator = ' · ';
   const atPrefix = '@';
+
   const cwdAvailableWidth = agentName
     ? textWidth - atPrefix.length - stringWidth(agentName) - separator.length
     : textWidth;
+
   const truncatedCwd = truncatePath(cwd, Math.max(cwdAvailableWidth, 10));
 
-  // OffscreenFreeze: the logo sits at the top of the message list and is the
-  // first thing to enter scrollback. useMainLoopModel() subscribes to model
-  // changes and getLogoDisplayData() reads getCwd()/subscription state — any
-  // of which changing while in scrollback would force a full terminal reset.
+  const logo = isFullscreenEnvEnabled() ? <AnimatedClawd /> : <Clawd />;
+
   return (
     <OffscreenFreeze>
-      <Box flexDirection="row" gap={2} alignItems="center">
-        {isFullscreenEnvEnabled() ? <AnimatedClawd /> : <Clawd />}
+      <Box flexDirection="row" gap={LOGO_GAP} alignItems="center">
+        <Box height={CLAWD_LOGO_HEIGHT} flexShrink={0}>
+          {logo}
+        </Box>
 
-        {/* Info */}
-        <Box flexDirection="column">
+        <Box flexDirection="column" flexShrink={1}>
           <Text>
             <Text bold>Claude Code</Text> <Text dimColor>v{truncatedVersion}</Text>
           </Text>
+
           {shouldSplit ? (
             <>
               <Text dimColor>{truncatedModel}</Text>
@@ -92,8 +100,11 @@ export function CondensedLogo(): ReactNode {
               {truncatedModel} · {truncatedBilling}
             </Text>
           )}
+
           <Text dimColor>{agentName ? `@${agentName} · ${truncatedCwd}` : truncatedCwd}</Text>
+
           {showGuestPassesUpsell && <GuestPassesUpsell />}
+
           {!showGuestPassesUpsell && showOverageCreditUpsell && <OverageCreditUpsell maxWidth={textWidth} twoLine />}
         </Box>
       </Box>

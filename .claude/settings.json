@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "FileEditTool|FileWriteTool",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd {{cwd}} && biome check --write {{filePath}}"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": []
+  }
+}

@@ -124,7 +124,10 @@ export interface SdkMcpToolDefinition<Schema extends AnyZodRawShape = AnyZodRawS
   name: string;
   description: string;
   inputSchema: Schema;
-  handler: (args: InferShape<Schema>, extra: unknown) => Promise<import('@modelcontextprotocol/sdk/types.js').CallToolResult>;
+  handler: (
+    args: InferShape<Schema>,
+    extra: unknown,
+  ) => Promise<import('@modelcontextprotocol/sdk/types.js').CallToolResult>;
   annotations?: import('@modelcontextprotocol/sdk/types.js').ToolAnnotations;
   searchHint?: string;
   alwaysLoad?: boolean;

@@ -145,11 +145,9 @@ export async function showSetupScreens(
     return false;
   }
   const config = getGlobalConfig();
+  const { isAuthorized } = await import('./utils/auth.js');
   let onboardingShown = false;
-  if (
-    !config.theme ||
-    !config.hasCompletedOnboarding // always show onboarding at least once
-  ) {
+  if (!config.theme || !config.hasCompletedOnboarding || !isAuthorized()) {
     onboardingShown = true;
     const { Onboarding } = await import('./components/Onboarding.js');
     await showSetupDialog(

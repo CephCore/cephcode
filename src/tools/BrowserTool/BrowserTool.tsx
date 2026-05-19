@@ -55,7 +55,7 @@ const ALL_ACTIONS = [
   'extract_data',
   'switch_tab',
   'open_new_tab',
-  'drag_and_drop'
+  'drag_and_drop',
 ] as const;
 
 const inputSchema = lazySchema(() =>

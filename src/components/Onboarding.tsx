@@ -80,37 +80,58 @@ export function Onboarding({ onDone }: Props): React.ReactNode {
     </Box>
   );
 
-  const securityStep = (
-    <Box flexDirection="column" gap={1} paddingLeft={1}>
-      <Text bold>Security notes:</Text>
-      <Box flexDirection="column" width={70}>
-        {/**
-         * OrderedList misnumbers items when rendering conditionally,
-         * so put all items in the if/else
-         */}
-        <OrderedList>
-          <OrderedList.Item>
-            <Text>Claude can make mistakes</Text>
-            <Text dimColor wrap="wrap">
-              You should always review Claude&apos;s responses, especially when
-              <Newline />
-              running code.
-              <Newline />
-            </Text>
-          </OrderedList.Item>
-          <OrderedList.Item>
-            <Text>Due to prompt injection risks, only use it with code you trust</Text>
-            <Text dimColor wrap="wrap">
-              For more details see:
-              <Newline />
-              <Link url="https://code.claude.com/docs/en/security" />
-            </Text>
-          </OrderedList.Item>
-        </OrderedList>
+  const securityStep = (() => {
+    let name = 'AI';
+    let docUrl = 'https://code.claude.com/docs/en/security';
+    try {
+      const { ProviderManager } = require('../services/ai/ProviderManager.js');
+      const activeProvider = ProviderManager.getInstance().getActiveProviderName();
+      if (activeProvider === 'anthropic') {
+        name = 'Claude';
+        docUrl = 'https://code.claude.com/docs/en/security';
+      } else if (activeProvider === 'openai') {
+        name = 'ChatGPT';
+        docUrl = 'https://openai.com/policies/sharing-publication-policy/';
+      } else if (activeProvider === 'gemini') {
+        name = 'Gemini';
+        docUrl = 'https://support.google.com/gemini/answer/13594961';
+      } else if (activeProvider === 'copilot') {
+        name = 'Copilot';
+        docUrl = 'https://github.com/features/copilot/safety';
+      } else if (activeProvider === 'ollama') {
+        name = 'Ollama';
+        docUrl = 'https://ollama.com/';
+      }
+    } catch {}
+
+    return (
+      <Box flexDirection="column" gap={1} paddingLeft={1}>
+        <Text bold>Security notes:</Text>
+        <Box flexDirection="column" width={70}>
+          <OrderedList>
+            <OrderedList.Item>
+              <Text>{name} can make mistakes</Text>
+              <Text dimColor wrap="wrap">
+                You should always review {name}&apos;s responses, especially when
+                <Newline />
+                running code.
+                <Newline />
+              </Text>
+            </OrderedList.Item>
+            <OrderedList.Item>
+              <Text>Due to prompt injection risks, only use it with code you trust</Text>
+              <Text dimColor wrap="wrap">
+                For more details see:
+                <Newline />
+                <Link url={docUrl} />
+              </Text>
+            </OrderedList.Item>
+          </OrderedList>
+        </Box>
+        <PressEnterToContinue />
       </Box>
-      <PressEnterToContinue />
-    </Box>
-  );
+    );
+  })();
 
   const preflightStep = <PreflightStep onSuccess={goToNextStep} />;
   // Create the steps array - determine which steps to include based on reAuth and oauthEnabled

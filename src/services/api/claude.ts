@@ -2607,7 +2607,9 @@ async function* queryModel(
         logForDebugging(`Error streaming, retrying once before non-streaming fallback`, { level: 'info' });
         logEvent('tengu_streaming_retry_before_fallback', {
           model: options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          fallback_cause: (streamIdleAborted ? 'watchdog' : 'other') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          fallback_cause: (streamIdleAborted
+            ? 'watchdog'
+            : 'other') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         });
         throw streamingError; // Let withRetry handle the retry as a new stream
       }

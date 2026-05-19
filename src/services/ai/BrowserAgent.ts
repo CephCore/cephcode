@@ -1,6 +1,6 @@
-import { sideQuery } from '../../utils/sideQuery.js';
 import { handleBrowserAction } from '../../tools/BrowserTool/handler.js';
 import type { BrowserActionInput, BrowserResult } from '../../tools/BrowserTool/types.js';
+import { sideQuery } from '../../utils/sideQuery.js';
 import { ProviderManager } from './ProviderManager.js';
 
 export interface AgentTask {
@@ -19,7 +19,7 @@ export class BrowserAgent {
   async runTask(task: AgentTask): Promise<string> {
     let currentStep = 0;
     const history: any[] = [];
-    let lastResult = "Started task: " + task.goal;
+    let lastResult = 'Started task: ' + task.goal;
 
     while (currentStep < (task.maxSteps || this.maxSteps)) {
       currentStep++;
@@ -27,8 +27,8 @@ export class BrowserAgent {
 
       // 1. Extract Interactive DOM & Draw Labels
       console.log(`[BrowserAgent] 🔍 Scanning page and drawing visual labels...`);
-      const domData = await handleBrowserAction({ 
-        action: 'evaluate', 
+      const domData = await handleBrowserAction({
+        action: 'evaluate',
         expression: `
           (() => {
             // Remove existing labels if any
@@ -87,9 +87,9 @@ export class BrowserAgent {
               }
             };
           })();
-        `
+        `,
       });
-      
+
       // 2. Get state + Screenshot (WITH labels)
       console.log(`[BrowserAgent] 📸 Capturing screenshot with visual labels...`);
       let state: BrowserResult;
@@ -102,10 +102,10 @@ export class BrowserAgent {
           timeout: 1000,
         }).catch(() => undefined);
       }
-      
+
       let elementsList = 'No interactive elements found.';
       let pageText = 'No text content available.';
-      
+
       if (domData.content) {
         try {
           const parsedDOM = JSON.parse(domData.content);
@@ -115,7 +115,12 @@ export class BrowserAgent {
       }
 
       // --- PHASE 1: CAPTCHA DETECTION ---
-      if (state.title.includes('Just a moment') || state.title.includes('CAPTCHA') || pageText.includes('unusual traffic') || pageText.includes('ยืนยันว่าคุณไม่ใช่หุ่นยนต์')) {
+      if (
+        state.title.includes('Just a moment') ||
+        state.title.includes('CAPTCHA') ||
+        pageText.includes('unusual traffic') ||
+        pageText.includes('ยืนยันว่าคุณไม่ใช่หุ่นยนต์')
+      ) {
         console.warn(`[BrowserAgent] ⚠️ CAPTCHA DETECTED! Waiting for human intervention...`);
         // We will pause and give the user 30 seconds to solve it manually (assuming headed mode)
         await new Promise(resolve => setTimeout(resolve, 30000));
@@ -124,7 +129,7 @@ export class BrowserAgent {
       }
 
       // --- PHASE 2: ANTI-LOOP DETECTION ---
-      let loopWarning = "";
+      let loopWarning = '';
       if (history.length >= 3) {
         const last3 = history.slice(-3);
         if (last3[0].action === last3[1].action && last3[1].action === last3[2].action) {
@@ -135,9 +140,9 @@ export class BrowserAgent {
       // 2. Ask AI (Vision-based planning + DOM)
       console.log(`[BrowserAgent] 🧠 Thinking...`);
       const plan = await this.askAI(task.goal, state, elementsList, pageText, history, loopWarning);
-      
+
       console.log(`[BrowserAgent] 🧠 Thoughts: ${plan.thought}`);
-      
+
       if (plan.action === 'done') {
         if (plan.status === 'success') {
           console.log(`[BrowserAgent] ✅ SUCCESS: ${plan.message}`);
@@ -153,10 +158,19 @@ export class BrowserAgent {
       const direction = plan.direction === 'up' ? 'up' : 'down';
       const x = typeof plan.x === 'number' ? plan.x : undefined;
       const y = typeof plan.y === 'number' ? plan.y : undefined;
-      const action = this.normalizeAction(plan.action, Boolean(selector), typeof plan.text === 'string', x !== undefined && y !== undefined);
-      const actionDesc = action + (selector ? ` on ${selector}` : '') + (x !== undefined && y !== undefined ? ` at (${x},${y})` : '') + (plan.url ? ` to ${plan.url}` : '');
+      const action = this.normalizeAction(
+        plan.action,
+        Boolean(selector),
+        typeof plan.text === 'string',
+        x !== undefined && y !== undefined,
+      );
+      const actionDesc =
+        action +
+        (selector ? ` on ${selector}` : '') +
+        (x !== undefined && y !== undefined ? ` at (${x},${y})` : '') +
+        (plan.url ? ` to ${plan.url}` : '');
       console.log(`[BrowserAgent] ⚡ Action: ${actionDesc}`);
-      
+
       const result = await handleBrowserAction({
         action: action as any,
         selector,
@@ -168,23 +182,28 @@ export class BrowserAgent {
         y,
         timeout: action === 'wait' ? (typeof plan.amount === 'number' ? plan.amount : 1500) : undefined,
       });
-      
-      const resultString = result.error ? `Error: ${result.error}` : `Completed. URL=${result.url} Title=${result.title}${result.content ? ` Content=${result.content.substring(0, 300)}` : ''}`;
-      
+
+      const resultString = result.error
+        ? `Error: ${result.error}`
+        : `Completed. URL=${result.url} Title=${result.title}${result.content ? ` Content=${result.content.substring(0, 300)}` : ''}`;
+
       // 4. Update History
       history.push({
         step: currentStep,
         thought: plan.thought,
-        action: plan.action === 'done' ? 'done' : `${action} ${selector ? 'on ' + selector : ''} ${x !== undefined && y !== undefined ? `at (${x},${y})` : ''} ${plan.text ? 'with text ' + plan.text : ''} ${plan.url ? 'to ' + plan.url : ''}`.trim(),
+        action:
+          plan.action === 'done'
+            ? 'done'
+            : `${action} ${selector ? 'on ' + selector : ''} ${x !== undefined && y !== undefined ? `at (${x},${y})` : ''} ${plan.text ? 'with text ' + plan.text : ''} ${plan.url ? 'to ' + plan.url : ''}`.trim(),
         scratchpad: plan.scratchpad || '',
-        result: resultString
+        result: resultString,
       });
       lastResult = resultString;
     }
 
     const fs = await import('fs');
     fs.writeFileSync('scratch/agent_history_debug.json', JSON.stringify(history, null, 2));
-    throw new Error("Max steps reached without achieving goal.");
+    throw new Error('Max steps reached without achieving goal.');
   }
 
   private normalizeSelector(selector?: string): string | undefined {
@@ -198,13 +217,21 @@ export class BrowserAgent {
   private normalizeAction(action: string, hasSelector: boolean, hasText: boolean, hasPoint: boolean): string {
     if (action === 'click' && hasPoint) return 'click_at';
     if ((action === 'type' || action === 'fill') && hasPoint && hasText) return 'type_at';
-    if ((action === 'click_at' || action === 'type_at') && !hasPoint) return hasSelector ? (action === 'type_at' ? 'type' : 'click') : action;
+    if ((action === 'click_at' || action === 'type_at') && !hasPoint)
+      return hasSelector ? (action === 'type_at' ? 'type' : 'click') : action;
     return action;
   }
 
-  private async askAI(goal: string, state: BrowserResult, elementsList: string, pageText: string, history: any[], loopWarning: string): Promise<any> {
+  private async askAI(
+    goal: string,
+    state: BrowserResult,
+    elementsList: string,
+    pageText: string,
+    history: any[],
+    loopWarning: string,
+  ): Promise<any> {
     const model = this.providerManager.getModelForProvider() || 'claude-3-5-sonnet-latest';
-    
+
     const systemPrompt = `You are an autonomous web browser agent.
 You have access to a browser and can perform actions to achieve a user's goal.
 
@@ -249,7 +276,9 @@ Tips:
 `;
 
     const userMessageContent: any[] = [
-      { type: 'text', text: `
+      {
+        type: 'text',
+        text: `
 GOAL: ${goal}
 
 CURRENT BROWSER STATE:
@@ -267,7 +296,8 @@ ${history.length > 0 ? history.map((h, i) => `${i + 1}. [${h.action}] ${h.result
 ${loopWarning}
 
 Analyze the current state and provide the NEXT action in pure JSON format.
-` }
+`,
+      },
     ];
 
     if (state.screenshot) {
@@ -276,8 +306,8 @@ Analyze the current state and provide the NEXT action in pure JSON format.
         source: {
           type: 'base64',
           media_type: 'image/jpeg',
-          data: state.screenshot
-        }
+          data: state.screenshot,
+        },
       });
     }
 
@@ -285,10 +315,10 @@ Analyze the current state and provide the NEXT action in pure JSON format.
     const response = await sideQuery({
       querySource: 'browser_agent' as any,
       model,
-      system: systemPrompt + "\nIMPORTANT: RESPONSE MUST BE A VALID JSON OBJECT.",
+      system: systemPrompt + '\nIMPORTANT: RESPONSE MUST BE A VALID JSON OBJECT.',
       messages: [{ role: 'user', content: userMessageContent }],
       max_tokens: 1000,
-      temperature: 0
+      temperature: 0,
     });
 
     console.log(`[BrowserAgent] 🤖 AI Response received.`);
@@ -299,16 +329,16 @@ Analyze the current state and provide the NEXT action in pure JSON format.
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       const jsonStr = jsonMatch ? jsonMatch[0] : text;
       const parsed = JSON.parse(jsonStr);
-      
+
       if (!parsed.action) {
-         throw new Error("Missing required field 'action' in AI response");
+        throw new Error("Missing required field 'action' in AI response");
       }
       return parsed;
     } catch (e) {
-      console.error("[BrowserAgent] Failed to parse AI response:", e);
-      return { 
-        status: 'failed', 
-        message: `Failed to parse AI response as JSON. Raw response: ${response.content[0].type === 'text' ? response.content[0].text.substring(0, 100) : 'Non-text content'}` 
+      console.error('[BrowserAgent] Failed to parse AI response:', e);
+      return {
+        status: 'failed',
+        message: `Failed to parse AI response as JSON. Raw response: ${response.content[0].type === 'text' ? response.content[0].text.substring(0, 100) : 'Non-text content'}`,
       };
     }
   }

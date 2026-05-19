@@ -44,8 +44,8 @@ import {
   recordContentReplacement,
   resetSessionFilePointer,
   restoreSessionMetadata,
-  setSessionModelForTranscript,
   type SessionLogResult,
+  setSessionModelForTranscript,
 } from '../utils/sessionStorage.js';
 import type { ThinkingConfig } from '../utils/thinking.js';
 import type { ContentReplacementRecord } from '../utils/toolResultStorage.js';

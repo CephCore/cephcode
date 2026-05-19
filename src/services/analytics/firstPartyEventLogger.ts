@@ -212,6 +212,8 @@ async function logEventTo1PAsync(
  * @param eventName - Name of the event (e.g., 'tengu_api_query')
  * @param metadata - Additional metadata for the event (intentionally no strings, to avoid accidentally logging code/filepaths)
  */
+import { getGlobalConfig } from '../../utils/config.js';
+
 export function logEventTo1P(eventName: string, metadata: Record<string, number | boolean | undefined> = {}): void {
   if (!is1PEventLoggingEnabled()) {
     return;
@@ -220,6 +222,13 @@ export function logEventTo1P(eventName: string, metadata: Record<string, number 
   if (isSinkKilled('firstParty')) {
     return;
   }
+
+  try {
+    const config = getGlobalConfig();
+    if (config.firstPartyDisabled) {
+      return;
+    }
+  } catch {}
 
   // Queue event if logger hasn't initialized yet — prevents early startup
   // events from being silently dropped between sink attachment and logger init.

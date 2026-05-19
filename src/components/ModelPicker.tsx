@@ -104,7 +104,6 @@ export function ModelPicker(t0) {
   const { query: searchQuery, cursorOffset: searchCursorOffset } = useSearchInput({
     isActive: isSearchActive,
     onExit: () => setIsSearchActive(false),
-    onCancel: onCancel,
     backspaceExitsOnEmpty: false,
   });
   const t2 = Boolean(isFastMode);
@@ -340,6 +339,7 @@ export function ModelPicker(t0) {
       }
 
       if (
+        !isSearchActive &&
         isStandaloneCommand &&
         onSetDefault &&
         (input === 'd' || input === 'D') &&
@@ -347,8 +347,7 @@ export function ModelPicker(t0) {
         !key.meta
       ) {
         const modelValue = resolveOptionModel(effectiveFocusedValue);
-        const selectedEffort =
-          hasToggledEffort && modelValue && modelSupportsEffort(modelValue) ? effort : undefined;
+        const selectedEffort = hasToggledEffort && modelValue && modelSupportsEffort(modelValue) ? effort : undefined;
         onSetDefault(effectiveFocusedValue === NO_PREFERENCE ? null : effectiveFocusedValue, selectedEffort);
       }
     },

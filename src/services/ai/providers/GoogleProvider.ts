@@ -20,10 +20,10 @@ function extractErrorMessage(body: Record<string, unknown> | undefined, fallback
     if (typeof message === 'string' && message.length > 0) return message;
     if (typeof nestedError === 'string') return nestedError;
   }
-  
+
   const bodyMessage = body?.message;
   if (typeof bodyMessage === 'string') return bodyMessage;
-  
+
   const bodyDetail = body?.detail;
   if (typeof bodyDetail === 'string') return bodyDetail;
 
@@ -53,7 +53,8 @@ export class GoogleProvider implements ProviderInterface {
 
   async createClient(options: ProviderInitOptions): Promise<ProviderClient> {
     const apiKey = options.apiKey ?? process.env.GOOGLE_API_KEY;
-    const baseUrl = options.baseUrl ?? process.env.GOOGLE_BASE_URL ?? 'https://generativelanguage.googleapis.com/v1beta/openai';
+    const baseUrl =
+      options.baseUrl ?? process.env.GOOGLE_BASE_URL ?? 'https://generativelanguage.googleapis.com/v1beta/openai';
 
     if (!apiKey) {
       throw new Error('GOOGLE_API_KEY is required for Google provider.');
@@ -73,7 +74,7 @@ export class GoogleProvider implements ProviderInterface {
             const isStreaming = params.stream === true;
             const headers: Record<string, string> = {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`,
+              Authorization: `Bearer ${apiKey}`,
             };
 
             const response = await fetch(getChatCompletionsUrl(baseUrl), {
@@ -103,13 +104,14 @@ export class GoogleProvider implements ProviderInterface {
 
   async listModels(options: ProviderInitOptions): Promise<Array<{ id: string; label: string }>> {
     const apiKey = options.apiKey ?? process.env.GOOGLE_API_KEY;
-    const baseUrl = options.baseUrl ?? process.env.GOOGLE_BASE_URL ?? 'https://generativelanguage.googleapis.com/v1beta/openai';
+    const baseUrl =
+      options.baseUrl ?? process.env.GOOGLE_BASE_URL ?? 'https://generativelanguage.googleapis.com/v1beta/openai';
 
     if (!apiKey) return [];
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
     };
 
     const normalizedBaseUrl = baseUrl.replace(/\/$/, '');
@@ -160,7 +162,9 @@ export class GoogleProvider implements ProviderInterface {
         try {
           const parsed = JSON.parse(data);
           yield this.normalizeStreamChunk(parsed);
-        } catch { /* Skip invalid JSON */ }
+        } catch {
+          /* Skip invalid JSON */
+        }
       }
     }
   }

@@ -5,6 +5,7 @@
  * across all analytics systems (Datadog, 1P)
  */
 
+import { getGlobalConfig } from '../../utils/config.js';
 import { isEnvTruthy } from '../../utils/envUtils.js';
 import { isTelemetryDisabled } from '../../utils/privacyLevel.js';
 
@@ -17,6 +18,12 @@ import { isTelemetryDisabled } from '../../utils/privacyLevel.js';
  * - Privacy level is no-telemetry or essential-traffic
  */
 export function isAnalyticsDisabled(): boolean {
+  try {
+    const config = getGlobalConfig();
+    if (config.telemetryDisabled) {
+      return true;
+    }
+  } catch {}
   return (
     process.env.NODE_ENV === 'test' ||
     isEnvTruthy(process.env.CLAUDE_CODE_USE_BEDROCK) ||

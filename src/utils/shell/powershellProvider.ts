@@ -1,8 +1,8 @@
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { join as posixJoin } from 'path/posix';
-import { isEnvTruthy } from '../envUtils.js';
 import { loadAllPluginsCacheOnly } from '../../utils/plugins/pluginLoader.js';
+import { isEnvTruthy } from '../envUtils.js';
 import { getPlatform } from '../platform.js';
 import { getSessionEnvVars } from '../sessionEnvVars.js';
 import type { ShellProvider } from './shellProvider.js';

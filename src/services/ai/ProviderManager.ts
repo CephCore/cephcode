@@ -305,7 +305,10 @@ export class ProviderManager {
     });
   }
 
-  async listModels(provider?: ProviderId, options: ProviderInitOptions = {}): Promise<Array<{ id: string; label: string }>> {
+  async listModels(
+    provider?: ProviderId,
+    options: ProviderInitOptions = {},
+  ): Promise<Array<{ id: string; label: string }>> {
     const effectiveProvider = provider ?? this.getActiveProviderName();
     const providerInstance = this.getProvider(effectiveProvider);
 

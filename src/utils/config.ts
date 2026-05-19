@@ -213,6 +213,9 @@ export type GlobalConfig = {
    * @deprecated. Use the Notification hook instead (docs/hooks.md).
    */
   customNotifyCommand?: string;
+  telemetryDisabled?: boolean;
+  datadogDisabled?: boolean;
+  firstPartyDisabled?: boolean;
   verbose: boolean;
   customApiKeyResponses?: {
     approved?: string[];
@@ -618,6 +621,9 @@ export const GLOBAL_CONFIG_KEYS = [
   'verbose',
   'preferredNotifChannel',
   'shiftEnterKeyBindingInstalled',
+  'telemetryDisabled',
+  'datadogDisabled',
+  'firstPartyDisabled',
   'editorMode',
   'hasUsedBackslashReturn',
   'autoCompactEnabled',
@@ -1108,7 +1114,7 @@ function saveConfigWithLock<A extends object>(
     const startTime = Date.now();
     release = lockfile.lockSync(file, {
       lockfilePath: lockFilePath,
-      onCompromised: err => {
+      onCompromised: (err: any) => {
         // Default onCompromised throws from a setTimeout callback, which
         // becomes an unhandled exception. Log instead -- the lock being
         // stolen (e.g. after a 10s event-loop stall) is recoverable.

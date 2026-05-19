@@ -16,7 +16,7 @@ try {
 
 // Define MACRO for build (normally replaced by macro processor)
 const MACRO = {
-  VERSION: '2.1.136',
+  VERSION: '2.1.145',
 };
 globalThis.MACRO = MACRO;
 
@@ -5537,7 +5537,10 @@ async function run(): Promise<CommanderCommand> {
     .option('--settings <path>', 'Path to settings file for dispatched sessions')
     .option('--mcp-config <path>', 'Path to MCP config file for dispatched sessions')
     .option('--plugin-dir <dirs...>', 'Plugin directories for dispatched sessions')
-    .option('--permission-mode <mode>', 'Permission mode for dispatched sessions (default/ask/acceptEdits/plan/auto/bypassPermissions)')
+    .option(
+      '--permission-mode <mode>',
+      'Permission mode for dispatched sessions (default/ask/acceptEdits/plan/auto/bypassPermissions)',
+    )
     .option('--model <model>', 'Default model for dispatched sessions')
     .option('--effort <level>', 'Effort level for dispatched sessions (low/medium/high)')
     .option('--dangerously-skip-permissions', 'Enable bypass permissions mode for dispatched sessions')
@@ -5898,36 +5901,62 @@ Examples:
   const bgCmd = process.argv[2];
   const bgArg = process.argv[3];
   if (
-    bgCmd === 'ps' || bgCmd === 'logs' || bgCmd === 'attach' ||
-    bgCmd === 'kill' || bgCmd === 'stop' || bgCmd === 'respawn' || bgCmd === 'rm' ||
+    bgCmd === 'ps' ||
+    bgCmd === 'logs' ||
+    bgCmd === 'attach' ||
+    bgCmd === 'kill' ||
+    bgCmd === 'stop' ||
+    bgCmd === 'respawn' ||
+    bgCmd === 'rm' ||
     bgCmd === 'agents' ||
-    process.argv.includes('--bg') || process.argv.includes('--background')
+    process.argv.includes('--bg') ||
+    process.argv.includes('--background')
   ) {
     const bg = await import('./cli/bg.js');
     switch (bgCmd) {
-      case 'ps': await bg.psHandler(process.argv.slice(4)); break;
-      case 'logs': await bg.logsHandler(bgArg || ''); break;
+      case 'ps':
+        await bg.psHandler(process.argv.slice(4));
+        break;
+      case 'logs':
+        await bg.logsHandler(bgArg || '');
+        break;
       case 'attach': {
-        if (!bgArg) { console.error('Usage: claude attach <session-id>'); process.exit(1); }
-        await bg.attachHandler(bgArg); break;
+        if (!bgArg) {
+          console.error('Usage: claude attach <session-id>');
+          process.exit(1);
+        }
+        await bg.attachHandler(bgArg);
+        break;
       }
       case 'kill':
       case 'stop': {
         const targetId = bgArg || '';
-        if (!targetId) { console.error('Usage: claude stop <session-id>'); process.exit(1); }
-        await bg.killHandler(targetId); break;
+        if (!targetId) {
+          console.error('Usage: claude stop <session-id>');
+          process.exit(1);
+        }
+        await bg.killHandler(targetId);
+        break;
       }
-      case 'respawn': await (bg as any).respawnCommand(
+      case 'respawn':
+        await (bg as any).respawnCommand(
           bgArg === '--all' ? undefined : bgArg,
           bgArg === '--all' || process.argv.includes('--all'),
-        ); break;
-      case 'rm': await (bg as any).rmCommand(bgArg); break;
+        );
+        break;
+      case 'rm':
+        await (bg as any).rmCommand(bgArg);
+        break;
       case 'agents': {
         const { getAgentViewDisabledReason } = await import('./commands/agents/index.js');
         const reason = getAgentViewDisabledReason();
-        if (reason) { console.log(`Agent view is ${reason}.`); process.exit(0); }
+        if (reason) {
+          console.log(`Agent view is ${reason}.`);
+          process.exit(0);
+        }
         const { agentsHandler } = await import('./cli/handlers/agents.js');
-        await agentsHandler(); break;
+        await agentsHandler();
+        break;
       }
       default:
         await bg.handleBgFlag(process.argv.slice(3));

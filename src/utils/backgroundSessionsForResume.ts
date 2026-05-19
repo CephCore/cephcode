@@ -1,5 +1,5 @@
-import type { LogOption } from '../types/logs.js';
 import { listSessions, pingDaemon } from '../services/Supervisor/ipcClient.js';
+import type { LogOption } from '../types/logs.js';
 import { getLastSessionLog } from './sessionStorage.js';
 import { validateUuid } from './uuid.js';
 

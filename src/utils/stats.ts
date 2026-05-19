@@ -345,6 +345,8 @@ async function processSessionFiles(sessionFiles: string[], options: ProcessOptio
               continue;
             }
 
+            const provider = extractProviderFromMessage(message, model);
+
             if (!modelUsageAgg[model]) {
               modelUsageAgg[model] = {
                 inputTokens: 0,
@@ -355,8 +357,10 @@ async function processSessionFiles(sessionFiles: string[], options: ProcessOptio
                 costUSD: 0,
                 contextWindow: 0,
                 maxOutputTokens: 0,
-                provider: extractProviderFromMessage(message, model),
+                provider,
               };
+            } else {
+              modelUsageAgg[model]!.provider = provider;
             }
 
             modelUsageAgg[model]!.inputTokens += usage.input_tokens || 0;
@@ -373,7 +377,6 @@ async function processSessionFiles(sessionFiles: string[], options: ProcessOptio
             }
 
             // Track provider usage
-            const provider = modelUsageAgg[model]!.provider ?? extractProviderFromMessage(message, model);
             if (!providerUsageAgg[provider]) {
               providerUsageAgg[provider] = {
                 inputTokens: 0,

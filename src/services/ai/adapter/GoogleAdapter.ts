@@ -335,7 +335,10 @@ class GoogleAdapter implements ProviderAdapter {
               typeof block.content === 'string'
                 ? block.content
                 : Array.isArray(block.content)
-                  ? block.content.map((b: any) => (b.type === 'text' ? b.text : '')).filter(Boolean).join('\n')
+                  ? block.content
+                      .map((b: any) => (b.type === 'text' ? b.text : ''))
+                      .filter(Boolean)
+                      .join('\n')
                   : JSON.stringify(block.content);
             parts.push({
               functionResponse: {
@@ -363,7 +366,7 @@ class GoogleAdapter implements ProviderAdapter {
     let systemInstruction: string | undefined;
     if (params.system) {
       systemInstruction = Array.isArray(params.system)
-        ? params.system.map((s: any) => (typeof s === 'string' ? s : s.text ?? '')).join('\n')
+        ? params.system.map((s: any) => (typeof s === 'string' ? s : (s.text ?? ''))).join('\n')
         : String(params.system);
     }
 
@@ -381,9 +384,7 @@ class GoogleAdapter implements ProviderAdapter {
       request.thinkingConfig = {
         includeThoughts: true,
         thinkingBudget:
-          typeof anthropicThinking.budget_tokens === 'number'
-            ? anthropicThinking.budget_tokens
-            : undefined,
+          typeof anthropicThinking.budget_tokens === 'number' ? anthropicThinking.budget_tokens : undefined,
       };
     }
 
@@ -417,7 +418,6 @@ class GoogleAdapter implements ProviderAdapter {
       // Regular text part
       if (part.text) {
         textBuffer += part.text;
-        continue;
       }
     }
 

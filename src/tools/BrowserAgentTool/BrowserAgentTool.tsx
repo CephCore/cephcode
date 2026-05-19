@@ -5,9 +5,9 @@
 import * as React from 'react';
 import { z } from 'zod/v4';
 import { Text } from '../../ink.js';
+import { BrowserAgent } from '../../services/ai/BrowserAgent.js';
 import { buildTool } from '../../Tool.js';
 import { lazySchema } from '../../utils/lazySchema.js';
-import { BrowserAgent } from '../../services/ai/BrowserAgent.js';
 
 export const BROWSER_AGENT_TOOL_NAME = 'browser_agent' as const;
 

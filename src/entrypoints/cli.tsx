@@ -165,14 +165,14 @@ async function main(): Promise<void> {
   // Session management against the ~/.claude/sessions/ registry. Flag
   // literals are inlined so bg.js only loads when actually dispatching.
   if (
-    (args[0] === 'ps' ||
-      args[0] === 'logs' ||
-      args[0] === 'attach' ||
-      args[0] === 'kill' ||
-      args[0] === 'respawn' ||
-      args[0] === 'rm' ||
-      args.includes('--bg') ||
-      args.includes('--background'))
+    args[0] === 'ps' ||
+    args[0] === 'logs' ||
+    args[0] === 'attach' ||
+    args[0] === 'kill' ||
+    args[0] === 'respawn' ||
+    args[0] === 'rm' ||
+    args.includes('--bg') ||
+    args.includes('--background')
   ) {
     profileCheckpoint('cli_bg_path');
     const { enableConfigs } = await import('../utils/config.js');

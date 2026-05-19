@@ -22,6 +22,8 @@ const DATADOG_GATE_NAME = 'tengu_log_datadog_events';
 // Module-level gate state - starts undefined, initialized during startup
 let isDatadogGateEnabled: boolean | undefined;
 
+import { getGlobalConfig } from '../../utils/config.js';
+
 /**
  * Check if Datadog tracking is enabled.
  * Falls back to cached value from previous session if not yet initialized.
@@ -30,6 +32,12 @@ function shouldTrackDatadog(): boolean {
   if (isSinkKilled('datadog')) {
     return false;
   }
+  try {
+    const config = getGlobalConfig();
+    if (config.datadogDisabled) {
+      return false;
+    }
+  } catch {}
   if (isDatadogGateEnabled !== undefined) {
     return isDatadogGateEnabled;
   }

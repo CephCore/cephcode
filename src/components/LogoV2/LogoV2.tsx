@@ -69,6 +69,8 @@ import { useMainLoopModel } from '../../hooks/useMainLoopModel.js';
 import { renderModelSetting } from '../../utils/model/model.js';
 
 const LEFT_PANEL_MAX_WIDTH = 50;
+const CLAWD_LOGO_HEIGHT = 6;
+const LEFT_PANEL_MIN_HEIGHT = 11;
 
 export function LogoV2(): React.ReactNode {
   const activities = getRecentActivitySync();
@@ -241,7 +243,7 @@ export function LogoV2(): React.ReactNode {
             width={columns}
           >
             <Text bold>{welcomeMessage}</Text>
-            <Box marginY={1}>
+            <Box height={CLAWD_LOGO_HEIGHT} marginTop={1} marginBottom={1} flexShrink={0}>
               <Clawd />
             </Box>
             <Text dimColor>{modelDisplayName}</Text>
@@ -303,15 +305,17 @@ export function LogoV2(): React.ReactNode {
               width={leftWidth}
               justifyContent="space-between"
               alignItems="center"
-              minHeight={9}
+              minHeight={LEFT_PANEL_MIN_HEIGHT}
             >
               <Box marginTop={1}>
                 <Text bold>{welcomeMessage}</Text>
               </Box>
 
-              <Clawd />
+              <Box height={CLAWD_LOGO_HEIGHT} flexShrink={0}>
+                <Clawd />
+              </Box>
 
-              <Box flexDirection="column" alignItems="center">
+              <Box flexDirection="column" alignItems="center" marginBottom={1}>
                 <Text dimColor>{modelLine}</Text>
                 <Text dimColor>{cwdLine}</Text>
               </Box>

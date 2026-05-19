@@ -14,6 +14,7 @@ import { Box, Text } from '../../ink.js';
 import type { LocalJSXCommandCall } from '../../types/command.js';
 import type { LogOption } from '../../types/logs.js';
 import { agenticSessionSearch } from '../../utils/agenticSessionSearch.js';
+import { loadBackgroundSessionsForResume } from '../../utils/backgroundSessionsForResume.js';
 import { checkCrossProjectResume } from '../../utils/crossProjectResume.js';
 import { getWorktreePaths } from '../../utils/getWorktreePaths.js';
 import { logError } from '../../utils/log.js';
@@ -27,7 +28,6 @@ import {
   loadSameRepoMessageLogs,
   searchSessionsByCustomTitle,
 } from '../../utils/sessionStorage.js';
-import { loadBackgroundSessionsForResume } from '../../utils/backgroundSessionsForResume.js';
 import { validateUuid } from '../../utils/uuid.js';
 
 type ResumeResult =
@@ -89,9 +89,7 @@ function ResumeCommand({
       setLoading(true);
       try {
         const allLogs = allProjects ? await loadAllProjectsMessageLogs() : await loadSameRepoMessageLogs(paths);
-        const existingIds = new Set(
-          allLogs.map(l => getSessionIdFromLog(l)).filter((id): id is string => Boolean(id)),
-        );
+        const existingIds = new Set(allLogs.map(l => getSessionIdFromLog(l)).filter((id): id is string => Boolean(id)));
         const backgroundLogs = allProjects ? [] : await loadBackgroundSessionsForResume(existingIds);
         const merged = sortResumeLogs([...allLogs, ...backgroundLogs]);
         const resumable = filterResumableSessions(merged, getSessionId());

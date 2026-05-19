@@ -337,7 +337,7 @@ function OverviewTab({
             <Text wrap="truncate">
               Favorite model:{' '}
               <Text color="claude" bold>
-                {renderModelName(favoriteModel[0])}
+                {renderModelName(favoriteModel[0], favoriteModel[1].provider)}
               </Text>
             </Text>
           )}
@@ -663,6 +663,7 @@ type ModelEntryProps = {
     inputTokens: number;
     outputTokens: number;
     cacheReadInputTokens: number;
+    provider?: string;
   };
   totalTokens: number;
 };
@@ -674,7 +675,8 @@ function ModelEntry({ model, usage, totalTokens }: ModelEntryProps): React.React
   return (
     <Box flexDirection="column">
       <Text>
-        {figures.bullet} <Text bold>{renderModelName(model)}</Text> <Text color="subtle">({percentage}%)</Text>
+        {figures.bullet} <Text bold>{renderModelName(model, usage.provider)}</Text>{' '}
+        <Text color="subtle">({percentage}%)</Text>
       </Text>
       <Text color="subtle">
         {'  '}In: {formatNumber(usage.inputTokens)} · Out: {formatNumber(usage.outputTokens)}
@@ -901,7 +903,14 @@ function renderOverviewToAnsi(stats: ClaudeCodeStats): string[] {
 
   // Row 1: Favorite model | Total tokens
   if (favoriteModel) {
-    lines.push(row('Favorite model', renderModelName(favoriteModel[0]), 'Total tokens', formatNumber(totalTokens)));
+    lines.push(
+      row(
+        'Favorite model',
+        renderModelName(favoriteModel[0], favoriteModel[1].provider),
+        'Total tokens',
+        formatNumber(totalTokens),
+      ),
+    );
   }
   lines.push('');
 
@@ -1004,7 +1013,7 @@ function renderModelsToAnsi(stats: ClaudeCodeStats): string[] {
 
   // Summary
   lines.push(
-    `${figures.star} Favorite: ${chalk.magenta.bold(renderModelName(favoriteModel?.[0] || ''))} · ${figures.circle} Total: ${chalk.magenta(formatNumber(totalTokens))} tokens`,
+    `${figures.star} Favorite: ${chalk.magenta.bold(renderModelName(favoriteModel?.[0] || '', favoriteModel?.[1]?.provider))} · ${figures.circle} Total: ${chalk.magenta(formatNumber(totalTokens))} tokens`,
   );
   lines.push('');
 
@@ -1013,7 +1022,9 @@ function renderModelsToAnsi(stats: ClaudeCodeStats): string[] {
   for (const [model, usage] of topModels) {
     const modelTokens = usage.inputTokens + usage.outputTokens;
     const percentage = ((modelTokens / totalTokens) * 100).toFixed(1);
-    lines.push(`${figures.bullet} ${chalk.bold(renderModelName(model))} ${chalk.gray(`(${percentage}%)`)}`);
+    lines.push(
+      `${figures.bullet} ${chalk.bold(renderModelName(model, usage.provider))} ${chalk.gray(`(${percentage}%)`)}`,
+    );
     lines.push(chalk.dim(`  In: ${formatNumber(usage.inputTokens)} · Out: ${formatNumber(usage.outputTokens)}`));
   }
 

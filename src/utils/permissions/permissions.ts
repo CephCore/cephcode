@@ -1108,10 +1108,7 @@ async function hasPermissionsToUseToolInner(
   // 1g. Safety checks (e.g. .git/, .claude/, .vscode/, shell configs) are
   // bypass-immune — they must prompt even in bypassPermissions mode.
   // checkPathSafetyForAutoEdit returns {type:'safetyCheck'} for these paths.
-  if (
-    toolPermissionResult?.behavior === 'ask' &&
-    toolPermissionResult.decisionReason?.type === 'safetyCheck'
-  ) {
+  if (toolPermissionResult?.behavior === 'ask' && toolPermissionResult.decisionReason?.type === 'safetyCheck') {
     return toolPermissionResult;
   }
 
@@ -1158,10 +1155,7 @@ async function hasPermissionsToUseToolInner(
   if (shouldBypassPermissions) {
     return {
       behavior: 'allow',
-      updatedInput: getUpdatedInputOrFallback(
-        toolPermissionResult,
-        input,
-      ),
+      updatedInput: getUpdatedInputOrFallback(toolPermissionResult, input),
       decisionReason: {
         type: 'mode',
         mode: appState.toolPermissionContext.mode,
@@ -1348,4 +1342,3 @@ function getUpdatedInputOrFallback(
 ): Record<string, unknown> {
   return ('updatedInput' in permissionResult ? permissionResult.updatedInput : undefined) ?? fallback;
 }
-

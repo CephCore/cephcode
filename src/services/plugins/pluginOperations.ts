@@ -729,9 +729,7 @@ export async function setPluginEnabledOp(
     const alreadyEnabled = new Set(loadedEnabled.map(p => p.source));
 
     // Build a lookup function for resolution from the known marketplaces.
-    const { getMarketplace, loadKnownMarketplacesConfig } = await import(
-      '../../utils/plugins/marketplaceManager.js'
-    );
+    const { getMarketplace, loadKnownMarketplacesConfig } = await import('../../utils/plugins/marketplaceManager.js');
     const marketplaces = await loadKnownMarketplacesConfig();
     const lookup = async (id: string) => {
       const { name } = parsePluginIdentifier(id);
@@ -740,8 +738,7 @@ export async function setPluginEnabledOp(
           const mkt = await getMarketplace(mktName);
           const entry = mkt.plugins.find(p => p.name === name);
           if (entry) return { dependencies: entry.dependencies };
-        } catch {
-        }
+        } catch {}
       }
       return null;
     };
@@ -769,9 +766,7 @@ export async function setPluginEnabledOp(
     }
 
     // Enable any transitive deps that aren't already enabled.
-    depsToEnable = (resolution.ok ? resolution.closure : []).filter(
-      id => id !== pluginId && !alreadyEnabled.has(id),
-    );
+    depsToEnable = (resolution.ok ? resolution.closure : []).filter(id => id !== pluginId && !alreadyEnabled.has(id));
     for (const depId of depsToEnable) {
       updateSettingsForSource(settingSource, {
         enabledPlugins: {
@@ -799,7 +794,10 @@ export async function setPluginEnabledOp(
   clearAllCaches();
 
   const { name: pluginName } = parsePluginIdentifier(pluginId);
-  const depNote = enabled && depsToEnable?.length ? ` (+ ${depsToEnable.length} transitive ${depsToEnable.length === 1 ? 'dependency' : 'dependencies'})` : '';
+  const depNote =
+    enabled && depsToEnable?.length
+      ? ` (+ ${depsToEnable.length} transitive ${depsToEnable.length === 1 ? 'dependency' : 'dependencies'})`
+      : '';
   return {
     success: true,
     message: `Successfully ${operation}d plugin: ${pluginName} (scope: ${resolvedScope})${depNote}`,

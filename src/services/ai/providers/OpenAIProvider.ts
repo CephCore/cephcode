@@ -60,7 +60,10 @@ export class OpenAIProvider implements ProviderInterface {
     }
 
     const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
-    const baseUrl = options.baseUrl ?? process.env.OPENAI_BASE_URL ?? (openaiType === 'subscriber' ? 'https://opencode.ai/zen/v1' : 'https://api.openai.com/v1');
+    const baseUrl =
+      options.baseUrl ??
+      process.env.OPENAI_BASE_URL ??
+      (openaiType === 'subscriber' ? 'https://opencode.ai/zen/v1' : 'https://api.openai.com/v1');
 
     if (!apiKey) return [];
 
@@ -71,7 +74,7 @@ export class OpenAIProvider implements ProviderInterface {
       const response = await fetch(modelsUrl, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
       });

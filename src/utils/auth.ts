@@ -1224,10 +1224,7 @@ export const getClaudeAIOAuthTokens = memoize((): OAuthTokens | null => {
     // would crash shouldUseClaudeAIAuth() which calls scopes.includes().
     if (oauthData.scopes !== undefined && !Array.isArray(oauthData.scopes)) {
       logForDebugging('Fixed corrupt .credentials.json: scopes was not an array');
-      oauthData.scopes =
-        typeof oauthData.scopes === 'string'
-          ? oauthData.scopes.split(' ').filter(Boolean)
-          : [];
+      oauthData.scopes = typeof oauthData.scopes === 'string' ? oauthData.scopes.split(' ').filter(Boolean) : [];
     }
 
     return oauthData;
@@ -1909,3 +1906,24 @@ export async function validateForceLoginOrg(): Promise<OrgValidationResult> {
 }
 
 class GcpCredentialsTimeoutError extends Error {}
+
+export function isAuthorized(): boolean {
+  try {
+    const { ProviderManager } = require('../services/ai/ProviderManager.js');
+    const pm = ProviderManager.getInstance();
+    const provider = pm.getActiveProviderName();
+    if (provider === 'anthropic') {
+      if (isAnthropicAuthEnabled()) {
+        const tokens = getClaudeAIOAuthTokens();
+        return !!tokens?.accessToken;
+      }
+      const { key } = getAnthropicApiKeyWithSource({ skipRetrievingKeyFromApiKeyHelper: false });
+      return !!key;
+    }
+    if (provider === 'ollama') return true;
+    const apiKey = pm.getApiKeyForProvider(provider);
+    return !!apiKey;
+  } catch {
+    return false;
+  }
+}

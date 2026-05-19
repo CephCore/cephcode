@@ -18,7 +18,6 @@ import {
   isFastModeEnabled,
   isFastModeSupportedByModel,
 } from '../../utils/fastMode.js';
-import { setSessionModelForTranscript } from '../../utils/sessionStorage.js';
 import { MODEL_ALIASES } from '../../utils/model/aliases.js';
 import { checkOpus1mAccess, checkSonnet1mAccess } from '../../utils/model/check1mAccess.js';
 import {
@@ -28,6 +27,7 @@ import {
 } from '../../utils/model/model.js';
 import { isModelAllowed } from '../../utils/model/modelAllowlist.js';
 import { validateModel } from '../../utils/model/validateModel.js';
+import { setSessionModelForTranscript } from '../../utils/sessionStorage.js';
 
 function ModelPickerWrapper({
   onDone,
@@ -49,7 +49,11 @@ function ModelPickerWrapper({
     });
   }
 
-  function handleSelect(model: string | null, effort: EffortLevel | undefined, options?: { persistAsDefault?: boolean }): void {
+  function handleSelect(
+    model: string | null,
+    effort: EffortLevel | undefined,
+    options?: { persistAsDefault?: boolean },
+  ): void {
     logEvent('tengu_model_command_menu', {
       action: model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       from_model: mainLoopModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,

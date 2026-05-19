@@ -11,6 +11,7 @@ import color from './commands/color/index.js';
 import commit from './commands/commit.js';
 import copy from './commands/copy/index.js';
 import desktop from './commands/desktop/index.js';
+import datadog from './commands/datadog/index.js';
 import commitPushPr from './commands/commit-push-pr.js';
 import compact from './commands/compact/index.js';
 import config from './commands/config/index.js';
@@ -230,6 +231,7 @@ const COMMANDS = memoize((): Command[] => [
   config,
   copy,
   desktop,
+  datadog,
   context,
   contextNonInteractive,
   cost,
@@ -254,6 +256,7 @@ const COMMANDS = memoize((): Command[] => [
   mobile,
   model,
   outputStyle,
+  onboarding,
   skill,
   powerup,
   providerSelect,

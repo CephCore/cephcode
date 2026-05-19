@@ -76,6 +76,7 @@ export function setSessionModelForTranscript(model: string | undefined): void {
 export function getSessionModelForTranscript(): string | undefined {
   return _sessionModelForTranscript;
 }
+
 import { logForDebugging } from './debug.js';
 import { logForDiagnosticsNoPII } from './diagLogs.js';
 import { getClaudeConfigHomeDir, isEnvTruthy } from './envUtils.js';

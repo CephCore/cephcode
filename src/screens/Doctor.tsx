@@ -17,8 +17,10 @@ import { useSettingsErrors } from '../hooks/notifs/useSettingsErrors.js';
 import { useExitOnCtrlCDWithKeybindings } from '../hooks/useExitOnCtrlCDWithKeybindings.js';
 import { Box, Text } from '../ink.js';
 import { useKeybindings } from '../keybindings/useKeybinding.js';
+import { ProviderManager } from '../services/ai/ProviderManager.js';
 import { useAppState } from '../state/AppState.js';
 import { getPluginErrorMessage } from '../types/plugin.js';
+import { isAuthorized } from '../utils/auth.js';
 import { getGcsDistTags, getNpmDistTags, type NpmDistTags } from '../utils/autoUpdater.js';
 import { type ContextWarnings, checkContextWarnings } from '../utils/doctorContextWarnings.js';
 import { type DiagnosticInfo, getDoctorDiagnostic } from '../utils/doctorDiagnostic.js';
@@ -274,6 +276,15 @@ export function Doctor({ onDone }: Props): React.ReactNode {
             <ValidationErrorsList errors={errorsExcludingMcp} />
           </Box>
         )}
+      </Box>
+
+      {/* AI Provider Status */}
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold>AI Provider Status</Text>
+        <Text>└ Active provider: {ProviderManager.getInstance().getActiveProviderName()}</Text>
+        <Text>└ Active model: {ProviderManager.getInstance().getModelForProvider() || 'None'}</Text>
+        <Text>└ API Base URL: {ProviderManager.getInstance().getBaseUrlForProvider() || 'Default'}</Text>
+        <Text>└ Authorization: {isAuthorized() ? '✓ Logged In / Key Configured' : '✗ Not Authenticated'}</Text>
       </Box>
 
       {/* Updates section */}

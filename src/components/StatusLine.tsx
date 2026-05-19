@@ -1,7 +1,6 @@
 import { feature } from 'bun:bundle';
 import chalk from 'chalk';
 import { existsSync } from 'fs';
-import { homedir } from 'os';
 import { dirname, join } from 'path';
 import * as React from 'react';
 import { memo, useCallback, useEffect, useRef } from 'react';
@@ -19,6 +18,7 @@ import { DEFAULT_OUTPUT_STYLE_NAME } from '../constants/outputStyles.js';
 import { useNotifications } from '../context/notifications.js';
 import {
   getTotalAPIDuration,
+  getTotalCost,
   getTotalDuration,
   getTotalInputTokens,
   getTotalLinesAdded,
@@ -28,7 +28,6 @@ import {
 import { useMainLoopModel } from '../hooks/useMainLoopModel.js';
 import { type ReadonlySettings, useSettings } from '../hooks/useSettings.js';
 import { Ansi, Box, Text } from '../ink.js';
-import { Spinner } from './Spinner.js';
 import { ProviderManager } from '../services/ai/ProviderManager.js';
 import { getRawUtilization } from '../services/claudeAiLimits.js';
 import { roughTokenCountEstimationForMessages } from '../services/tokenEstimation.js';
@@ -49,6 +48,7 @@ import { getCurrentSessionTitle } from '../utils/sessionStorage.js';
 import { doesMostRecentAssistantMessageExceed200k, getCurrentUsage } from '../utils/tokens.js';
 import { getCurrentWorktreeSession } from '../utils/worktree.js';
 import { isVimModeEnabled } from './PromptInput/utils.js';
+import { Spinner } from './Spinner.js';
 
 export function statusLineShouldDisplay(settings: ReadonlySettings): boolean {
   if (feature('KAIROS') && getKairosActive()) return false;
@@ -164,31 +164,94 @@ export function getLastAssistantMessageId(messages: Message[]): string | null {
   return getLastAssistantMessage(messages)?.uuid ?? null;
 }
 
-// ─── Claude-HUD-inspired helpers ───────────────────────────────────────────
+// ─── Context bar helpers ────────────────────────────────────────────────────
+const FRACTIONS = [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
+const CLAUDE_THEME = {
+  text: '#D6D3CC',
+  muted: '#8A8780',
+  subtle: '#5F5B54',
+  surface: '#2F2A25',
+  accent: '#D97757',
+  accentSoft: '#B56A4D',
+  success: '#B8B08A',
+  warning: '#D9A441',
+  danger: '#E06C75',
+  mcp: '#C6A0F6',
+} as const;
 
-/** Visual context bar like claude-hud's coloredBar (Smooth fractional version) */
-function coloredBar(percent: number, width: number = 10): string {
-  const safePercent = Math.min(100, Math.max(0, percent));
-  const filledWidth = (safePercent / 100) * width;
-  const fullBlocks = Math.floor(filledWidth);
-  const partialBlocks = [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
-  const partialChar = partialBlocks[Math.floor((filledWidth % 1) * 8)] || '';
+const BAR_FREE_HEX = CLAUDE_THEME.surface;
+const CLAUDE_DOT = chalk.hex(CLAUDE_THEME.subtle)(' · ');
 
-  const emptyWidth = width - fullBlocks - (partialChar.trim() ? 1 : 0);
+function claudeMuted(text: string): string {
+  return chalk.hex(CLAUDE_THEME.muted)(text);
+}
 
-  let color: string;
-  if (percent > 90)
-    color = '#FF0055'; // Neon Red (Critical)
-  else if (percent > 75)
-    color = '#FFCC00'; // Cyber Amber (Warning)
-  else if (percent > 50)
-    color = '#00CCFF'; // Sky Blue (Moderate)
-  else color = '#00FFCC'; // Electric Teal (Healthy)
+function claudeSubtle(text: string): string {
+  return chalk.hex(CLAUDE_THEME.subtle)(text);
+}
 
-  const filledPart = '█'.repeat(fullBlocks) + (fullBlocks < width ? partialChar : '');
-  const emptyPart = '░'.repeat(Math.max(0, emptyWidth));
+function claudeAccent(text: string): string {
+  return chalk.hex(CLAUDE_THEME.accent)(text);
+}
 
-  return chalk.hex(color)(filledPart) + chalk.hex('#2A2A2A')(emptyPart);
+function claudeSuccess(text: string): string {
+  return chalk.hex(CLAUDE_THEME.success)(text);
+}
+
+function claudePill(text: string): string {
+  return (
+    chalk.hex(CLAUDE_THEME.subtle)('[') + chalk.hex(CLAUDE_THEME.muted)(text) + chalk.hex(CLAUDE_THEME.subtle)(']')
+  );
+}
+
+/**
+ * Build a cache-segmented context bar from `getCurrentUsage` data.
+ *
+ * Segments: cache_read (teal) · cache_creation (blue) · new_input (orange) · free (dim)
+ * Using the same tokens from `currentUsage` that status line already has.
+ */
+function buildCacheSegments(
+  u: NonNullable<ReturnType<typeof getCurrentUsage>>,
+  contextWindow: number,
+): { tokens: number; hex: string }[] {
+  const segs: { tokens: number; hex: string }[] = [];
+  if (u.cache_read_input_tokens > 0) {
+    segs.push({ tokens: Math.min(u.cache_read_input_tokens, contextWindow), hex: CLAUDE_THEME.success });
+  }
+  if (u.cache_creation_input_tokens > 0) {
+    segs.push({ tokens: Math.min(u.cache_creation_input_tokens, contextWindow), hex: CLAUDE_THEME.accentSoft });
+  }
+  const newInput = Math.max(0, u.input_tokens - u.cache_read_input_tokens - u.cache_creation_input_tokens);
+  if (newInput > 0) {
+    segs.push({ tokens: Math.min(newInput, contextWindow), hex: CLAUDE_THEME.accent });
+  }
+  return segs;
+}
+
+/** Render a multi-segment horizontal bar using Unicode block characters. */
+function renderSegments(segs: { tokens: number; hex: string }[], total: number, width: number): string {
+  if (total <= 0 || segs.length === 0) return chalk.hex(BAR_FREE_HEX)('░'.repeat(width));
+
+  const chars: string[] = [];
+  let cursor = 0;
+  for (const s of segs) {
+    const end = cursor + (s.tokens / total) * width;
+    const startInt = Math.floor(cursor);
+    const endInt = Math.floor(end);
+    const frac = end - endInt;
+
+    for (let i = 0; i < endInt - startInt; i++) {
+      chars.push(chalk.hex(s.hex)('█'));
+    }
+    if (frac > 0.001 && endInt < width) {
+      chars.push(chalk.hex(s.hex)(FRACTIONS[Math.min(Math.round(frac * 8), 8)]));
+    }
+    cursor = end;
+  }
+
+  while (chars.length < width) chars.push(chalk.hex(BAR_FREE_HEX)('░'));
+  if (chars.length > width) chars.length = width;
+  return chars.join('');
 }
 
 interface ToolActivity {
@@ -277,7 +340,7 @@ function formatCompactDuration(ms: number): string {
 
 function formatActivityDuration(item: { startedAt?: number; endedAt?: number }): string {
   if (!item.startedAt || !item.endedAt || item.endedAt < item.startedAt) return '';
-  return chalk.dim(` (${formatCompactDuration(item.endedAt - item.startedAt)})`);
+  return claudeSubtle(` (${formatCompactDuration(item.endedAt - item.startedAt)})`);
 }
 
 function formatContextSize(tokens: number): string {
@@ -676,8 +739,28 @@ function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props
     // since the provider is already displayed separately in brackets below
     const modelName = rawModelName.replace(/^[^:]+:\s*/, '');
 
-    // Context bar (claude-hud style)
-    const bar = coloredBar(usedPercentage, 10);
+    // Context bar with cache-read · cache-creation · new-input segments
+    // Falls back to estimated input only when getCurrentUsage returns null (streaming start).
+    const bar = (() => {
+      // During streaming, freeze bar at last known non-zero percentage.
+      if (!currentUsage && lastKnownCtxBarRef.current) {
+        const lastMsg = messagesRef.current[messagesRef.current.length - 1];
+        const isStreaming = lastMsg && (lastMsg as any).type !== 'user';
+        if (isStreaming) {
+          const frac = lastKnownCtxBarRef.current.pct / 100;
+          const fullBlocks = Math.floor(frac * 10);
+          const chars: string[] = [];
+          for (let i = 0; i < fullBlocks; i++) chars.push(chalk.hex(CLAUDE_THEME.muted)('█'));
+          while (chars.length < 10) chars.push(chalk.hex(BAR_FREE_HEX)('░'));
+          return chars.join('');
+        }
+      }
+      const cacheSegs = buildCacheSegments(usageForContext, contextWindowSize);
+      if (cacheSegs.length > 0) {
+        return renderSegments(cacheSegs, contextWindowSize, 10);
+      }
+      return chalk.hex(BAR_FREE_HEX)('░'.repeat(10));
+    })();
 
     // Extract tool/agent/todo activity
     const { tools, agents, todos } = extractActivity(messagesRef.current);
@@ -699,41 +782,46 @@ function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props
     const hookCount = countHooks(settings);
     const percentText =
       usedPercentage > 85
-        ? chalk.hex('#ff4444')(`${usedPercentage.toFixed(0)}%`)
+        ? chalk.hex(CLAUDE_THEME.danger)(`${usedPercentage.toFixed(0)}%`)
         : usedPercentage > 70
-          ? chalk.hex('#ffaa00')(`${usedPercentage.toFixed(0)}%`)
-          : chalk.green(`${usedPercentage.toFixed(0)}%`);
+          ? chalk.hex(CLAUDE_THEME.warning)(`${usedPercentage.toFixed(0)}%`)
+          : claudeMuted(`${usedPercentage.toFixed(0)}%`);
 
     const activeProvider =
       mainLoopProviderForSession ?? mainLoopProvider ?? ProviderManager.getInstance().getActiveProviderName();
-    const activeProviderDisplay = activeProvider ? chalk.hex('#888888')(`[${activeProvider}]`) : '';
-    const cwdShort = cwd.length > 40 ? '...' + cwd.slice(-37) : cwd;
-    const cwdDisplay = chalk.hex('#666666')(cwdShort);
+    const activeProviderDisplay = activeProvider ? claudeSubtle(` ${activeProvider}`) : '';
+    const cwdShort = cwd.length > 44 ? '…' + cwd.slice(-43) : cwd;
+    const cwdDisplay = claudeMuted(cwdShort.replace(/\\/g, '/'));
     let sessionGoalDisplay = '';
     if (sessionGoal) {
       const elapsed = sessionGoalStartTime ? Math.floor((Date.now() - sessionGoalStartTime) / 1000) : 0;
       const elapsedStr = elapsed > 0 ? `${Math.floor(elapsed / 60)}m${elapsed % 60}s` : '0s';
       const turns = sessionGoalTurnCount ?? 0;
-      sessionGoalDisplay = chalk.yellow(` [${sessionGoal} ${elapsedStr} t${turns}]`);
+      sessionGoalDisplay = ' ' + claudePill(`${sessionGoal} ${elapsedStr} t${turns}`);
     }
     // Build stats parts (only show non-zero)
     const statsParts: string[] = [];
     if (ruleCount > 0) statsParts.push(`${ruleCount} rules`);
+    if (hookCount > 0) statsParts.push(`${hookCount} hooks`);
     if (mcpCount > 0) statsParts.push(`${mcpCount} MCPs`);
-    const statsStr = statsParts.length > 0 ? ' · ' + statsParts.join(' · ') : '';
+    const statsStr = statsParts.length > 0 ? CLAUDE_DOT + statsParts.map(claudeMuted).join(CLAUDE_DOT) : '';
 
     const line1 =
+      claudeAccent('▌ ') +
       cwdDisplay +
-      chalk.dim(' · ') +
-      chalk.cyan(modelName) +
+      CLAUDE_DOT +
+      chalk.hex(CLAUDE_THEME.text)(modelName) +
       activeProviderDisplay +
       sessionGoalDisplay +
-      chalk.dim('  ') +
+      claudeSubtle('  ') +
       bar +
-      chalk.dim(' ') +
+      claudeSubtle(' ') +
       percentText +
-      chalk.dim(` · ${formatContextSize(contextWindowSize)} · ◷ ${formatCompactDuration(duration)}`) +
-      chalk.dim(statsStr);
+      CLAUDE_DOT +
+      claudeMuted(formatContextSize(contextWindowSize)) +
+      CLAUDE_DOT +
+      claudeMuted(`◷ ${formatCompactDuration(duration)}`) +
+      statsStr;
 
     // ── Build activity line ──
     const hasRunningTools = runningTools.length > 0;
@@ -742,50 +830,58 @@ function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props
     if (hasCompletedTools) {
       const parts: string[] = [];
       for (const [name, count] of sortedCompletedTools.slice(0, 3)) {
-        parts.push(chalk.green('✓') + name + chalk.dim(`×${count}`));
+        parts.push(claudeSuccess('✓ ') + claudeMuted(name) + claudeSubtle(`×${count}`));
       }
       if (sortedCompletedTools.length > 3) {
-        parts.push(chalk.dim(`+${sortedCompletedTools.length - 3} more`));
+        parts.push(claudeSubtle(`+${sortedCompletedTools.length - 3} more`));
       }
-      completedToolsLine = parts.join(chalk.dim(' · '));
+      completedToolsLine = parts.join(CLAUDE_DOT);
     }
 
     const agentLines: Array<{ key: string; node: React.ReactNode }> = [
-      ...runningAgents
-        .slice(-1)
-        .map(
-          a => ({
-            key: `agent-running-${a.id}`,
-            node: (
-              <Box flexDirection="row" key={`agent-running-${a.id}`}>
-                <Spinner color="yellow" />
-                <Text><Ansi>{chalk.dim(' ') + chalk.magenta(a.type) + (a.description ? chalk.dim(` ${truncate(a.description, 40)}`) : '')}</Ansi></Text>
-              </Box>
-            ),
-          }),
+      ...runningAgents.slice(-1).map(a => ({
+        key: `agent-running-${a.id}`,
+        node: (
+          <Box flexDirection="row" key={`agent-running-${a.id}`}>
+            <Spinner color="#D97757" />
+            <Text>
+              <Ansi>
+                {chalk.dim(' ') +
+                  claudeAccent(a.type) +
+                  (a.description ? claudeSubtle(` ${truncate(a.description, 40)}`) : '')}
+              </Ansi>
+            </Text>
+          </Box>
         ),
-      ...completedAgents
-        .slice(-2)
-        .map(
-          a => ({
-            key: `agent-done-${a.id}`,
-            node: (
-              <Box flexDirection="row" key={`agent-done-${a.id}`}>
-                <Text><Ansi>{chalk.green('✓') + chalk.dim(' ') + chalk.magenta(a.type) + (a.description ? chalk.dim(` ${truncate(a.description, 40)}`) : '') + formatActivityDuration(a)}</Ansi></Text>
-              </Box>
-            ),
-          }),
+      })),
+      ...completedAgents.slice(-2).map(a => ({
+        key: `agent-done-${a.id}`,
+        node: (
+          <Box flexDirection="row" key={`agent-done-${a.id}`}>
+            <Text>
+              <Ansi>
+                {claudeSuccess('✓') +
+                  claudeSubtle(' ') +
+                  claudeAccent(a.type) +
+                  (a.description ? claudeSubtle(` ${truncate(a.description, 40)}`) : '') +
+                  formatActivityDuration(a)}
+              </Ansi>
+            </Text>
+          </Box>
         ),
+      })),
     ];
 
     const todoLine = todos
       ? todos.total > 0 && todos.completed === todos.total
-        ? chalk.green('✓') + chalk.dim(' All todos complete ') + chalk.dim(`(${todos.completed}/${todos.total})`)
+        ? claudeSuccess('✓') +
+          claudeSubtle(' All todos complete ') +
+          claudeSubtle(`(${todos.completed}/${todos.total})`)
         : todos.inProgress
-          ? chalk.dim(' ') +
-            truncate(todos.inProgress, 50) +
-            chalk.dim(` (${todos.completed}/${todos.total})`)
-          : chalk.green('✓') + chalk.dim(' Todos ') + chalk.dim(`(${todos.completed}/${todos.total})`)
+          ? claudeSubtle(' ') +
+            claudeMuted(truncate(todos.inProgress, 50)) +
+            claudeSubtle(` (${todos.completed}/${todos.total})`)
+          : claudeSuccess('✓') + claudeSubtle(' Todos ') + claudeSubtle(`(${todos.completed}/${todos.total})`)
       : '';
 
     return (
@@ -801,21 +897,34 @@ function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props
           <Box overflowX="hidden" flexDirection="row">
             {runningTools.slice(-2).map((t, i) => (
               <React.Fragment key={t.id}>
-                {i > 0 && <Text dimColor> · </Text>}
+                {i > 0 && <Text color={CLAUDE_THEME.subtle}> · </Text>}
                 {t.isMcp ? (
-                  <Text color="#AA88FF">◈ <Text color="#CC99FF">{t.name.replace(/^mcp__/, 'mcp:')}</Text>{t.target ? <Text dimColor> {truncate(t.target.replace(/\\/g, '/'), 20)}</Text> : null}</Text>
+                  <Text color={CLAUDE_THEME.mcp}>
+                    ◈ <Text color={CLAUDE_THEME.mcp}>{t.name.replace(/^mcp__/, 'mcp:')}</Text>
+                    {t.target ? (
+                      <Text color={CLAUDE_THEME.subtle}> {truncate(t.target.replace(/\\/g, '/'), 20)}</Text>
+                    ) : null}
+                  </Text>
                 ) : (
                   <>
-                    <Spinner color="yellow" />
-                    <Text><Ansi>{chalk.dim(' ') + chalk.cyan(t.name) + (t.target ? chalk.dim(` ${truncate(t.target.replace(/\\/g, '/'), 20)}`) : '')}</Ansi></Text>
+                    <Spinner color="#D97757" />
+                    <Text>
+                      <Ansi>
+                        {claudeSubtle(' ') +
+                          claudeAccent(t.name) +
+                          (t.target ? claudeSubtle(` ${truncate(t.target.replace(/\\/g, '/'), 20)}`) : '')}
+                      </Ansi>
+                    </Text>
                   </>
                 )}
               </React.Fragment>
             ))}
             {/* separator before completed tools */}
-            {hasCompletedTools && <Text dimColor> · </Text>}
+            {hasCompletedTools && <Text color={CLAUDE_THEME.subtle}> · </Text>}
             {completedToolsLine && (
-              <Text><Ansi>{completedToolsLine}</Ansi></Text>
+              <Text>
+                <Ansi>{completedToolsLine}</Ansi>
+              </Text>
             )}
           </Box>
         )}
@@ -837,7 +946,7 @@ function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props
         {todos && todos.total > 0 && todos.inProgress && (
           <Box overflowX="hidden" flexDirection="row">
             <Text>
-              <Ansi>{chalk.green('◐') + todoLine}</Ansi>
+              <Ansi>{claudeAccent('◐') + todoLine}</Ansi>
             </Text>
           </Box>
         )}
@@ -856,7 +965,7 @@ function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props
     <Box paddingX={paddingX} flexDirection="column" gap={0} marginTop={0}>
       {filteredStatusLineText && (
         <Box paddingLeft={1} marginBottom={0} justifyContent="flex-start">
-          <Ansi>{chalk.gray.dim(filteredStatusLineText)}</Ansi>
+          <Ansi>{claudeSubtle(filteredStatusLineText)}</Ansi>
         </Box>
       )}
       {defaultStatusLine || (fullscreenEnabled ? <Text> </Text> : null)}

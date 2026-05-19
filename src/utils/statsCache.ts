@@ -11,8 +11,8 @@ import { logError } from './log.js';
 import { jsonParse, jsonStringify } from './slowOperations.js';
 import type { DailyActivity, DailyModelTokens, SessionStats } from './stats.js';
 
-export const STATS_CACHE_VERSION = 4;
-const MIN_MIGRATABLE_VERSION = 4;
+export const STATS_CACHE_VERSION = 5;
+const MIN_MIGRATABLE_VERSION = 5;
 const STATS_CACHE_FILENAME = 'stats-cache.json';
 
 /**

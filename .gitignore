@@ -43,7 +43,9 @@ desktop.ini
 *.sublime-workspace
 
 # Claude Code / Research Tools
-.claude/
+.claude/*
+!.claude/skills/
+!.claude/settings.json
 .searxng/
 research-dossiers/
 .provider.json
@@ -74,5 +76,4 @@ tmp/
 temp/
 .docs/
 
-CLAUDE.md
 scratch/
