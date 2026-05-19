@@ -836,10 +836,10 @@
 | 8: Infrastructure | 6 | ✅✅✅✅✅✅ |
 | 9: Windows | 5 | ⬜⬜⬜⬜⬜ |
 | 10: Agent View & BG Sessions | 9 | ⬜⬜⬜⬜✅⬜⬜⬜⬜ |
-| 11: Improvements & Polish | 12 | ✅⬜✅✅✅✅✅✅⬜⬜✅ |
-| **Total** | **53** | **✅ 38/53** |
+| 11: Improvements & Polish | 12 | ✅✅✅✅✅✅✅✅⬜⬜✅ |
+| **Total** | **53** | **✅ 40/53** |
 
-### Remaining (15)
+### Remaining (13)
 
 - **2.2** macOS bg Full Disk Access crash
 - **3.1–3.3** Terminal resize / corruption / VS Code spinner
