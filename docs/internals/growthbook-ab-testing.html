@@ -4,111 +4,85 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrowthBook A/B Testing — Ceph Code</title>
-  <meta name="description" content="GrowthBook A/B testing system architecture and implementation details.">
+  <meta name="description" content="GrowthBook A/B testing system for feature flags, experiments, and gradual rollouts in Ceph Code.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body>
+<header class="header"><div class="header-inner"><a href="../index.html" class="logo"><span class="logo-mark">~</span><span>Ceph Code</span></a><nav class="header-nav"><a href="../index.html">Home</a><a href="../index.html#features">Features</a><a href="../index.html#commands">Commands</a><a href="../features/searxng-search.html" class="active">Docs</a><a href="https://github.com/CephCore/cephcode" target="_blank">GitHub</a></nav><button class="menu-btn" id="menuToggle" aria-label="Toggle navigation"><span></span><span></span><span></span></button></div></header>
+<div class="app"><aside class="sidebar" id="sidebar"></aside><div class="sidebar-overlay" id="sidebarOverlay"></div><main class="content">
+  <h1>GrowthBook A/B Testing</h1>
+  <p class="section-subtitle">Feature flagging and experiment management using GrowthBook for gradual rollouts, A/B tests, and targeted feature releases.</p>
 
-<header class="header">
-  <div class="header-inner">
-    <a href="../index.html" class="logo">
-      <span class="logo-mark">~</span>
-      <span>Ceph Code</span>
-    </a>
-    <nav class="header-nav">
-      <a href="../index.html">Home</a>
-      <a href="../index.html#features">Features</a>
-      <a href="../index.html#commands">Commands</a>
-      <a href="../features/searxng-search.html" class="active">Docs</a>
-      <a href="https://github.com/CephCore/cephcode" target="_blank">GitHub</a>
-    </nav>
-    <button class="menu-btn" id="menuToggle" aria-label="Toggle navigation">
-      <span></span><span></span><span></span>
-    </button>
+  <div class="callout callout-warn">
+    <strong>Internal Infrastructure</strong>
+    GrowthBook integration is used for Ceph Code's own product development telemetry and experiment tracking. It is not a user-facing feature — this documentation is for contributors and integrators.
   </div>
-</header>
 
-<div class="app">
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-section">
-      <div class="sidebar-label">Getting Started</div>
-      <nav>
-        <a href="../index.html" class="sidebar-link"><span class="link-icon"></span>Overview</a>
-        <a href="../index.html#features" class="sidebar-link"><span class="link-icon"></span>Features</a>
-        <a href="../index.html#providers" class="sidebar-link"><span class="link-icon"></span>Providers</a>
-      </nav>
-    </div>
-    <div class="sidebar-section">
-      <div class="sidebar-label">Features</div>
-      <nav>
-        <a href="../features/searxng-search.html" class="sidebar-link"><span class="link-icon"></span>SearXNG Search</a>
-        <a href="../features/bridge-mode.html" class="sidebar-link"><span class="link-icon"></span>Bridge Mode</a>
-      </nav>
-    </div>
-    <div class="sidebar-section">
-      <div class="sidebar-label">Internals</div>
-      <nav>
-        <a href="hidden-features.html" class="sidebar-link"><span class="link-icon"></span>Hidden Features</a>
-        <a href="growthbook-ab-testing.html" class="sidebar-link active"><span class="link-icon"></span>A/B Testing</a>
-      </nav>
-    </div>
-  </aside>
+  <h2>Overview</h2>
+  <p>GrowthBook provides feature flagging and A/B testing within Ceph Code. It enables controlled rollouts of new features, experiment tracking, and targeted feature releases based on user segments. The SDK is initialized at startup and evaluates flags locally with caching for minimal latency.</p>
 
-  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <h2>Architecture</h2>
+  <ul>
+    <li><strong>Feature Flags</strong> — Boolean, string, number, and JSON flag types evaluated locally</li>
+    <li><strong>Experiments</strong> — Multi-variant A/B tests with statistical tracking and automatic analysis</li>
+    <li><strong>Forced Variations</strong> — Override flag values for testing and debugging</li>
+    <li><strong>Sticky Bucketing</strong> — Consistent user experience across sessions based on stable identifiers</li>
+    <li><strong>Local Caching</strong> — Feature definitions cached after initial fetch for offline resilience</li>
+  </ul>
 
-  <main class="content">
-    <h1>GrowthBook A/B Testing</h1>
-    <p class="section-subtitle">A/B testing system architecture and implementation.</p>
-
-    <h2>Overview</h2>
-    <p>
-      GrowthBook is used for feature flagging and A/B testing within Ceph Code.
-      It enables gradual rollouts, experiment tracking, and targeted feature
-      releases based on user segments.
-    </p>
-
-    <h2>Architecture</h2>
-    <p>
-      The GrowthBook SDK is initialized at startup with a set of feature definitions
-      loaded from the GrowthBook server. Feature flags are evaluated locally with
-      caching to minimize latency. The system supports:
-    </p>
-    <ul>
-      <li><strong>Feature Flags</strong> — Boolean, string, number, and JSON flag types</li>
-      <li><strong>Experiments</strong> — Multi-variant A/B tests with statistical tracking</li>
-      <li><strong>Forced Variations</strong> — Override for testing and debugging</li>
-      <li><strong>Sticky Bucketing</strong> — Consistent user experience across sessions</li>
-    </ul>
-
-    <h2>Usage in Code</h2>
-    <pre><code><span style="color:var(--text-tertiary)">// Check if a feature is enabled</span>
-<span style="color:var(--orange-400)">const</span> isEnabled = getFeatureValue_CACHED_MAY_BE_STALE(<span style="color:var(--teal-400)">'tengu_plum_vx3'</span>, <span style="color:var(--orange-400)">false</span>);
+  <h2>Usage in Code</h2>
+  <p>Feature flags are accessed through a cached evaluation function. The cache may return slightly stale values within a session, which is acceptable for product experimentation:</p>
+  <pre><code><span style="color:var(--text-tertiary)">// Check if a feature is enabled (cached evaluation)</span>
+<span style="color:var(--orange-400)">const</span> isEnabled = getFeatureValue_CACHED_MAY_BE_STALE(
+  <span style="color:var(--teal-400)">'tengu_plum_vx3'</span>,  <span style="color:var(--text-tertiary)">// Feature key</span>
+  <span style="color:var(--orange-400)">false</span>                  <span style="color:var(--text-tertiary)">// Default value</span>
+);
 
 <span style="color:var(--text-tertiary)">// Use the feature value</span>
 <span style="color:var(--orange-400)">if</span> (isEnabled) {
-  <span style="color:var(--text-tertiary)">// New behavior</span>
+  <span style="color:var(--text-tertiary)">// New behavior path</span>
+} <span style="color:var(--orange-400)">else</span> {
+  <span style="color:var(--text-tertiary)">// Control behavior path</span>
 }</code></pre>
 
-    <h2>Configuration</h2>
-    <p>
-      GrowthBook is configured via environment variables. The SDK connects to the
-      GrowthBook API at startup to fetch the latest feature definitions, then caches
-      them locally. Feature values can be forced for testing purposes.
-    </p>
+  <h2>Configuration</h2>
+  <p>GrowthBook is configured via environment variables. The SDK connects to the GrowthBook API at startup to fetch the latest feature definitions, then caches them locally for offline operation:</p>
+  <table>
+    <tr><th>Variable</th><th>Purpose</th></tr>
+    <tr><td><code>GROWTHBOOK_API_HOST</code></td><td>GrowthBook API endpoint (self-hosted or cloud)</td></tr>
+    <tr><td><code>GROWTHBOOK_CLIENT_KEY</code></td><td>Client-side SDK key for feature flag access</td></tr>
+    <tr><td><code>GROWTHBOOK_FORCE_VARIATION</code></td><td>Force a specific variation for testing</td></tr>
+  </table>
 
-    <footer class="footer">
-      <span>Ceph Code v2.1.145</span>
-      <div class="footer-links">
-        <a href="https://github.com/CephCore/cephcode">GitHub</a>
-        <a href="https://github.com/CephCore/cephcode/issues">Issues</a>
-      </div>
-    </footer>
-  </main>
-</div>
+  <h2>How It Works</h2>
+  <ol>
+    <li>On startup, Ceph Code initializes the GrowthBook SDK with the configured API host and client key</li>
+    <li>Feature definitions are fetched from the GrowthBook server and cached locally</li>
+    <li>Throughout the session, code checks feature flags using the cached evaluation function</li>
+    <li>Flag values are re-evaluated periodically or on explicit refresh</li>
+    <li>Experiment results are tracked and sent back to GrowthBook for statistical analysis</li>
+    <li>Forced variations can override normal bucket assignment for testing</li>
+  </ol>
 
+  <h2>Best Practices</h2>
+  <ul>
+    <li>Always provide a sensible default value (usually <code>false</code> for features not yet released)</li>
+    <li>Use descriptive, unique feature keys (e.g., <code>tengu_plum_vx3</code> follows the internal naming convention)</li>
+    <li>Cache-aware design: do not rely on flag values being real-time; they are evaluated at session start</li>
+    <li>Clean up stale flags after experiments conclude</li>
+  </ul>
+
+  <footer class="footer">
+    <span>Ceph Code v2.1.145 — Open Source (MIT)</span>
+    <div class="footer-links">
+      <a href="https://github.com/CephCore/cephcode">GitHub</a>
+      <a href="https://github.com/CephCore/cephcode/issues">Issues</a>
+    </div>
+  </footer>
+</main></div>
 <script src="../js/main.js"></script>
 </body>
 </html>

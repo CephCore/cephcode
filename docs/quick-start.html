@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Start — Ceph Code</title>
+  <meta name="description" content="Get started with Ceph Code in minutes — install, configure a provider, and run your first session.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="header">
+  <div class="header-inner">
+    <a href="index.html" class="logo"><span class="logo-mark">~</span><span>Ceph Code</span></a>
+    <nav class="header-nav">
+      <a href="index.html">Home</a><a href="index.html#features">Features</a><a href="index.html#commands">Commands</a><a href="quick-start.html" class="active">Docs</a><a href="https://github.com/CephCore/cephcode" target="_blank">GitHub</a>
+    </nav>
+    <button class="menu-btn" id="menuToggle" aria-label="Toggle navigation"><span></span><span></span><span></span></button>
+  </div>
+</header>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <main class="content">
+    <h1>Quick Start</h1>
+    <p class="section-subtitle">From zero to AI-assisted coding in under a minute.</p>
+
+    <h2>1. Install</h2>
+    <pre><code>npm install -g cephcode
+cephcode --version</code></pre>
+
+    <h2>2. Set a Provider Key</h2>
+    <p>Set at least one API key as an environment variable. See <a href="providers.html">Providers</a> for all 27 options.</p>
+    <pre><code># Anthropic (recommended for best tool calling)
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Or DeepSeek
+export DEEPSEEK_API_KEY=sk-...
+
+# Or Google Gemini
+export GOOGLE_API_KEY=...</code></pre>
+
+    <h2>3. Launch</h2>
+    <pre><code>cd /path/to/your/project
+cephcode</code></pre>
+    <p>The terminal UI starts with model name, provider, and context usage in the status bar.</p>
+
+    <h2>4. First Commands</h2>
+    <pre><code>> "explain this project's structure"
+
+> "find all the test files"
+
+> /status          # Check model, provider, API status
+
+> /model sonnet    # Switch model (alias or full ID)
+
+> /doctor          # Run environment diagnostics</code></pre>
+
+    <h2>5. Key Commands to Know</h2>
+    <table>
+      <tr><th>Command</th><th>Use</th></tr>
+      <tr><td><code>/clear</code></td><td>Clear conversation and free context</td></tr>
+      <tr><td><code>/compact</code></td><td>Compress context to save tokens</td></tr>
+      <tr><td><code>/model &lt;name&gt;</code></td><td>Switch model or provider</td></tr>
+      <tr><td><code>/permissions</code></td><td>Manage tool permission rules</td></tr>
+      <tr><td><code>/plan</code></td><td>Toggle plan mode</td></tr>
+      <tr><td><code>/config</code></td><td>Open config panel</td></tr>
+      <tr><td><code>/help</code></td><td>Show all available commands</td></tr>
+    </table>
+
+    <h2>6. Sessions</h2>
+    <pre><code># Continue last conversation
+cephcode -c
+
+# Resume a specific session
+cephcode -r
+
+# Print mode (non-interactive, pipe-friendly)
+cephcode -p "find all unused exports"
+
+# With structured output
+cephcode -p --output-format json "list all dependencies"</code></pre>
+
+    <div class="callout callout-info">
+      <strong>Tips</strong>
+      Type <code>/</code> to discover all commands. Use <code>/powerup</code> for interactive lessons. Set <code>--model sonnet</code> at startup to skip the default model.
+    </div>
+  </main>
+</div>
+<script src="js/main.js"></script>
+</body>
+</html>

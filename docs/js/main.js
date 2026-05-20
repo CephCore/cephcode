@@ -6,6 +6,75 @@
   var sidebar = document.getElementById('sidebar');
   var overlay = document.getElementById('sidebarOverlay');
 
+  // Calculate relative root path dynamically from the script tag src
+  var rootPrefix = '';
+  var currentScript = document.currentScript;
+  if (currentScript) {
+    var scriptSrc = currentScript.getAttribute('src');
+    if (scriptSrc && scriptSrc.indexOf('js/main.js') !== -1) {
+      rootPrefix = scriptSrc.replace('js/main.js', '');
+    }
+  } else {
+    // Fallback: check all script tags
+    var scripts = document.getElementsByTagName('script');
+    for (var i = 0; i < scripts.length; i++) {
+      var src = scripts[i].getAttribute('src');
+      if (src && src.indexOf('js/main.js') !== -1) {
+        rootPrefix = src.replace('js/main.js', '');
+        break;
+      }
+    }
+  }
+
+  // Inject unified sidebar HTML template if the container exists
+  if (sidebar) {
+    sidebar.innerHTML =
+      '<div class="sidebar-section">' +
+      '  <div class="sidebar-label">Getting Started</div>' +
+      '  <nav>' +
+      '    <a href="' + rootPrefix + 'index.html" class="sidebar-link"><span class="link-icon"></span>Overview</a>' +
+      '    <a href="' + rootPrefix + 'quick-start.html" class="sidebar-link"><span class="link-icon"></span>Quick Start</a>' +
+      '    <a href="' + rootPrefix + 'installation.html" class="sidebar-link"><span class="link-icon"></span>Installation</a>' +
+      '    <a href="' + rootPrefix + 'configuration.html" class="sidebar-link"><span class="link-icon"></span>Configuration</a>' +
+      '    <a href="' + rootPrefix + 'troubleshooting.html" class="sidebar-link"><span class="link-icon"></span>Troubleshooting</a>' +
+      '  </nav>' +
+      '</div>' +
+      '<div class="sidebar-section">' +
+      '  <div class="sidebar-label">Core Concepts</div>' +
+      '  <nav>' +
+      '    <a href="' + rootPrefix + 'providers.html" class="sidebar-link"><span class="link-icon"></span>Providers</a>' +
+      '    <a href="' + rootPrefix + 'models.html" class="sidebar-link"><span class="link-icon"></span>Models</a>' +
+      '    <a href="' + rootPrefix + 'commands.html" class="sidebar-link"><span class="link-icon"></span>Commands</a>' +
+      '    <a href="' + rootPrefix + 'tools.html" class="sidebar-link"><span class="link-icon"></span>Tools</a>' +
+      '    <a href="' + rootPrefix + 'permission-model.html" class="sidebar-link"><span class="link-icon"></span>Permission Model</a>' +
+      '  </nav>' +
+      '</div>' +
+      '<div class="sidebar-section">' +
+      '  <div class="sidebar-label">Extending</div>' +
+      '  <nav>' +
+      '    <a href="' + rootPrefix + 'plugins.html" class="sidebar-link"><span class="link-icon"></span>Plugins</a>' +
+      '    <a href="' + rootPrefix + 'skills.html" class="sidebar-link"><span class="link-icon"></span>Skills</a>' +
+      '    <a href="' + rootPrefix + 'architecture.html" class="sidebar-link"><span class="link-icon"></span>Architecture</a>' +
+      '  </nav>' +
+      '</div>' +
+      '<div class="sidebar-section">' +
+      '  <div class="sidebar-label">Features</div>' +
+      '  <nav>' +
+      '    <a href="' + rootPrefix + 'features/searxng-search.html" class="sidebar-link"><span class="link-icon"></span>SearXNG Search</a>' +
+      '    <a href="' + rootPrefix + 'features/bridge-mode.html" class="sidebar-link"><span class="link-icon"></span>Bridge Mode</a>' +
+      '    <a href="' + rootPrefix + 'features/evals.html" class="sidebar-link"><span class="link-icon"></span>Evaluation Harness</a>' +
+      '    <a href="' + rootPrefix + 'features/sentry-setup.html" class="sidebar-link"><span class="link-icon"></span>Sentry Setup</a>' +
+      '  </nav>' +
+      '</div>' +
+      '<div class="sidebar-section">' +
+      '  <div class="sidebar-label">Internals</div>' +
+      '  <nav>' +
+      '    <a href="' + rootPrefix + 'internals/hidden-features.html" class="sidebar-link"><span class="link-icon"></span>Hidden Features</a>' +
+      '    <a href="' + rootPrefix + 'internals/growthbook-ab-testing.html" class="sidebar-link"><span class="link-icon"></span>A/B Testing</a>' +
+      '  </nav>' +
+      '</div>';
+  }
+
   function open() {
     if (sidebar) sidebar.classList.add('open');
     if (menuBtn) menuBtn.setAttribute('aria-expanded', 'true');
@@ -49,15 +118,22 @@
   document.querySelectorAll('.content pre').forEach(wrapScroll);
 
   // Highlight active sidebar link
-  var current = window.location.pathname.split('/').pop() || 'index.html';
+  var currentPath = window.location.pathname;
+  var currentPage = currentPath.split('/').pop() || 'index.html';
+  if (currentPage === '') currentPage = 'index.html';
+
   document.querySelectorAll('.sidebar-link').forEach(function (link) {
     var href = link.getAttribute('href');
-    if (href === current) link.classList.add('active');
+    if (!href) return;
+    var hrefPage = href.split('/').pop().split('#')[0];
+    if (hrefPage === currentPage) link.classList.add('active');
   });
 
   // Highlight current page in header nav
   document.querySelectorAll('.header-nav a').forEach(function (link) {
     var href = link.getAttribute('href');
-    if (href === current) link.classList.add('active');
+    if (!href) return;
+    var hrefPage = href.split('/').pop().split('#')[0];
+    if (hrefPage === currentPage) link.classList.add('active');
   });
 })();

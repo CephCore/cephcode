@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuration — Ceph Code</title>
+  <meta name="description" content="Comprehensive configuration guide for Ceph Code — CLI flags, environment variables, settings file, and profiles.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="header"><div class="header-inner"><a href="index.html" class="logo"><span class="logo-mark">~</span><span>Ceph Code</span></a><nav class="header-nav"><a href="index.html">Home</a><a href="index.html#features">Features</a><a href="index.html#commands">Commands</a><a href="quick-start.html" class="active">Docs</a><a href="https://github.com/CephCore/cephcode" target="_blank">GitHub</a></nav><button class="menu-btn" id="menuToggle" aria-label="Toggle navigation"><span></span><span></span><span></span></button></div></header>
+<div class="app"><aside class="sidebar" id="sidebar"></aside><div class="sidebar-overlay" id="sidebarOverlay"></div><main class="content">
+  <h1>Configuration</h1>
+  <p class="section-subtitle">Ceph Code is configured through CLI flags (Commander.js), environment variables, a JSON settings file (<code>~/.clawdbot/moltbot.json</code> validated with TypeBox), and in-session slash commands.</p>
+
+  <h2>CLI Flags</h2>
+  <p>Defined in <code>src/main.tsx</code> with Commander.js <code>.option()</code> and <code>.addOption()</code>:</p>
+  <table>
+    <tr><th>Flag</th><th>Description</th></tr>
+    <tr><td><code>-p, --print</code></td><td>Print response and exit (useful for pipes). Skips workspace trust dialog.</td></tr>
+    <tr><td><code>--bare</code></td><td>Minimal mode: skip hooks, LSP, plugins, attribution, auto-memory, keychain reads, CLAUDE.md discovery. Sets CLAUDE_CODE_SIMPLE=1.</td></tr>
+    <tr><td><code>-d, --debug [filter]</code></td><td>Enable debug mode with optional category filtering (e.g., "api,hooks" or "!1p,!file")</td></tr>
+    <tr><td><code>--debug-file &lt;path&gt;</code></td><td>Write debug logs to a file</td></tr>
+    <tr><td><code>--verbose</code></td><td>Override verbose mode setting from config</td></tr>
+    <tr><td><code>--model &lt;model&gt;</code></td><td>Model for the current session (alias or full ID)</td></tr>
+    <tr><td><code>--effort &lt;level&gt;</code></td><td>Effort level: low, medium, high, max</td></tr>
+    <tr><td><code>--agent &lt;agent&gt;</code></td><td>Agent for the current session</td></tr>
+    <tr><td><code>--permission-mode &lt;mode&gt;</code></td><td>Permission mode (default, ask, plan, auto, acceptEdits, bypassPermissions, dontAsk)</td></tr>
+    <tr><td><code>--dangerously-skip-permissions</code></td><td>Bypass all permission checks (sandbox only)</td></tr>
+    <tr><td><code>--allow-dangerously-skip-permissions</code></td><td>Enable bypass as an option without enabling by default</td></tr>
+    <tr><td><code>--allowedTools, --allowed-tools</code></td><td>Comma/space-separated tool names to allow (e.g., "Bash(git:*) Edit")</td></tr>
+    <tr><td><code>--disallowedTools, --disallowed-tools</code></td><td>Comma/space-separated tool names to deny</td></tr>
+    <tr><td><code>--tools &lt;tools...&gt;</code></td><td>Specify available tools from built-in set</td></tr>
+    <tr><td><code>--mcp-config &lt;configs...&gt;</code></td><td>Load MCP servers from JSON files or strings</td></tr>
+    <tr><td><code>--strict-mcp-config</code></td><td>Only use MCP servers from --mcp-config</td></tr>
+    <tr><td><code>--plugin-dir &lt;path&gt;</code></td><td>Load plugins from a directory (repeatable)</td></tr>
+    <tr><td><code>--settings &lt;file-or-json&gt;</code></td><td>Path to a settings JSON file or JSON string</td></tr>
+    <tr><td><code>--add-dir &lt;directories...&gt;</code></td><td>Additional directories to allow tool access</td></tr>
+    <tr><td><code>--system-prompt &lt;prompt&gt;</code></td><td>Custom system prompt</td></tr>
+    <tr><td><code>--system-prompt-file &lt;file&gt;</code></td><td>Read system prompt from a file</td></tr>
+    <tr><td><code>--append-system-prompt &lt;prompt&gt;</code></td><td>Append to default system prompt</td></tr>
+    <tr><td><code>--continue, -c</code></td><td>Continue the most recent conversation</td></tr>
+    <tr><td><code>--resume, -r [value]</code></td><td>Resume a conversation by session ID or picker</td></tr>
+    <tr><td><code>--fork-session</code></td><td>When resuming, create a new session ID</td></tr>
+    <tr><td><code>--session-id &lt;uuid&gt;</code></td><td>Use a specific session ID</td></tr>
+    <tr><td><code>--name, -n &lt;name&gt;</code></td><td>Display name for this session</td></tr>
+    <tr><td><code>--agents &lt;json&gt;</code></td><td>JSON defining custom agents</td></tr>
+    <tr><td><code>--profile &lt;name&gt;</code></td><td>Use a specific configuration profile</td></tr>
+    <tr><td><code>--output-format &lt;format&gt;</code></td><td>text, json, or stream-json (with --print)</td></tr>
+    <tr><td><code>--input-format &lt;format&gt;</code></td><td>text or stream-json (with --print)</td></tr>
+    <tr><td><code>--json-schema &lt;schema&gt;</code></td><td>JSON Schema for structured output validation</td></tr>
+    <tr><td><code>--thinking &lt;mode&gt;</code></td><td>Thinking mode: enabled, adaptive, disabled</td></tr>
+    <tr><td><code>--max-turns &lt;turns&gt;</code></td><td>Max agentic turns in non-interactive mode</td></tr>
+    <tr><td><code>--max-budget-usd &lt;amount&gt;</code></td><td>Max API spend (print mode only)</td></tr>
+    <tr><td><code>--fallback-model &lt;model&gt;</code></td><td>Fallback when primary model is overloaded</td></tr>
+    <tr><td><code>--betas &lt;betas...&gt;</code></td><td>Beta headers for API requests</td></tr>
+    <tr><td><code>--ide</code></td><td>Auto-connect to IDE on startup</td></tr>
+    <tr><td><code>--chrome / --no-chrome</code></td><td>Enable/disable Claude in Chrome integration</td></tr>
+    <tr><td><code>--computer</code></td><td>Enable Computer Use tool (Windows only)</td></tr>
+    <tr><td><code>--no-session-persistence</code></td><td>Disable session save to disk (print mode only)</td></tr>
+    <tr><td><code>--disable-slash-commands</code></td><td>Disable all skills</td></tr>
+    <tr><td><code>--prefill &lt;text&gt;</code></td><td>Pre-fill prompt input without submitting</td></tr>
+    <tr><td><code>--file &lt;specs...&gt;</code></td><td>Download file resources at startup</td></tr>
+  </table>
+
+  <h2>Environment Variables</h2>
+
+  <h3>Provider API Keys</h3>
+  <p>27 providers — set one or more. See <a href="providers.html">Providers page</a> for the full list.</p>
+
+  <h3>Runtime &amp; Feature Flags</h3>
+  <table>
+    <tr><th>Variable</th><th>Purpose</th></tr>
+    <tr><td><code>DEBUG</code></td><td>Debug logging with optional category filter</td></tr>
+    <tr><td><code>NO_COLOR</code> / <code>FORCE_COLOR</code></td><td>Terminal color control</td></tr>
+    <tr><td><code>BRIDGE_MODE=1</code></td><td>Enable WebSocket bridge for remote control</td></tr>
+    <tr><td><code>VOICE_MODE=1</code></td><td>Enable voice mode</td></tr>
+    <tr><td><code>KAIROS=1</code></td><td>Enable proactive/brief/assistant features</td></tr>
+    <tr><td><code>ENABLE_LSP_TOOL=1</code></td><td>Enable LSP tool integration</td></tr>
+    <tr><td><code>ENABLE_COMPUTER_USE=1</code></td><td>Enable Computer Use tool (Windows)</td></tr>
+    <tr><td><code>CLAUDECODE_PROFILE</code></td><td>Active config profile name</td></tr>
+    <tr><td><code>CLAUDECODE_NO_RESPAWN</code></td><td>Disable process respawn</td></tr>
+    <tr><td><code>SENTRY_DSN</code></td><td>Enable Sentry error reporting (opt-in)</td></tr>
+    <tr><td><code>TAVILY_API_KEY</code></td><td>Tavily web search (highest priority)</td></tr>
+    <tr><td><code>BRAVE_API_KEY</code></td><td>Brave web search</td></tr>
+    <tr><td><code>SERPER_API_KEY</code></td><td>Serper web search</td></tr>
+    <tr><td><code>SEARXNG_INSTANCE_URL</code></td><td>Self-hosted SearXNG URL</td></tr>
+  </table>
+
+  <h2>Settings File</h2>
+  <p>Config file at <code>~/.clawdbot/moltbot.json</code> (TypeBox-validated). Stores:</p>
+  <ul>
+    <li>Default provider and model</li>
+    <li>Permission mode and rules</li>
+    <li>Workspace directories</li>
+    <li>Plugin and MCP server configs</li>
+    <li>Theme and UI preferences</li>
+    <li>Session persistence settings</li>
+    <li>Profile configurations</li>
+  </ul>
+
+  <h2>Config Paths</h2>
+  <table>
+    <tr><th>Path</th><th>Content</th></tr>
+    <tr><td><code>~/.clawdbot/moltbot.json</code></td><td>Main configuration (TypeBox schema)</td></tr>
+    <tr><td><code>~/.clawdbot/credentials/</code></td><td>Stored credentials</td></tr>
+    <tr><td><code>~/.clawdbot/sessions/</code></td><td>Session persistence</td></tr>
+    <tr><td><code>~/.clawdbot/logs/</code></td><td>Debug and error logs</td></tr>
+    <tr><td><code>~/.claude/skills/</code></td><td>User-installed skills</td></tr>
+    <tr><td><code>.claude/skills/</code></td><td>Project-level skills</td></tr>
+  </table>
+
+  <h2>In-Session Configuration</h2>
+  <pre><code>/config      # Open config panel (aliases: settings)
+/profile     # Manage isolated configurations
+/theme       # Change the theme
+/color       # Set prompt bar color
+/keybindings # Edit keybindings
+/permissions # Manage permission rules</code></pre>
+
+  <h2>Build Configuration</h2>
+  <p>Build via <code>bun run build</code> with compile-time feature defines:</p>
+  <pre><code># In src/main.tsx:
+--define.TRANSCRIPT_CLASSIFIER=true  # Enables auto permission mode
+--define.CHICAGO_MCP=true            # Enables Chicago MCP features</code></pre>
+
+  <footer class="footer">
+    <span>Ceph Code v2.1.145 — Open Source (MIT)</span>
+    <div class="footer-links">
+      <a href="https://github.com/CephCore/cephcode">GitHub</a>
+      <a href="https://github.com/CephCore/cephcode/issues">Issues</a>
+    </div>
+  </footer>
+</main></div><script src="js/main.js"></script></body></html>
