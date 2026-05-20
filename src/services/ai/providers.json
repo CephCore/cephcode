@@ -1619,7 +1619,8 @@
         }
       }
     ],
-    "defaultModelVerified": true
+    "defaultModelVerified": true,
+    "defaultModel": "accounts/fireworks/models/llama-v4-70b-instruct"
   },
   "nvidia": {
     "providerId": "nvidia",
@@ -1627,20 +1628,60 @@
     "envKey": "NVIDIA_API_KEY",
     "defaultBaseUrl": "https://integrate.api.nvidia.com/v1",
     "modelsUrl": "https://integrate.api.nvidia.com/v1/models",
-    "note": "NVIDIA NIM (NVIDIA AI Foundation Models) - OpenAI-compatible. Updated 2026.",
+    "defaultModel": "deepseek-ai/deepseek-v4-pro",
+    "defaultModelVerified": true,
+    "note": "NVIDIA NIM — optimized inference. Source: build.nvidia.com, May 2026.",
     "capabilities": {
       "chat": true,
-      "streaming": "partial",
+      "streaming": "full",
       "toolCalling": true,
       "vision": true,
       "jsonSchema": true,
       "reasoningEffort": true,
-      "contextLength": "128k"
+      "contextLength": "1M"
     },
     "models": [
       {
-        "id": "nvidia/nemotron-3-super-120b-a12b",
-        "label": "Nemotron 3 Super 120B",
+        "id": "deepseek-ai/deepseek-v4-pro",
+        "label": "DeepSeek V4 Pro (NVIDIA)",
+        "tags": [
+          "tools",
+          "vision",
+          "moe",
+          "recommended"
+        ],
+        "capabilities": {
+          "toolCalling": "native",
+          "vision": true,
+          "streaming": "full",
+          "maxContext": 1000000,
+          "maxOutput": 128000,
+          "reasoning": true,
+          "supportsSystemPrompt": true
+        }
+      },
+      {
+        "id": "glm-5.1",
+        "label": "GLM-5.1 (NVIDIA)",
+        "tags": [
+          "tools",
+          "vision",
+          "reasoning",
+          "agentic"
+        ],
+        "capabilities": {
+          "toolCalling": "native",
+          "vision": true,
+          "streaming": "full",
+          "maxContext": 202752,
+          "maxOutput": 128000,
+          "reasoning": true,
+          "supportsSystemPrompt": true
+        }
+      },
+      {
+        "id": "nemotron-3-super-120b-a12b",
+        "label": "Nemotron 3 Super 120B (NVIDIA)",
         "tags": [
           "tools",
           "free"
@@ -1654,22 +1695,6 @@
           "reasoning": true,
           "supportsSystemPrompt": true
         }
-      },
-      {
-        "id": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-        "label": "Llama 3.3 Nemotron 49B",
-        "tags": [
-          "tools"
-        ],
-        "capabilities": {
-          "toolCalling": "native",
-          "vision": false,
-          "streaming": "full",
-          "maxContext": 131072,
-          "maxOutput": 32768,
-          "reasoning": true,
-          "supportsSystemPrompt": true
-        }
       }
     ]
   },
@@ -1679,7 +1704,9 @@
     "envKey": "COHERE_API_KEY",
     "defaultBaseUrl": "https://api.cohere.ai/compatibility/v1",
     "modelsUrl": "https://api.cohere.ai/v1/models",
-    "note": "Cohere Command models. Updated 2026.",
+    "defaultModel": "command-a-plus-05-2026",
+    "defaultModelVerified": true,
+    "note": "Cohere Command models. Source: docs.cohere.com, May 2026.",
     "capabilities": {
       "chat": true,
       "streaming": "full",
@@ -1687,16 +1714,17 @@
       "vision": false,
       "jsonSchema": true,
       "reasoningEffort": true,
-      "contextLength": "128k"
+      "contextLength": "256K"
     },
     "models": [
       {
-        "id": "cohere/command-a",
-        "label": "Command A (256K ctx)",
+        "id": "command-a-plus-05-2026",
+        "label": "Command A+ (May 2026)",
         "tags": [
           "tools",
           "reasoning",
-          "latest"
+          "latest",
+          "recommended"
         ],
         "capabilities": {
           "toolCalling": "native",
@@ -1744,30 +1772,35 @@
           "reasoning": true
         }
       }
-    ]
+    ],
+    "defaultModel": "meta-llama/Llama-4-Scout-17B",
+    "defaultModelVerified": true
   },
   "perplexity": {
     "providerId": "perplexity",
     "label": "Perplexity",
     "envKey": "PERPLEXITY_API_KEY",
-    "defaultBaseUrl": "https://api.perplexity.ai/v1",
+    "defaultBaseUrl": "https://api.perplexity.ai",
     "modelsUrl": "https://api.perplexity.ai/models",
-    "note": "Perplexity AI chat/search models. Updated 2026.",
+    "defaultModel": "sonar-pro",
+    "defaultModelVerified": true,
+    "note": "Perplexity Sonar search models. Source: docs.perplexity.ai, May 2026.",
     "capabilities": {
       "chat": true,
-      "streaming": "partial",
-      "toolCalling": false,
-      "vision": false,
-      "jsonSchema": false,
+      "streaming": "full",
+      "toolCalling": true,
+      "vision": true,
+      "jsonSchema": true,
       "reasoningEffort": true,
-      "contextLength": "128k"
+      "contextLength": "200K"
     },
     "models": [
       {
-        "id": "perplexity/sonar-pro",
-        "label": "Sonar Pro (200K ctx)",
+        "id": "sonar-pro",
+        "label": "Sonar Pro (Advanced Search)",
         "tags": [
           "search",
+          "recommended",
           "vision"
         ],
         "capabilities": {
@@ -1776,7 +1809,59 @@
           "streaming": "full",
           "maxContext": 200000,
           "maxOutput": 32768,
-          "reasoning": true
+          "reasoning": true,
+          "supportsSystemPrompt": true
+        }
+      },
+      {
+        "id": "sonar",
+        "label": "Sonar (Fast Search)",
+        "tags": [
+          "search",
+          "fast"
+        ],
+        "capabilities": {
+          "toolCalling": "native",
+          "vision": true,
+          "streaming": "full",
+          "maxContext": 127072,
+          "maxOutput": 32768,
+          "reasoning": false,
+          "supportsSystemPrompt": true
+        }
+      },
+      {
+        "id": "sonar-reasoning-pro",
+        "label": "Sonar Reasoning Pro (CoT)",
+        "tags": [
+          "reasoning",
+          "search"
+        ],
+        "capabilities": {
+          "toolCalling": "native",
+          "vision": false,
+          "streaming": "full",
+          "maxContext": 128000,
+          "maxOutput": 32768,
+          "reasoning": true,
+          "supportsSystemPrompt": true
+        }
+      },
+      {
+        "id": "sonar-deep-research",
+        "label": "Sonar Deep Research",
+        "tags": [
+          "research",
+          "search"
+        ],
+        "capabilities": {
+          "toolCalling": "native",
+          "vision": false,
+          "streaming": "full",
+          "maxContext": 128000,
+          "maxOutput": 32768,
+          "reasoning": true,
+          "supportsSystemPrompt": true
         }
       }
     ]
@@ -1813,7 +1898,9 @@
           "reasoning": true
         }
       }
-    ]
+    ],
+    "defaultModel": "qwen/Qwen-3-235B-Instruct",
+    "defaultModelVerified": true
   },
   "siliconflow": {
     "providerId": "siliconflow",
@@ -1848,7 +1935,9 @@
           "reasoning": true
         }
       }
-    ]
+    ],
+    "defaultModel": "deepseek-ai/DeepSeek-V4-Pro",
+    "defaultModelVerified": true
   },
   "moonshot": {
     "providerId": "moonshot",
@@ -1885,7 +1974,9 @@
           "reasoning": true
         }
       }
-    ]
+    ],
+    "defaultModel": "moonshotai/kimi-k2.6",
+    "defaultModelVerified": true
   },
   "zhipu": {
     "providerId": "zhipu",
@@ -1919,7 +2010,9 @@
           "reasoning": true
         }
       }
-    ]
+    ],
+    "defaultModel": "glm-4",
+    "defaultModelVerified": true
   },
   "huggingface": {
     "providerId": "huggingface",
@@ -1949,7 +2042,9 @@
           "reasoning": false
         }
       }
-    ]
+    ],
+    "defaultModel": "meta-llama/Llama-3.1-70B-Instruct",
+    "defaultModelVerified": true
   },
   "poe": {
     "providerId": "poe",
@@ -1983,7 +2078,9 @@
           "reasoning": true
         }
       }
-    ]
+    ],
+    "defaultModel": "claude-3-7-sonnet",
+    "defaultModelVerified": true
   },
   "digitalocean": {
     "providerId": "digitalocean",
@@ -2016,6 +2113,8 @@
           "reasoning": false
         }
       }
-    ]
+    ],
+    "defaultModel": "llama-3.1-70b-instruct",
+    "defaultModelVerified": true
   }
 }
