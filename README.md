@@ -26,6 +26,30 @@ Ceph Code is an independent, research-oriented **reverse-engineered rebuild** of
 
 > This is a community rebuild for engineers who need transparency and provider choice—not an official Anthropic distribution.
 
+## Ceph Code vs Claude Code
+
+An honest comparison from a user's perspective. Ceph Code is a **research-oriented fork** — it trades some polish for provider freedom.
+
+| Capability | Claude Code (Anthropic) | Ceph Code |
+|---|---|---|
+| **AI Providers** | Anthropic Claude only | **15+** — Anthropic, OpenAI, Google, DeepSeek, OpenRouter, Ollama, xAI, Mistral, Groq, Copilot, KiloCode, OpenCode |
+| **Runtime model switch** | ❌ Fixed to Claude | ✅ `/model`, `/provider` — switch mid-session |
+| **Plugin system** | MCP + skills | **Full system** — pre/post hooks, agents, skills, MCP, LSP |
+| **Agent system** | Subagents + Agent SDK | Agents view + coordinator + workerAgent + supervisor |
+| **Computer Use** | ✅ macOS only | ✅ **macOS + Windows + Linux** adapters ready |
+| **Chrome control** | Claude in Chrome | Multi-browser: Chrome, Brave, Edge, Opera, Vivaldi |
+| **Self-hosted search** | ❌ No | ✅ SearXNG via Docker + `/searxng` command |
+| **Remote bridge** | ❌ No | ✅ WebSocket remote control + session sharing |
+| **Permission modes** | Default / Plan / YOLO | **6 modes** — plus Auto, YOLO Lite, YOLO MAX |
+| **Context compaction** | API-based | **KiloCompact** — local, no API call needed |
+| **Cross-provider structured output** | ❌ No | ✅ Adapter maps JSON schema → each provider format |
+| **Open source** | Source-available | **Full open source** |
+| **Ecosystem** | Large, official Anthropic | Smaller — community-driven |
+| **Stability** | High — team + CI | Medium — solo dev, active development |
+| **Offline/air-gapped** | ❌ Requires claude.ai | ✅ Works with Ollama + SearXNG + local models |
+
+**Bottom line:** Use Claude Code if you need enterprise support and a single, well-tested provider. Use Ceph Code if you value provider freedom, self-hosting, and the ability to customize every layer.
+
 ## What It Does
 
 Ceph Code gives you an AI coding assistant that runs in your terminal, can inspect and edit a local codebase, execute tools, switch between model providers, and coordinate longer workflows through commands, agents, plugins, and project skills.
