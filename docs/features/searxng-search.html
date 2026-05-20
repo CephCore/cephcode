@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SearXNG Search — self-hosted web search</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <article>
+    <h1>SearXNG Search</h1>
+    <p class="subtitle">Self-hosted, privacy-respecting web search via Docker</p>
+
+    <h2>Overview</h2>
+    <p>
+      SearXNG is a free, privacy-respecting metasearch engine. This project provides
+      a Docker-based setup so you can run your own instance locally, avoiding reliance
+      on public instances (which increasingly return 403/429 due to Cloudflare/anti-bot
+      protection).
+    </p>
+
+    <h2>Quick Start</h2>
+    <pre><code>cd searxng
+start.bat</code></pre>
+    <p>Starts SearXNG on <a href="http://localhost:18889">http://localhost:18889</a>.</p>
+
+    <h3>Other Commands</h3>
+    <pre><code>stop.bat         # Stop the container
+restart.bat      # Restart the container
+logs.bat         # Tail logs</code></pre>
+
+    <p>Or using Docker Compose directly:</p>
+    <pre><code>docker compose -f searxng/docker-compose.yml up -d
+docker compose -f searxng/docker-compose.yml down
+docker compose -f searxng/docker-compose.yml logs -f</code></pre>
+
+    <h2>Files</h2>
+    <table>
+      <tr><th>File</th><th>Purpose</th></tr>
+      <tr><td><code>searxng/docker-compose.yml</code></td><td>Container definition, port 18889 → 8080</td></tr>
+      <tr><td><code>searxng/.env</code></td><td>Host, port, and secret key</td></tr>
+      <tr><td><code>searxng/config/settings.yml</code></td><td>SearXNG configuration with JSON API enabled</td></tr>
+      <tr><td><code>searxng/limiter.toml</code></td><td>Rate limiter — relaxed for local network IPs</td></tr>
+      <tr><td><code>searxng/start.bat</code></td><td>Start wrapper</td></tr>
+      <tr><td><code>searxng/stop.bat</code></td><td>Stop wrapper</td></tr>
+      <tr><td><code>searxng/restart.bat</code></td><td>Restart wrapper</td></tr>
+      <tr><td><code>searxng/logs.bat</code></td><td>Log tail wrapper</td></tr>
+    </table>
+
+    <h2>How It Works</h2>
+    <ol>
+      <li>SearXNG runs in Docker on <code>localhost:18889</code></li>
+      <li>The project's <code>.env</code> sets <code>SEARXNG_INSTANCE_URL=http://localhost:18889</code></li>
+      <li><code>selectBestDirectProvider()</code> in <code>WebSearchTool.ts</code> auto-detects this and prioritises SearXNG</li>
+      <li>The <code>SearXNGProvider</code> sends GET requests with <code>format=json</code> and parses results</li>
+    </ol>
+
+    <h2>Engines Enabled</h2>
+    <ul>
+      <li><strong>DuckDuckGo</strong> — primary general search (no API key needed)</li>
+      <li><strong>Google</strong> — general search</li>
+      <li><strong>Wikipedia</strong> — infobox and article results</li>
+      <li><strong>StackOverflow</strong> — technical Q&amp;A</li>
+      <li><strong>GitHub</strong> — repository search</li>
+      <li><strong>Wikidata</strong> — structured data infoboxes</li>
+    </ul>
+    <p>Additional engines can be added in <code>searxng/config/settings.yml</code> under the <code>engines:</code> section.</p>
+
+    <h2>Provider Selection Priority</h2>
+    <p>When performing a web search, the system selects the best available provider:</p>
+    <ol>
+      <li><strong>Tavily</strong> — requires <code>TAVILY_API_KEY</code></li>
+      <li><strong>Brave</strong> — requires <code>BRAVE_API_KEY</code></li>
+      <li><strong>Serper</strong> — requires <code>SERPER_API_KEY</code></li>
+      <li><strong>SearXNG</strong> — only if <code>SEARXNG_INSTANCE_URL</code> is explicitly set</li>
+      <li><strong>DuckDuckGo</strong> — always available, free, no API key</li>
+    </ol>
+    <p>
+      Public SearXNG instances are intentionally excluded from auto-selection because
+      almost all of them are behind Cloudflare or other anti-bot protection. The
+      provider is only considered available when a self-hosted URL is configured.
+    </p>
+
+    <h2>Troubleshooting</h2>
+    <h3>Container won't start</h3>
+    <pre><code>docker compose -f searxng/docker-compose.yml logs</code></pre>
+    <p>Check for schema errors in <code>settings.yml</code> or <code>limiter.toml</code>.</p>
+
+    <h3>No results returned</h3>
+    <p>Check that engines are not failing by visiting <a href="http://localhost:18889">http://localhost:18889</a> and performing a search in the web UI.</p>
+
+    <h3>Port conflict</h3>
+    <p>Change <code>SEARXNG_PORT</code> in <code>searxng/.env</code> and update <code>SEARXNG_INSTANCE_URL</code> in <code>.env</code> to match.</p>
+
+    <h2>Updating</h2>
+    <pre><code>cd searxng
+docker compose pull
+docker compose up -d</code></pre>
+  </article>
+</body>
+</html>

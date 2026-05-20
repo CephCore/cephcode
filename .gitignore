@@ -79,4 +79,5 @@ tmp/
 temp/
 .docs/
 
-scratch/index.json
+scratch/
+.plan/

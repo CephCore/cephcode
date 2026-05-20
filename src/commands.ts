@@ -119,6 +119,7 @@ import ant from './commands/ant/index.js';
 import stickers from './commands/stickers/index.js';
 import goal from './commands/goal/index.js';
 import scrollSpeed from './commands/scroll-speed/index.js';
+import searxng from './commands/searxng/index.js';
 import pluginDetails from './commands/plugin-details/index.js';
 import advisor from './commands/advisor.js';
 import capabilities from './commands/capabilities/index.js';
@@ -280,6 +281,7 @@ const COMMANDS = memoize((): Command[] => [
   theme,
   feedback,
   scrollSpeed,
+  searxng,
   review,
   ultrareview,
   rewind,

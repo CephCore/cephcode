@@ -1,8 +1,30 @@
+<p align="center">
+  <img src="assets/ceph-logo-long.png" alt="Ceph Code" width="480" />
+</p>
+
+<p align="center">
+  <strong>Languages:</strong>
+  <a href="README.md"><strong>English</strong></a> ·
+  <a href="README_ZH.md">中文 (简体)</a> ·
+  <a href="README_TH.md">ไทย</a>
+</p>
+
 # Ceph Code
 
-Ceph Code is a research-oriented fork of Anthropic's [Claude Code](https://claude.ai/code) CLI. It keeps the terminal-first coding workflow while adding multi-provider model routing, provider adapters, plugin hooks, skills, MCP integrations, and developer tooling for larger AI-assisted engineering sessions.
+Ceph Code is an independent, research-oriented **reverse-engineered rebuild** of Anthropic's [Claude Code](https://claude.ai/code) CLI. The goal is a **runnable, buildable, and debuggable** terminal workflow from source—not a black-box binary—while extending the runtime with multi-provider routing, adapters, and engineering tooling.
 
-> This repository is an independent research and development project. It is not affiliated with, endorsed by, or sponsored by Anthropic PBC.
+> **Disclaimer:** This repository is not affiliated with, endorsed by, or sponsored by Anthropic PBC. The upstream Claude Code product is proprietary; this project reconstructs and extends behavior for research and self-hosted use. Review [LICENSE.md](LICENSE.md) before redistributing or deploying.
+
+## Positioning
+
+| Aspect | What Ceph Code provides |
+| --- | --- |
+| **Source fidelity** | Reconstructed CLI aligned with Claude Code's terminal UX, tools, and extension points |
+| **Build & debug** | Bun/TypeScript tree you can `bun run dev`, type-check, test, and patch locally |
+| **Enterprise-style surface** | Bridge/remote sessions, MCP, plugins, skills, agents/supervisor, voice, session memory, LSP—without requiring Anthropic's hosted-only gates for every workflow |
+| **Our differentiation** | Declarative **multi-provider** routing (`providers.json`, `/model`), provider adapters, and dev utilities (`preload`, `codeindex`, `session`) |
+
+> This is a community rebuild for engineers who need transparency and provider choice—not an official Anthropic distribution.
 
 ## What It Does
 

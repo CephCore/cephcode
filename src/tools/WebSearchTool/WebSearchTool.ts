@@ -68,13 +68,18 @@ import type { WebSearchProgress } from '../../types/tools.js';
 
 /**
  * Select the best available direct search provider.
- * Priority: tavily > brave > serper > searxng > duckduckgo (always available, free)
+ * Priority: tavily > brave > serper > searxng (if self-hosted) > duckduckgo
+ *
+ * SearXNG is only auto-selected when SEARXNG_INSTANCE_URL is explicitly set,
+ * indicating the user has a self-hosted/working instance. Public instances
+ * (the default) nearly all return 403/429 due to Cloudflare/anti-bot protection.
  */
 function selectBestDirectProvider(): string {
   if (isProviderConfigured('tavily')) return 'tavily';
   if (isProviderConfigured('brave')) return 'brave';
   if (isProviderConfigured('serper')) return 'serper';
-  if (isProviderConfigured('searxng')) return 'searxng';
+  // Only auto-select SearXNG if user has explicitly configured their own instance
+  if (isProviderConfigured('searxng') && process.env.SEARXNG_INSTANCE_URL) return 'searxng';
   return 'duckduckgo';
 }
 
