@@ -38,8 +38,62 @@ export type SessionIndexEntry = {
   worktreePath?: string;
 };
 
+type AgentSessionJsonEntry = {
+  id: string;
+  status: 'running' | 'awaiting_input' | 'stopped' | 'failed';
+  cwd: string;
+  session_id: string;
+  created_at: string;
+  awaiting_input: boolean;
+};
+
 function getShortId(sessionId: string): string {
   return sessionId.slice(0, 8);
+}
+
+function normalizeAgentSessionStatus(status: unknown): AgentSessionJsonEntry['status'] {
+  if (status === 'failed') return 'failed';
+  if (status === 'awaiting_input') return 'awaiting_input';
+  if (status === 'running') return 'running';
+  return 'stopped';
+}
+
+export function formatAgentSessionsJson(sessions: unknown[]): { agents: AgentSessionJsonEntry[] } {
+  return {
+    agents: sessions.map((session: any) => {
+      const status = normalizeAgentSessionStatus(session?.status);
+      const startedAt = typeof session?.startedAt === 'number' ? session.startedAt : Date.now();
+      const sessionId = String(session?.id ?? session?.sessionId ?? '');
+      return {
+        id: String(session?.agentId ?? session?.id ?? sessionId),
+        status,
+        cwd: String(session?.cwd ?? ''),
+        session_id: sessionId,
+        created_at: new Date(startedAt).toISOString(),
+        awaiting_input:
+          status === 'awaiting_input' || session?.awaitingInput === true || session?.awaiting_input === true,
+      };
+    }),
+  };
+}
+
+export async function listSessionsJsonCommand(): Promise<void> {
+  const supervisorRunning = await pingDaemon();
+
+  if (!supervisorRunning) {
+    console.log(JSON.stringify({ agents: [] }));
+    return;
+  }
+
+  const result = await listIpcSessions();
+  if (!result.ok) {
+    console.error(`Error: ${result.error}`);
+    process.exit(1);
+  }
+
+  const data = result.data as any;
+  const sessions: any[] = data?.sessions ?? [];
+  console.log(JSON.stringify(formatAgentSessionsJson(sessions)));
 }
 
 export async function listSessionsCommand(): Promise<void> {

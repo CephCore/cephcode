@@ -1342,6 +1342,21 @@ export function REPL({
   const haikuTitleAttemptedRef = useRef((initialMessages?.length ?? 0) > 0);
   const agentTitle = mainThreadAgentDefinition?.agentType;
   const terminalTitle = sessionTitle ?? agentTitle ?? haikuTitle ?? 'Claude Code';
+  const awaitingInputAgentCount = useMemo(
+    () =>
+      Object.values(tasks).filter(
+        task =>
+          task.status === 'running' &&
+          ((task.type === 'remote_agent' &&
+            (task.ultraplanPhase === 'needs_input' || task.ultraplanPhase === 'plan_ready')) ||
+            (task.type === 'in_process_teammate' && task.awaitingPlanApproval)),
+      ).length,
+    [tasks],
+  );
+  const terminalTitleWithAgentAttention =
+    awaitingInputAgentCount > 0
+      ? `${terminalTitle} (${awaitingInputAgentCount} needs input)`
+      : terminalTitle;
   const isWaitingForApproval =
     toolUseConfirmQueue.length > 0 || promptQueue.length > 0 || pendingWorkerRequest || pendingSandboxRequest;
   // Local-jsx commands (like /plugin, /config) show user-facing dialogs that
@@ -5157,7 +5172,7 @@ export function REPL({
       <KeybindingSetup>
         <AnimatedTerminalTitle
           isAnimating={titleIsAnimating}
-          title={terminalTitle}
+          title={terminalTitleWithAgentAttention}
           disabled={titleDisabled}
           noPrefix={showStatusInTerminalTab}
         />
@@ -5371,7 +5386,7 @@ export function REPL({
     <KeybindingSetup>
       <AnimatedTerminalTitle
         isAnimating={titleIsAnimating}
-        title={terminalTitle}
+        title={terminalTitleWithAgentAttention}
         disabled={titleDisabled}
         noPrefix={showStatusInTerminalTab}
       />

@@ -1063,6 +1063,14 @@ async function checkPermissionsAndCallTool(
     const durationMs = Date.now() - startTime;
     addToToolDuration(durationMs);
 
+    // Track tool usage
+    try {
+      const { recordToolUsage } = await import('../../utils/toolUsageTracker.js');
+      recordToolUsage(tool.name);
+    } catch {
+      // best-effort
+    }
+
     // Log tool content/output as span event if enabled
     if (result.data && typeof result.data === 'object') {
       const contentAttributes: Record<string, string | number | boolean> = {};

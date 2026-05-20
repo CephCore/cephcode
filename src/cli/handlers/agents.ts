@@ -13,6 +13,7 @@ import {
 } from '../../tools/AgentTool/agentDisplay.js';
 import { getActiveAgentsFromList, getAgentDefinitionsWithOverrides } from '../../tools/AgentTool/loadAgentsDir.js';
 import { getCwd } from '../../utils/cwd.js';
+import { listSessionsJsonCommand } from '../sessionManager.js';
 
 function formatAgent(agent: ResolvedAgent): string {
   const model = resolveAgentModelDisplay(agent);
@@ -26,7 +27,12 @@ function formatAgent(agent: ResolvedAgent): string {
   return parts.join(' · ');
 }
 
-export async function agentsHandler(): Promise<void> {
+export async function agentsHandler(options?: { json?: boolean }): Promise<void> {
+  if (options?.json) {
+    await listSessionsJsonCommand();
+    return;
+  }
+
   // Check agent view gate before listing agents
   const { getAgentViewDisabledReason } = await import('../../commands/agents/index.js');
   const reason = getAgentViewDisabledReason();
