@@ -26,7 +26,6 @@ import { isEnvTruthy } from '../utils/envUtils.js';
 import { ConfigParseError, errorMessage } from '../utils/errors.js';
 // showInvalidConfigDialog is dynamically imported in the error path to avoid loading React at init
 import { gracefulShutdownSync, setupGracefulShutdown } from '../utils/gracefulShutdown.js';
-import { initSentry } from '../utils/sentry.js';
 import { applyConfigEnvironmentVariables, applySafeConfigEnvironmentVariables } from '../utils/managedEnv.js';
 import { configureGlobalMTLS } from '../utils/mtls.js';
 import { ensureScratchpadDir, isScratchpadEnabled } from '../utils/permissions/filesystem.js';
@@ -34,6 +33,7 @@ import { ensureScratchpadDir, isScratchpadEnabled } from '../utils/permissions/f
 // ~400KB of OpenTelemetry + protobuf modules until telemetry is actually initialized.
 // gRPC exporters (~700KB via @grpc/grpc-js) are further lazy-loaded within instrumentation.ts.
 import { configureGlobalAgents } from '../utils/proxy.js';
+import { initSentry } from '../utils/sentry.js';
 import { isBetaTracingEnabled } from '../utils/telemetry/betaSessionTracing.js';
 import { getTelemetryAttributes } from '../utils/telemetryAttributes.js';
 import { setShellIfWindows } from '../utils/windowsPaths.js';

@@ -2322,7 +2322,8 @@ async function run(): Promise<CommanderCommand> {
       // Store the explicit CLI flag so teammates can inherit it
       setChromeFlagOverride(chromeOpts.chrome);
       const enableClaudeInChrome =
-        shouldEnableClaudeInChrome(chromeOpts.chrome) && (process.env.ENABLE_CHROME_MCP === '1' || 'external' === 'ant' || isClaudeAISubscriber());
+        shouldEnableClaudeInChrome(chromeOpts.chrome) &&
+        (process.env.ENABLE_CHROME_MCP === '1' || 'external' === 'ant' || isClaudeAISubscriber());
       const autoEnableClaudeInChrome = !enableClaudeInChrome && shouldAutoEnableClaudeInChrome();
       if (enableClaudeInChrome) {
         const platform = getPlatform();
@@ -2406,7 +2407,11 @@ async function run(): Promise<CommanderCommand> {
       // `type: 'stdio'`. An enterprise-config ant with the GB gate on would
       // otherwise process.exit(1). Chrome has the same latent issue but has
       // shipped without incident; chicago places itself correctly.
-      if ((feature('CHICAGO_MCP') || process.env.ENABLE_COMPUTER_USE === '1') && !getIsNonInteractiveSession() && ['darwin', 'win32', 'linux'].includes(process.platform)) {
+      if (
+        (feature('CHICAGO_MCP') || process.env.ENABLE_COMPUTER_USE === '1') &&
+        !getIsNonInteractiveSession() &&
+        ['darwin', 'win32', 'linux'].includes(process.platform)
+      ) {
         try {
           const { getChicagoEnabled } = await import('src/utils/computerUse/gates.js');
           if (getChicagoEnabled()) {

@@ -536,13 +536,9 @@ function OAuthStatusMessage({
       return (
         <Box flexDirection="column" gap={1} marginTop={1}>
           <Text bold>Ceph Code — Local Profile</Text>
-          <Text>
-            Using your configured provider profile. No Anthropic authentication required.
-          </Text>
+          <Text>Using your configured provider profile. No Anthropic authentication required.</Text>
           <Box flexDirection="column" gap={1} marginTop={1}>
-            <Text>
-              Set your provider via environment variables or the onboarding wizard:
-            </Text>
+            <Text>Set your provider via environment variables or the onboarding wizard:</Text>
             <Text>
               · <Text bold>DEEPSEEK_API_KEY</Text> for DeepSeek
             </Text>
@@ -558,8 +554,8 @@ function OAuthStatusMessage({
           </Box>
           <Box marginTop={1}>
             <Text>
-              Run <Text bold>/onboarding</Text> to configure, or press{' '}
-              <Text bold>Enter</Text> to continue with current config.
+              Run <Text bold>/onboarding</Text> to configure, or press <Text bold>Enter</Text> to continue with current
+              config.
             </Text>
           </Box>
         </Box>

@@ -1341,7 +1341,7 @@ export function REPL({
   // session from mid-conversation context.
   const haikuTitleAttemptedRef = useRef((initialMessages?.length ?? 0) > 0);
   const agentTitle = mainThreadAgentDefinition?.agentType;
-  const terminalTitle = sessionTitle ?? agentTitle ?? haikuTitle ?? 'Claude Code';
+  const terminalTitle = sessionTitle ?? agentTitle ?? haikuTitle ?? 'Ceph Code';
   const awaitingInputAgentCount = useMemo(
     () =>
       Object.values(tasks).filter(
@@ -1354,9 +1354,7 @@ export function REPL({
     [tasks],
   );
   const terminalTitleWithAgentAttention =
-    awaitingInputAgentCount > 0
-      ? `${terminalTitle} (${awaitingInputAgentCount} needs input)`
-      : terminalTitle;
+    awaitingInputAgentCount > 0 ? `${terminalTitle} (${awaitingInputAgentCount} needs input)` : terminalTitle;
   const isWaitingForApproval =
     toolUseConfirmQueue.length > 0 || promptQueue.length > 0 || pendingWorkerRequest || pendingSandboxRequest;
   // Local-jsx commands (like /plugin, /config) show user-facing dialogs that

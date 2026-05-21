@@ -8,7 +8,7 @@ export const PRODUCT_URL = process.env.CLAUDE_CODE_PRODUCT_URL || 'https://claud
  * Product name — used in attributions and UI labels.
  * Override via CLAUDE_CODE_PRODUCT_NAME env var (useful for forks).
  */
-export const PRODUCT_NAME = process.env.CLAUDE_CODE_PRODUCT_NAME || 'Claude Code';
+export const PRODUCT_NAME = process.env.CLAUDE_CODE_PRODUCT_NAME || 'Ceph Code';
 
 /**
  * Claude AI base URLs for remote session routing.

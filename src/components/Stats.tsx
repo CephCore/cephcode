@@ -13,6 +13,7 @@ import type { Color } from '../ink/styles.js';
 // eslint-disable-next-line custom-rules/prefer-use-keybindings -- raw j/k/arrow stats navigation
 import { Ansi, Box, Text, useInput } from '../ink.js';
 import { useKeybinding } from '../keybindings/useKeybinding.js';
+import { PROVIDER_REGISTRY } from '../services/ai/providerRegistry.js';
 import { getGlobalConfig } from '../utils/config.js';
 import { formatDuration, formatNumber } from '../utils/format.js';
 import { generateHeatmap } from '../utils/heatmap.js';
@@ -589,6 +590,13 @@ function ModelsTab({
   }
 
   const totalTokens = modelEntries.reduce((sum, [, usage]) => sum + usage.inputTokens + usage.outputTokens, 0);
+  const providerEntries = Object.entries(stats.providerUsage).sort(
+    ([, a], [, b]) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens),
+  );
+  const totalProviderTokens = providerEntries.reduce(
+    (sum, [, usage]) => sum + usage.inputTokens + usage.outputTokens,
+    0,
+  );
 
   // Generate token usage chart - use terminal width for responsive sizing
   const chartOutput = generateTokenChart(
@@ -597,11 +605,12 @@ function ModelsTab({
     terminalWidth,
   );
 
-  // Get visible models and split into two columns
+  // Get visible models, grouped by provider, and split into two columns
   const visibleModels = modelEntries.slice(scrollOffset, scrollOffset + VISIBLE_MODELS);
-  const midpoint = Math.ceil(visibleModels.length / 2);
-  const leftModels = visibleModels.slice(0, midpoint);
-  const rightModels = visibleModels.slice(midpoint);
+  const visibleProviderGroups = buildProviderModelGroups(visibleModels, stats.providerUsage);
+  const midpoint = Math.ceil(visibleProviderGroups.length / 2);
+  const leftGroups = visibleProviderGroups.slice(0, midpoint);
+  const rightGroups = visibleProviderGroups.slice(midpoint);
 
   const canScrollUp = scrollOffset > 0;
   const canScrollDown = scrollOffset < modelEntries.length - VISIBLE_MODELS;
@@ -629,16 +638,27 @@ function ModelsTab({
       {/* Date range selector */}
       <DateRangeSelector dateRange={dateRange} isLoading={isLoading} />
 
-      {/* Model breakdown - two columns with fixed width */}
+      {/* Model breakdown grouped by provider */}
+      <Text bold>Models by provider</Text>
       <Box flexDirection="row" gap={4}>
         <Box flexDirection="column" width={36}>
-          {leftModels.map(([model, usage]) => (
-            <ModelEntry key={model} model={model} usage={usage} totalTokens={totalTokens} />
+          {leftGroups.map(group => (
+            <ProviderModelGroupEntry
+              key={group.provider}
+              group={group}
+              totalProviderTokens={totalProviderTokens || totalTokens}
+              totalModelTokens={totalTokens}
+            />
           ))}
         </Box>
         <Box flexDirection="column" width={36}>
-          {rightModels.map(([model, usage]) => (
-            <ModelEntry key={model} model={model} usage={usage} totalTokens={totalTokens} />
+          {rightGroups.map(group => (
+            <ProviderModelGroupEntry
+              key={group.provider}
+              group={group}
+              totalProviderTokens={totalProviderTokens || totalTokens}
+              totalModelTokens={totalTokens}
+            />
           ))}
         </Box>
       </Box>
@@ -653,6 +673,105 @@ function ModelsTab({
           </Text>
         </Box>
       )}
+    </Box>
+  );
+}
+
+type StatsModelUsage = ClaudeCodeStats['modelUsage'][string];
+type ModelUsageEntry = [string, StatsModelUsage];
+type ProviderModelGroup = {
+  provider: string;
+  usage: StatsModelUsage;
+  models: ModelUsageEntry[];
+};
+
+function formatProviderLabel(provider: string): string {
+  const registryEntry = PROVIDER_REGISTRY[provider as keyof typeof PROVIDER_REGISTRY];
+  if (registryEntry?.label) {
+    return registryEntry.label;
+  }
+  if (provider === 'unknown') {
+    return 'Unknown';
+  }
+  return provider
+    .split('-')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function formatModelLabelForProvider(model: string, provider?: string): string {
+  if (provider) {
+    const registryEntry = PROVIDER_REGISTRY[provider as keyof typeof PROVIDER_REGISTRY];
+    const modelInfo = registryEntry?.models.find(entry => entry.id.toLowerCase() === model.toLowerCase());
+    if (modelInfo?.label) {
+      return modelInfo.label;
+    }
+  }
+  return renderModelName(model, provider, 'short');
+}
+
+function formatStatsCost(cost: number): string {
+  return cost > 0.5 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(4)}`;
+}
+
+function buildProviderModelGroups(
+  modelEntries: ModelUsageEntry[],
+  providerUsage: ClaudeCodeStats['providerUsage'],
+): ProviderModelGroup[] {
+  const groups = new Map<string, ProviderModelGroup>();
+
+  for (const [model, usage] of modelEntries) {
+    const provider = usage.provider ?? 'unknown';
+    let group = groups.get(provider);
+    if (!group) {
+      group = {
+        provider,
+        usage: providerUsage[provider] ?? {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 0,
+          webSearchRequests: 0,
+          costUSD: 0,
+          contextWindow: 0,
+          maxOutputTokens: 0,
+          provider,
+        },
+        models: [],
+      };
+      groups.set(provider, group);
+    }
+    group.models.push([model, usage]);
+  }
+
+  return Array.from(groups.values());
+}
+
+function ProviderModelGroupEntry({
+  group,
+  totalProviderTokens,
+  totalModelTokens,
+}: {
+  group: ProviderModelGroup;
+  totalProviderTokens: number;
+  totalModelTokens: number;
+}): React.ReactNode {
+  const providerTokens = group.usage.inputTokens + group.usage.outputTokens;
+  const percentage = totalProviderTokens > 0 ? ((providerTokens / totalProviderTokens) * 100).toFixed(1) : '0.0';
+
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      <Text>
+        {figures.bullet} <Text bold>{formatProviderLabel(group.provider)}</Text>{' '}
+        <Text color="subtle">({percentage}%)</Text>
+      </Text>
+      <Text color="subtle">
+        {'  '}Tokens: {formatNumber(providerTokens)}
+        {group.usage.costUSD > 0 ? ` · ${formatStatsCost(group.usage.costUSD)}` : ''}
+      </Text>
+      {group.models.map(([model, usage]) => (
+        <ModelEntry key={model} model={model} usage={usage} totalTokens={totalModelTokens} />
+      ))}
     </Box>
   );
 }
@@ -675,11 +794,12 @@ function ModelEntry({ model, usage, totalTokens }: ModelEntryProps): React.React
   return (
     <Box flexDirection="column">
       <Text>
-        {figures.bullet} <Text bold>{renderModelName(model, usage.provider)}</Text>{' '}
+        {'  - '}
+        <Text bold>{formatModelLabelForProvider(model, usage.provider)}</Text>{' '}
         <Text color="subtle">({percentage}%)</Text>
       </Text>
       <Text color="subtle">
-        {'  '}In: {formatNumber(usage.inputTokens)} · Out: {formatNumber(usage.outputTokens)}
+        {'    '}In: {formatNumber(usage.inputTokens)} · Out: {formatNumber(usage.outputTokens)}
       </Text>
     </Box>
   );
@@ -993,6 +1113,13 @@ function renderModelsToAnsi(stats: ClaudeCodeStats): string[] {
 
   const favoriteModel = modelEntries[0];
   const totalTokens = modelEntries.reduce((sum, [, usage]) => sum + usage.inputTokens + usage.outputTokens, 0);
+  const providerEntries = Object.entries(stats.providerUsage).sort(
+    ([, a], [, b]) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens),
+  );
+  const totalProviderTokens = providerEntries.reduce(
+    (sum, [, usage]) => sum + usage.inputTokens + usage.outputTokens,
+    0,
+  );
 
   // Generate chart if we have data - use fixed width for screenshot
   const chartOutput = generateTokenChart(
@@ -1017,15 +1144,28 @@ function renderModelsToAnsi(stats: ClaudeCodeStats): string[] {
   );
   lines.push('');
 
+  lines.push(chalk.bold('Models by provider'));
+
   // Model breakdown - only show top 3 for screenshot
   const topModels = modelEntries.slice(0, 3);
-  for (const [model, usage] of topModels) {
-    const modelTokens = usage.inputTokens + usage.outputTokens;
-    const percentage = ((modelTokens / totalTokens) * 100).toFixed(1);
+  const providerGroups = buildProviderModelGroups(topModels, stats.providerUsage);
+  for (const group of providerGroups) {
+    const providerTokens = group.usage.inputTokens + group.usage.outputTokens;
+    const providerPercentage =
+      (totalProviderTokens || totalTokens) > 0
+        ? ((providerTokens / (totalProviderTokens || totalTokens)) * 100).toFixed(1)
+        : '0.0';
     lines.push(
-      `${figures.bullet} ${chalk.bold(renderModelName(model, usage.provider))} ${chalk.gray(`(${percentage}%)`)}`,
+      `${figures.bullet} ${chalk.bold(formatProviderLabel(group.provider))} ${chalk.gray(`(${providerPercentage}%)`)} ${chalk.dim(formatNumber(providerTokens) + ' tokens')}`,
     );
-    lines.push(chalk.dim(`  In: ${formatNumber(usage.inputTokens)} · Out: ${formatNumber(usage.outputTokens)}`));
+    for (const [model, usage] of group.models) {
+      const modelTokens = usage.inputTokens + usage.outputTokens;
+      const percentage = ((modelTokens / totalTokens) * 100).toFixed(1);
+      lines.push(
+        `  - ${chalk.bold(formatModelLabelForProvider(model, usage.provider))} ${chalk.gray(`(${percentage}%)`)}`,
+      );
+      lines.push(chalk.dim(`    In: ${formatNumber(usage.inputTokens)} · Out: ${formatNumber(usage.outputTokens)}`));
+    }
   }
 
   return lines;

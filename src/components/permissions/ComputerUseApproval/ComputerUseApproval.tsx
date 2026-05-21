@@ -2,12 +2,13 @@
 function getSentinelCategory(_bundleId: string): 'system' | 'browser' | 'settings' | 'appStore' | 'other' | undefined {
   return undefined;
 }
-import type { CuPermissionRequest, CuPermissionResponse } from '../../../utils/computerUse/hostAdapter.js';
-import { DEFAULT_GRANT_FLAGS } from '../../../utils/computerUse/hostAdapter.js';
+
 import figures from 'figures';
 import type * as React from 'react';
 import { useMemo, useState } from 'react';
 import { Box, Text } from '../../../ink.js';
+import type { CuPermissionRequest, CuPermissionResponse } from '../../../utils/computerUse/hostAdapter.js';
+import { DEFAULT_GRANT_FLAGS } from '../../../utils/computerUse/hostAdapter.js';
 import { execFileNoThrow } from '../../../utils/execFileNoThrow.js';
 import { plural } from '../../../utils/stringUtils.js';
 import type { OptionWithDescription } from '../../CustomSelect/select.js';

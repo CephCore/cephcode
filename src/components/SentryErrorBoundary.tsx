@@ -1,5 +1,5 @@
-import { captureException } from '../utils/sentry.js';
 import React from 'react';
+import { captureException } from '../utils/sentry.js';
 
 type Props = {
   children: React.ReactNode;

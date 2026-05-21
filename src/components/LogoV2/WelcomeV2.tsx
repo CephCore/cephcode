@@ -5,28 +5,20 @@ import { env } from '../../utils/env.js';
 const WELCOME_V2_WIDTH = 58;
 const CLAWD_PREFIX = '      ';
 const CLAWD_ART_WIDTH = 9;
-const CLAWD_SUFFIX_WIDTH =
-  WELCOME_V2_WIDTH - CLAWD_PREFIX.length - CLAWD_ART_WIDTH;
+const CLAWD_SUFFIX_WIDTH = WELCOME_V2_WIDTH - CLAWD_PREFIX.length - CLAWD_ART_WIDTH;
 
 const EMPTY_LINE = ' '.repeat(WELCOME_V2_WIDTH);
 const DIVIDER_LINE = '…'.repeat(WELCOME_V2_WIDTH);
 const CLAWD_SUFFIX = ' '.repeat(CLAWD_SUFFIX_WIDTH);
 const TENTACLES = '▗▞▜ ▟▛ ▙▚▖';
-const TENTACLE_TRAIL = '…'.repeat(
-  WELCOME_V2_WIDTH - CLAWD_PREFIX.length - TENTACLES.length,
-);
+const TENTACLE_TRAIL = '…'.repeat(WELCOME_V2_WIDTH - CLAWD_PREFIX.length - TENTACLES.length);
 
 export function WelcomeV2(): React.ReactNode {
   const [theme] = useTheme();
   const welcomeMessage = 'Welcome to Ceph Code';
 
   if (env.terminal === 'Apple_Terminal') {
-    return (
-      <AppleTerminalWelcomeV2
-        theme={theme}
-        welcomeMessage={welcomeMessage}
-      />
-    );
+    return <AppleTerminalWelcomeV2 theme={theme} welcomeMessage={welcomeMessage} />;
   }
 
   return <WelcomeScene theme={theme} welcomeMessage={welcomeMessage} />;
@@ -37,10 +29,7 @@ type AppleTerminalWelcomeV2Props = {
   welcomeMessage: string;
 };
 
-function AppleTerminalWelcomeV2({
-  theme,
-  welcomeMessage,
-}: AppleTerminalWelcomeV2Props): React.ReactNode {
+function AppleTerminalWelcomeV2({ theme, welcomeMessage }: AppleTerminalWelcomeV2Props): React.ReactNode {
   return <WelcomeScene theme={theme} welcomeMessage={welcomeMessage} />;
 }
 
@@ -49,13 +38,8 @@ type WelcomeSceneProps = {
   welcomeMessage: string;
 };
 
-function WelcomeScene({
-  theme,
-  welcomeMessage,
-}: WelcomeSceneProps): React.ReactNode {
-  const isLightTheme = ['light', 'light-daltonized', 'light-ansi'].includes(
-    theme,
-  );
+function WelcomeScene({ theme, welcomeMessage }: WelcomeSceneProps): React.ReactNode {
+  const isLightTheme = ['light', 'light-daltonized', 'light-ansi'].includes(theme);
 
   if (isLightTheme) {
     return (
@@ -122,11 +106,7 @@ function WelcomeScene({
   );
 }
 
-function WelcomeHeader({
-  welcomeMessage,
-}: {
-  welcomeMessage: string;
-}): React.ReactNode {
+function WelcomeHeader({ welcomeMessage }: { welcomeMessage: string }): React.ReactNode {
   return (
     <Text>
       <Text color="claude">{welcomeMessage} </Text>
@@ -135,11 +115,7 @@ function WelcomeHeader({
   );
 }
 
-function ClawdTop({
-  suffix = CLAWD_SUFFIX,
-}: {
-  suffix?: React.ReactNode;
-}): React.ReactNode {
+function ClawdTop({ suffix = CLAWD_SUFFIX }: { suffix?: React.ReactNode }): React.ReactNode {
   return (
     <Text>
       {CLAWD_PREFIX}
@@ -149,11 +125,7 @@ function ClawdTop({
   );
 }
 
-function ClawdBody({
-  suffix = CLAWD_SUFFIX,
-}: {
-  suffix?: React.ReactNode;
-}): React.ReactNode {
+function ClawdBody({ suffix = CLAWD_SUFFIX }: { suffix?: React.ReactNode }): React.ReactNode {
   return (
     <Text>
       {CLAWD_PREFIX}
@@ -167,11 +139,7 @@ function ClawdBody({
   );
 }
 
-function ClawdEyeEmpty({
-  suffix = CLAWD_SUFFIX,
-}: {
-  suffix?: React.ReactNode;
-}): React.ReactNode {
+function ClawdEyeEmpty({ suffix = CLAWD_SUFFIX }: { suffix?: React.ReactNode }): React.ReactNode {
   return (
     <Text>
       {CLAWD_PREFIX}
@@ -189,11 +157,7 @@ function ClawdEyeEmpty({
   );
 }
 
-function ClawdEyePupil({
-  suffix = CLAWD_SUFFIX,
-}: {
-  suffix?: React.ReactNode;
-}): React.ReactNode {
+function ClawdEyePupil({ suffix = CLAWD_SUFFIX }: { suffix?: React.ReactNode }): React.ReactNode {
   return (
     <Text>
       {CLAWD_PREFIX}
