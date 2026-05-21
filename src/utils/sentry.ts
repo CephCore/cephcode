@@ -59,7 +59,15 @@ const SCRUB_PATTERNS: Array<[RegExp, string]> = [
   [/access[_-]token[":\s]+[A-Za-z0-9._-]{16,}/gi, 'access-token=[REDACTED]'],
   [/refresh[_-]token[":\s]+[A-Za-z0-9._-]{16,}/gi, 'refresh-token=[REDACTED]'],
   // Home directory paths (Windows and Unix)
-  [new RegExp(homedir().replace(/[\\/]/g, '[/\\\\]').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '[HOME]'],
+  [
+    new RegExp(
+      homedir()
+        .replace(/[\\/]/g, '[/\\\\]')
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+      'g',
+    ),
+    '[HOME]',
+  ],
 ];
 
 /**
@@ -218,10 +226,9 @@ export async function initSentry(): Promise<void> {
     logForDebugging('[Sentry] Initialized with DSN (masked): ' + getMaskedSentryDsn());
   } catch (err) {
     // Sentry failing to initialize must never crash the app
-    logForDebugging(
-      `[Sentry] Failed to initialize: ${err instanceof Error ? err.message : String(err)}`,
-      { level: 'warn' },
-    );
+    logForDebugging(`[Sentry] Failed to initialize: ${err instanceof Error ? err.message : String(err)}`, {
+      level: 'warn',
+    });
   }
 }
 

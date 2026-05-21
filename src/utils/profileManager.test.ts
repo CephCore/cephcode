@@ -1,8 +1,7 @@
-import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { mkdtempSync, rmSync } from 'fs';
-import { join } from 'path';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
+import { join } from 'path';
 
 let sandboxDir: string;
 
@@ -12,7 +11,8 @@ let sandboxDir: string;
  * are functions (not constants), so they pick up CLAUDECODE_PROFILES_DIR at call time.
  */
 function freshMod() {
-  const { ProfileManager, getProfilesDir, getActiveProfileFile, PROFILE_ENV_VAR } = require('./profileManager.js') as typeof import('./profileManager.js');
+  const { ProfileManager, getProfilesDir, getActiveProfileFile, PROFILE_ENV_VAR } =
+    require('./profileManager.js') as typeof import('./profileManager.js');
   ProfileManager.resetInstance();
   return { ProfileManager, getProfilesDir, getActiveProfileFile, PROFILE_ENV_VAR };
 }

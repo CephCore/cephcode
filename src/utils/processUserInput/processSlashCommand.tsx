@@ -724,16 +724,17 @@ async function getMessagesForSlashCommand(
           };
           void command
             .load()
-            .then(mod =>
-              mod.call(
+            .then(async mod => {
+              await 0; // yield: resolve circular ESM TDZ in Bun
+              return mod.call(
                 onDone,
                 {
                   ...context,
                   canUseTool,
                 },
                 args,
-              ),
-            )
+              );
+            })
             .then(jsx => {
               if (jsx == null) return;
               if (context.options.isNonInteractiveSession) {
@@ -791,6 +792,7 @@ async function getMessagesForSlashCommand(
         try {
           const syntheticCaveatMessage = createSyntheticUserCaveatMessage();
           const mod = await command.load();
+          await 0; // yield: resolve circular ESM TDZ in Bun
           const result = await mod.call(args, context);
           if (result.type === 'skip') {
             return {

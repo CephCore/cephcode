@@ -17,6 +17,7 @@ import { computeFingerprint } from './fingerprint.js';
 import { logError } from './log.js';
 import { normalizeModelStringForAPI } from './model/model.js';
 import { getActiveProviderId, isAnthropicProvider } from './model/providers.js';
+import { calculateUSDCostFromProviderUsage } from './modelCost.js';
 
 type MessageParam = Anthropic.MessageParam;
 type TextBlockParam = Anthropic.TextBlockParam;
@@ -232,11 +233,9 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
 
       // J2: Track side query costs for non-Anthropic providers
       try {
-        addToTotalSessionCost(
-          normalizedModel,
-          fromGenericUsage(response.usage.input_tokens, response.usage.output_tokens),
-          providerId,
-        );
+        const providerUsage = fromGenericUsage(response.usage as unknown as Record<string, unknown>);
+        const costUSD = calculateUSDCostFromProviderUsage(normalizedModel, providerUsage);
+        addToTotalSessionCost(costUSD, providerUsage, normalizedModel, providerId);
       } catch {
         /* cost tracking is best-effort */
       }

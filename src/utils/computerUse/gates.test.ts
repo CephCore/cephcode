@@ -1,4 +1,4 @@
-import { describe, expect, test, afterEach } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import { getChicagoEnabled } from './gates.js';
 
 describe('computerUse gates', () => {

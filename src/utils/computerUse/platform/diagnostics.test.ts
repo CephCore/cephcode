@@ -1,4 +1,4 @@
-import { describe, expect, test, afterEach } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import { checkComputerUseDependencies } from './diagnostics.js';
 
 describe('computerUse diagnostics', () => {

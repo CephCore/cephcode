@@ -64,6 +64,69 @@ function extractProviderFromMessage(message: TranscriptMessage, model: string): 
   return extractProviderFromModel(model);
 }
 
+type TranscriptUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  webSearchRequests: number;
+  costUSD: number;
+};
+
+function readNumber(source: Record<string, unknown>, keys: string[]): number {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) {
+      return Number(value);
+    }
+  }
+  return 0;
+}
+
+function normalizeTranscriptUsage(rawUsage: unknown): TranscriptUsage {
+  const usage = rawUsage && typeof rawUsage === 'object' ? (rawUsage as Record<string, unknown>) : {};
+  const promptTokenDetails =
+    usage.prompt_tokens_details && typeof usage.prompt_tokens_details === 'object'
+      ? (usage.prompt_tokens_details as Record<string, unknown>)
+      : {};
+  const serverToolUse =
+    usage.server_tool_use && typeof usage.server_tool_use === 'object'
+      ? (usage.server_tool_use as Record<string, unknown>)
+      : {};
+
+  const inputTokens = readNumber(usage, [
+    'input_tokens',
+    'inputTokens',
+    'prompt_tokens',
+    'promptTokens',
+    'promptTokenCount',
+  ]);
+  const outputTokens = readNumber(usage, [
+    'output_tokens',
+    'outputTokens',
+    'completion_tokens',
+    'completionTokens',
+    'candidatesTokenCount',
+  ]);
+  const totalTokens = readNumber(usage, ['total_tokens', 'totalTokens', 'totalTokenCount']);
+
+  return {
+    inputTokens: inputTokens || (outputTokens === 0 ? totalTokens : 0),
+    outputTokens,
+    cacheReadInputTokens:
+      readNumber(usage, ['cache_read_input_tokens', 'cacheReadInputTokens', 'cachedContentTokenCount']) ||
+      readNumber(promptTokenDetails, ['cached_tokens', 'cachedTokens']),
+    cacheCreationInputTokens: readNumber(usage, ['cache_creation_input_tokens', 'cacheCreationInputTokens']),
+    webSearchRequests:
+      readNumber(usage, ['web_search_requests', 'webSearchRequests']) ||
+      readNumber(serverToolUse, ['web_search_requests', 'webSearchRequests']),
+    costUSD: readNumber(usage, ['costUSD', 'cost_usd', 'cost']),
+  };
+}
+
 export type DailyActivity = {
   date: string; // YYYY-MM-DD format
   messageCount: number;
@@ -337,7 +400,7 @@ async function processSessionFiles(sessionFiles: string[], options: ProcessOptio
 
           // Track model usage if available (skip synthetic messages)
           if (message.message?.usage) {
-            const usage = message.message.usage;
+            const usage = normalizeTranscriptUsage(message.message.usage);
             const model = message.message.model || 'unknown';
 
             // Skip synthetic messages - they are internal and shouldn't appear in stats
@@ -363,13 +426,15 @@ async function processSessionFiles(sessionFiles: string[], options: ProcessOptio
               modelUsageAgg[model]!.provider = provider;
             }
 
-            modelUsageAgg[model]!.inputTokens += usage.input_tokens || 0;
-            modelUsageAgg[model]!.outputTokens += usage.output_tokens || 0;
-            modelUsageAgg[model]!.cacheReadInputTokens += usage.cache_read_input_tokens || 0;
-            modelUsageAgg[model]!.cacheCreationInputTokens += usage.cache_creation_input_tokens || 0;
+            modelUsageAgg[model]!.inputTokens += usage.inputTokens;
+            modelUsageAgg[model]!.outputTokens += usage.outputTokens;
+            modelUsageAgg[model]!.cacheReadInputTokens += usage.cacheReadInputTokens;
+            modelUsageAgg[model]!.cacheCreationInputTokens += usage.cacheCreationInputTokens;
+            modelUsageAgg[model]!.webSearchRequests += usage.webSearchRequests;
+            modelUsageAgg[model]!.costUSD += usage.costUSD;
 
             // Track daily tokens per model
-            const totalTokens = (usage.input_tokens || 0) + (usage.output_tokens || 0);
+            const totalTokens = usage.inputTokens + usage.outputTokens;
             if (totalTokens > 0) {
               const dayTokens = dailyModelTokensMap.get(dateKey) || {};
               dayTokens[model] = (dayTokens[model] || 0) + totalTokens;
@@ -389,10 +454,12 @@ async function processSessionFiles(sessionFiles: string[], options: ProcessOptio
                 maxOutputTokens: 0,
               };
             }
-            providerUsageAgg[provider]!.inputTokens += usage.input_tokens || 0;
-            providerUsageAgg[provider]!.outputTokens += usage.output_tokens || 0;
-            providerUsageAgg[provider]!.cacheReadInputTokens += usage.cache_read_input_tokens || 0;
-            providerUsageAgg[provider]!.cacheCreationInputTokens += usage.cache_creation_input_tokens || 0;
+            providerUsageAgg[provider]!.inputTokens += usage.inputTokens;
+            providerUsageAgg[provider]!.outputTokens += usage.outputTokens;
+            providerUsageAgg[provider]!.cacheReadInputTokens += usage.cacheReadInputTokens;
+            providerUsageAgg[provider]!.cacheCreationInputTokens += usage.cacheCreationInputTokens;
+            providerUsageAgg[provider]!.webSearchRequests += usage.webSearchRequests;
+            providerUsageAgg[provider]!.costUSD += usage.costUSD;
           }
         }
       }
@@ -527,6 +594,7 @@ function cacheToStats(cache: PersistedStatsCache, todayStats: ProcessedStats | n
           costUSD: modelUsage[model]!.costUSD + usage.costUSD,
           contextWindow: Math.max(modelUsage[model]!.contextWindow, usage.contextWindow),
           maxOutputTokens: Math.max(modelUsage[model]!.maxOutputTokens, usage.maxOutputTokens),
+          provider: modelUsage[model]!.provider ?? usage.provider,
         };
       } else {
         modelUsage[model] = { ...usage };

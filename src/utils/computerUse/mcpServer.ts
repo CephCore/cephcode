@@ -5,10 +5,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  ListToolsRequestSchema,
-  CallToolRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 import { shutdownDatadog } from '../../services/analytics/datadog.js';
 import { shutdown1PEventLogging } from '../../services/analytics/firstPartyEventLogger.js';
@@ -32,7 +29,10 @@ function normToPixel(val: number, dim: number): number {
 let lastScreenshotWidth = 1920;
 let lastScreenshotHeight = 1080;
 
-export async function handleToolCall(name: string, args: Record<string, unknown>): Promise<{
+export async function handleToolCall(
+  name: string,
+  args: Record<string, unknown>,
+): Promise<{
   content: Array<{ type: 'text' | 'image'; text?: string; data?: string; mimeType?: string }>;
 }> {
   const { adapter, coordinateMode, subGates } = getComputerUseHostAdapter();
@@ -75,10 +75,12 @@ export async function handleToolCall(name: string, args: Record<string, unknown>
         const [ex, ey] = toPixel(Number(args.end_x), Number(args.end_y));
         await adapter.drag({ x: sx, y: sy }, { x: ex, y: ey });
         return {
-          content: [{
-            type: 'text',
-            text: `Dragged from (${sx}, ${sy}) to (${ex}, ${ey})`,
-          }],
+          content: [
+            {
+              type: 'text',
+              text: `Dragged from (${sx}, ${sy}) to (${ex}, ${ey})`,
+            },
+          ],
         };
       }
 
@@ -126,20 +128,19 @@ export async function createComputerUseMcpServerForCli(): Promise<Server> {
   const { coordinateMode } = getComputerUseHostAdapter();
   const tools = buildComputerUseTools(coordinateMode);
 
-  const server = new Server(
-    { name: 'computer-use', version: '1.0.0' },
-    { capabilities: { tools: {} } },
-  );
+  const server = new Server({ name: 'computer-use', version: '1.0.0' }, { capabilities: { tools: {} } });
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
-  server.setRequestHandler(CallToolRequestSchema, async (req) => {
-    const result = await handleToolCall(req.params.name, req.params.arguments as Record<string, unknown> ?? {});
-    return { content: result.content.map(c => ({
-      type: c.type as any,
-      text: c.text,
-      data: c.data,
-      mimeType: c.mimeType,
-    })) };
+  server.setRequestHandler(CallToolRequestSchema, async req => {
+    const result = await handleToolCall(req.params.name, (req.params.arguments as Record<string, unknown>) ?? {});
+    return {
+      content: result.content.map(c => ({
+        type: c.type as any,
+        text: c.text,
+        data: c.data,
+        mimeType: c.mimeType,
+      })),
+    };
   });
 
   return server;

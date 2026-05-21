@@ -30,10 +30,10 @@ import {
 import { getPlatform } from './platform.js';
 import { getRipgrepStatus } from './ripgrep.js';
 import { SandboxManager } from './sandbox/sandbox-adapter.js';
+import { getMaskedSentryDsn, isSentryEnabled } from './sentry.js';
 import { getManagedFilePath } from './settings/managedPath.js';
 import { CUSTOMIZATION_SURFACES } from './settings/types.js';
 import { findClaudeAlias, findValidClaudeAlias, getShellConfigPaths } from './shellConfig.js';
-import { isSentryEnabled, getMaskedSentryDsn } from './sentry.js';
 import { jsonParse } from './slowOperations.js';
 import { which } from './which.js';
 

@@ -29,7 +29,7 @@ import { has1mContext } from './context.js';
 import { isEnvDefinedFalsy, isEnvTruthy } from './envUtils.js';
 import { getCanonicalName } from './model/model.js';
 import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js';
-import { getAPIProvider, getActiveProviderId, isAnthropicProvider } from './model/providers.js';
+import { getActiveProviderId, getAPIProvider, isAnthropicProvider } from './model/providers.js';
 import { getInitialSettings } from './settings/settings.js';
 
 /**

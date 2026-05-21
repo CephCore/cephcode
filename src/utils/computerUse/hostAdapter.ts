@@ -94,7 +94,9 @@ export function getComputerUseBackend(): ComputerUseBackend {
       cachedBackendType = 'anthropic';
       return 'anthropic';
     } catch {
-      logForDebugging('[cu-backend] anthropic backend requested but @ant packages not found, falling back to builtin', { level: 'warn' });
+      logForDebugging('[cu-backend] anthropic backend requested but @ant packages not found, falling back to builtin', {
+        level: 'warn',
+      });
     }
   }
 
@@ -125,9 +127,10 @@ export function getComputerUseHostAdapter(): ComputerUseHostAdapter {
 
 export function buildComputerUseTools(coordinateMode: CoordinateMode): CuToolDefinition[] {
   const coordNote = coordinateMode === 'normalized' ? ' (0-1 range)' : ' (pixels)';
-  const coordDesc = coordinateMode === 'normalized'
-    ? 'Use 0-1 range where (0,0) is top-left and (1,1) is bottom-right of the display.'
-    : 'Use pixel coordinates where (0,0) is top-left of the display.';
+  const coordDesc =
+    coordinateMode === 'normalized'
+      ? 'Use 0-1 range where (0,0) is top-left and (1,1) is bottom-right of the display.'
+      : 'Use pixel coordinates where (0,0) is top-left of the display.';
   return [
     {
       name: 'screenshot',

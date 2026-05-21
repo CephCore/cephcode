@@ -1,9 +1,6 @@
 import type { MemorySearchResult } from '../memory/types.js';
 
-export function injectMemoryIntoPrompt(
-  userPrompt: string,
-  memories: MemorySearchResult[]
-): string {
+export function injectMemoryIntoPrompt(userPrompt: string, memories: MemorySearchResult[]): string {
   if (memories.length === 0) return userPrompt;
 
   const renderedMemories = memories

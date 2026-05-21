@@ -306,6 +306,7 @@ export function mergeCacheWithNewStats(
         costUSD: modelUsage[model]!.costUSD + usage.costUSD,
         contextWindow: Math.max(modelUsage[model]!.contextWindow, usage.contextWindow),
         maxOutputTokens: Math.max(modelUsage[model]!.maxOutputTokens, usage.maxOutputTokens),
+        provider: modelUsage[model]!.provider ?? usage.provider,
       };
     } else {
       modelUsage[model] = { ...usage };

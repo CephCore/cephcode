@@ -562,6 +562,20 @@ export type GlobalConfig = {
   // (avoiding 11× saveGlobalConfig lock+re-read on every startup).
   migrationVersion?: number;
   explorerMode?: 'none' | 'sidebar' | 'fullscreen';
+  openaiOAuthTokens?: {
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt?: number;
+    scope?: string[];
+  };
+  googleOAuthTokens?: {
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt?: number;
+    scope?: string[];
+  };
+  googleOAuthClientId?: string;
+  googleOAuthClientSecret?: string;
 };
 
 /**

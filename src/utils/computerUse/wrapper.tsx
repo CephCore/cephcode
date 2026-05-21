@@ -6,10 +6,10 @@
 
 import * as React from 'react';
 import type { Tool, ToolUseContext } from '../../Tool.js';
+import { logForDebugging } from '../debug.js';
+import { registerEscKey, unregisterEscKey } from './abortKey.js';
 import { handleToolCall } from './mcpServer.js';
 import { getComputerUseMCPRenderingOverrides } from './toolRendering.js';
-import { registerEscKey, unregisterEscKey } from './abortKey.js';
-import { logForDebugging } from '../debug.js';
 
 type CallOverride = Pick<Tool, 'call'>['call'];
 
@@ -70,7 +70,9 @@ async function ensurePermission(context: ToolUseContext, toolName: string): Prom
  * tool: rendering overrides from `toolRendering.tsx` plus a `.call()` that
  * dispatches through our PlatformAdapter.
  */
-export function getComputerUseMCPToolOverrides(toolName: string): ReturnType<typeof getComputerUseMCPRenderingOverrides> & {
+export function getComputerUseMCPToolOverrides(toolName: string): ReturnType<
+  typeof getComputerUseMCPRenderingOverrides
+> & {
   call: CallOverride;
 } {
   const call: CallOverride = async (args, context: ToolUseContext) => {
@@ -94,7 +96,7 @@ export function getComputerUseMCPToolOverrides(toolName: string): ReturnType<typ
               }
             : {
                 type: 'text' as const,
-                text: item.type === 'text' ? item.text ?? '' : '',
+                text: item.type === 'text' ? (item.text ?? '') : '',
               },
         )
       : result.content;

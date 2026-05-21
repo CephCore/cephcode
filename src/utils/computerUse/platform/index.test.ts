@@ -5,7 +5,9 @@ describe('platform adapter factory', () => {
   test('getPlatformAdapter returns adapter for current platform', () => {
     const adapter = getPlatformAdapter();
     expect(adapter).toBeDefined();
-    expect(adapter.platform).toBe(process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'darwin' : 'linux');
+    expect(adapter.platform).toBe(
+      process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'darwin' : 'linux',
+    );
   }, 20000);
 
   test('adapter.getDisplaySize returns valid geometry', async () => {
@@ -27,4 +29,3 @@ describe('platform adapter factory', () => {
     expect(displays[0]?.width).toBeGreaterThan(0);
   }, 20000);
 });
-
