@@ -6,10 +6,27 @@ import { registerBundledSkill } from '../bundledSkills.js';
 /**
  * Generate JSON Schema from the settings Zod schema.
  * This keeps the skill prompt in sync with the actual types.
+ * Falls back to a simplified representation if toJSONSchema fails
+ * (e.g. when the schema contains z.undefined which Zod v4 cannot serialize).
  */
 function generateSettingsSchema(): string {
-  const jsonSchema = toJSONSchema(SettingsSchema(), { io: 'input' });
-  return jsonStringify(jsonSchema, null, 2);
+  try {
+    const jsonSchema = toJSONSchema(SettingsSchema(), { io: 'input' });
+    return jsonStringify(jsonSchema, null, 2);
+  } catch {
+    // Fallback: render the schema keys manually
+    const schema = SettingsSchema();
+    const descriptions: Record<string, string> = {};
+    // Extract descriptions from each key
+    for (const key of Object.keys(schema._def?.shape?.() ?? {})) {
+      const field = schema._def?.shape?.()?.[key];
+      if (field) {
+        const desc = field._def?.description ?? field.description;
+        descriptions[key] = desc ?? '(see settings types)';
+      }
+    }
+    return jsonStringify(descriptions, null, 2);
+  }
 }
 
 const SETTINGS_EXAMPLES_DOCS = `## Settings File Locations
@@ -446,7 +463,7 @@ export function registerUpdateConfigSkill(): void {
   registerBundledSkill({
     name: 'update-config',
     description:
-      'Use this skill to configure the Ceph Code harness via settings.json. Automated behaviors ("from now on when X", "each time X", "whenever X", "before/after X") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions ("allow X", "add permission", "move permission to"), env vars ("set X=Y"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: "allow npm commands", "add bq permission to global settings", "move permission to user settings", "set DEBUG=true", "when ceph stops show X". For simple settings like theme/model, use Config tool.',
+      'Use this skill to configure the Claude Code harness via settings.json. Automated behaviors ("from now on when X", "each time X", "whenever X", "before/after X") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions ("allow X", "add permission", "move permission to"), env vars ("set X=Y"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: "allow npm commands", "add bq permission to global settings", "move permission to user settings", "set DEBUG=true", "when claude stops show X". For simple settings like theme/model, use Config tool.',
     allowedTools: ['Read'],
     userInvocable: true,
     async getPromptForCommand(args) {

@@ -96,7 +96,7 @@ export function HelpV2({ onClose, commands }: Props): React.ReactNode {
     <Box flexDirection="column" height={insideModal ? undefined : maxHeight}>
       <Pane color="professionalBlue">
         <Tabs
-          title={'external' === 'ant' ? '/help' : `Claude Code v${MACRO.VERSION}`}
+          title="/help"
           color="professionalBlue"
           defaultTab="general"
         >

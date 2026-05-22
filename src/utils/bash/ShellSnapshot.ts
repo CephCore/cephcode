@@ -182,9 +182,11 @@ function getUserSnapshotContent(configFile: string): string {
       # Force autoload all functions first
       typeset -f > /dev/null 2>&1
 
-      # Now get user function names - filter completion functions (single underscore prefix)
-      # but keep double-underscore helpers (e.g. __zsh_like_cd from mise, __pyenv_init)
-      typeset +f | grep -vE '^_[^_]' | while read func; do
+      # Now get user function names - include all functions, even those starting
+      # with a single underscore. Previously we filtered single-underscore functions
+      # as "completion functions", but many user aliases reference _-prefixed
+      # helpers (e.g. _git_remote_origin_url), and dropping them broke those aliases.
+      typeset +f | while read func; do
         typeset -f "$func" >> "$SNAPSHOT_FILE"
       done
     `;
@@ -195,9 +197,11 @@ function getUserSnapshotContent(configFile: string): string {
       # Force autoload all functions first
       declare -f > /dev/null 2>&1
 
-      # Now get user function names - filter completion functions (single underscore prefix)
-      # but keep double-underscore helpers (e.g. __zsh_like_cd from mise, __pyenv_init)
-      declare -F | cut -d' ' -f3 | grep -vE '^_[^_]' | while read func; do
+      # Now get user function names - include all functions, even those starting
+      # with a single underscore. Previously we filtered single-underscore functions
+      # as "completion functions", but many user aliases reference _-prefixed
+      # helpers and dropping them broke those aliases.
+      declare -F | cut -d' ' -f3 | while read func; do
         # Encode the function to base64, preserving all special characters
         encoded_func=$(declare -f "$func" | base64 )
         # Write the function definition to the snapshot

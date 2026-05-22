@@ -1,4 +1,4 @@
-// Ceph Code Docs — Mobile Nav & Helpers
+// Claude Code Docs — Mobile Nav & Helpers
 (function () {
   'use strict';
 

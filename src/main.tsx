@@ -24,7 +24,7 @@ export { MACRO };
 
 const startupArgs = process.argv.slice(2);
 if (startupArgs.length === 1 && ['--version', '-v', '-V'].includes(startupArgs[0] ?? '')) {
-  console.log(`${globalThis.MACRO.VERSION} (Ceph Code)`);
+  console.log(`${globalThis.MACRO.VERSION} (Claude Code)`);
   process.exit(0);
 }
 
@@ -124,6 +124,7 @@ import {
   isClaudeAISubscriber,
   prefetchAwsCredentialsAndBedRockInfoIfSafe,
   prefetchGcpCredentialsIfSafe,
+  validateForceLoginMethod,
   validateForceLoginOrg,
 } from './utils/auth.js';
 import {
@@ -497,6 +498,7 @@ import { createDirectConnectSession, DirectConnectError } from './server/createD
 import { initializeLspServerManager } from './services/lsp/manager.js';
 import { shouldEnablePromptSuggestion } from './services/PromptSuggestion/promptSuggestion.js';
 import { type AppState, getDefaultAppState, IDLE_SPECULATION_STATE } from './state/AppStateStore.js';
+import { restoreSessionGoal } from './utils/sessionGoalState.js';
 import { onChangeAppState } from './state/onChangeAppState.js';
 import { createStore } from './state/store.js';
 import { asSessionId } from './types/ids.js';
@@ -1365,7 +1367,7 @@ async function run(): Promise<CommanderCommand> {
   });
   program
     .name('ceph')
-    .description(`Ceph Code - starts an interactive session by default, use -p/--print for non-interactive output`)
+    .description(`Claude Code - starts an interactive session by default, use -p/--print for non-interactive output`)
     .argument('[prompt]', 'Your prompt', String)
     // Subcommands inherit helpOption via commander's copyInheritedSettings —
     // setting it once here covers mcp, plugin, auth, and all other subcommands.
@@ -1685,7 +1687,7 @@ async function run(): Promise<CommanderCommand> {
       if (prompt === 'code') {
         logEvent('tengu_code_prompt_ignored', {});
         // biome-ignore lint/suspicious/noConsole:: intentional console output
-        console.warn(chalk.yellow('Tip: You can launch Ceph Code with just `ceph`'));
+        console.warn(chalk.yellow('Tip: You can launch Claude Code with just `ceph`'));
         prompt = undefined;
       }
 
@@ -3204,6 +3206,11 @@ async function run(): Promise<CommanderCommand> {
         if (!orgValidation.valid) {
           await exitWithError(root, orgValidation.message);
         }
+
+        const methodValidation = await validateForceLoginMethod();
+        if (!methodValidation.valid) {
+          await exitWithError(root, methodValidation.message);
+        }
       }
 
       // If gracefulShutdown was initiated (e.g., user rejected trust dialog),
@@ -3540,6 +3547,12 @@ async function run(): Promise<CommanderCommand> {
           process.exit(1);
         }
 
+        const methodValidation = await validateForceLoginMethod();
+        if (!methodValidation.valid) {
+          process.stderr.write(methodValidation.message + '\n');
+          process.exit(1);
+        }
+
         // Headless mode supports all prompt commands and some local commands
         // If disableSlashCommands is true, return empty array
         const commandsHeadless = disableSlashCommands
@@ -3848,12 +3861,17 @@ async function run(): Promise<CommanderCommand> {
           priority: 'high',
         });
       }
+      const goalState = await restoreSessionGoal();
+      const hasActiveGoal = goalState && goalState.goal && !goalState.achieved;
+
       const effectiveToolPermissionContext = {
         ...toolPermissionContext,
         mode:
-          isAgentSwarmsEnabled() && getTeammateUtils().isPlanModeRequired()
-            ? ('plan' as const)
-            : toolPermissionContext.mode,
+          hasActiveGoal
+            ? 'bypassPermissions'
+            : isAgentSwarmsEnabled() && getTeammateUtils().isPlanModeRequired()
+              ? ('plan' as const)
+              : toolPermissionContext.mode,
       };
       // All startup opt-in paths (--tools, --brief, defaultView) have fired
       // above; initialIsBriefOnly just reads the resulting state.
@@ -3887,6 +3905,9 @@ async function run(): Promise<CommanderCommand> {
         viewSelectionMode: 'none',
         footerSelection: null,
         toolPermissionContext: effectiveToolPermissionContext,
+        sessionGoal: hasActiveGoal ? goalState.goal : undefined,
+        sessionGoalStartTime: hasActiveGoal ? (goalState.setAt ?? Date.now()) : undefined,
+        sessionGoalTurnCount: hasActiveGoal ? (goalState.turnCount ?? 0) : undefined,
         agent: mainThreadAgentDefinition?.agentType,
         agentDefinitions,
         mcp: {
@@ -4954,7 +4975,7 @@ async function run(): Promise<CommanderCommand> {
         );
       }
     })
-    .version(`${MACRO.VERSION} (Ceph Code)`, '-v, --version', 'Output the version number');
+    .version(`${MACRO.VERSION} (Claude Code)`, '-v, --version', 'Output the version number');
 
   // Worktree flags
   program.option('-w, --worktree [name]', 'Create a new git worktree for this session (optionally specify a name)');

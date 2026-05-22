@@ -10,7 +10,7 @@ import {
 } from '../bootstrap/state.js';
 import { parseTokenBudget } from '../utils/tokenBudget.js';
 import { count } from '../utils/array.js';
-import { dirname, join } from 'path';
+import { dirname, join, basename } from 'path';
 import { tmpdir } from 'os';
 import figures from 'figures';
 // eslint-disable-next-line custom-rules/prefer-use-keybindings -- / n N Esc [ v are bare letters in transcript modal context, same class as g/G/j/k in ScrollKeybindingHandler
@@ -320,6 +320,7 @@ import {
   exitRestoredWorktree,
 } from '../utils/sessionRestore.js';
 import { isBgSession, updateSessionName, updateSessionActivity } from '../utils/concurrentSessions.js';
+import { restoreSessionGoal } from '../utils/sessionGoalState.js';
 import { isInProcessTeammateTask, type InProcessTeammateTaskState } from '../tasks/InProcessTeammateTask/types.js';
 import { restoreRemoteAgentTasks } from '../tasks/RemoteAgentTask/RemoteAgentTask.js';
 import { useInboxPoller } from '../hooks/useInboxPoller.js';
@@ -1341,7 +1342,7 @@ export function REPL({
   // session from mid-conversation context.
   const haikuTitleAttemptedRef = useRef((initialMessages?.length ?? 0) > 0);
   const agentTitle = mainThreadAgentDefinition?.agentType;
-  const terminalTitle = sessionTitle ?? agentTitle ?? haikuTitle ?? 'Ceph Code';
+  const terminalTitle = sessionTitle ?? agentTitle ?? haikuTitle ?? 'Claude Code';
   const awaitingInputAgentCount = useMemo(
     () =>
       Object.values(tasks).filter(
@@ -2157,6 +2158,39 @@ export function REPL({
         // a different project (cross-worktree, /branch); null derives from
         // current originalCwd.
         switchSession(asSessionId(sessionId), log.fullPath ? dirname(log.fullPath) : null);
+
+        // Restore session goal state for resumed session
+        const goalState = await restoreSessionGoal();
+        const hasActiveGoal = goalState && goalState.goal && !goalState.achieved;
+
+        setAppState(prev => {
+          const nextPermissionMode = hasActiveGoal
+            ? 'bypassPermissions'
+            : prev.toolPermissionContext.mode === 'bypassPermissions'
+              ? (goalState?.preGoalMode ?? 'default')
+              : prev.toolPermissionContext.mode;
+
+          /* eslint-disable @typescript-eslint/no-require-imports */
+          const { transitionPermissionMode } =
+            require('../utils/permissions/permissionSetup.js') as typeof import('../utils/permissions/permissionSetup.js');
+          /* eslint-enable @typescript-eslint/no-require-imports */
+          const transitionedContext = transitionPermissionMode(
+            prev.toolPermissionContext.mode,
+            nextPermissionMode,
+            prev.toolPermissionContext,
+          );
+
+          return {
+            ...prev,
+            sessionGoal: hasActiveGoal ? goalState.goal : undefined,
+            sessionGoalStartTime: hasActiveGoal ? (goalState.setAt ?? Date.now()) : undefined,
+            sessionGoalTurnCount: hasActiveGoal ? (goalState.turnCount ?? 0) : undefined,
+            toolPermissionContext: {
+              ...transitionedContext,
+              mode: nextPermissionMode,
+            },
+          };
+        });
         // Rename asciicast recording to match the resumed session ID
         const { renameRecordingForSession } = await import('../utils/asciicast.js');
         await renameRecordingForSession();
@@ -2234,6 +2268,33 @@ export function REPL({
             log.contentReplacements ?? [],
           );
         }
+
+        // Format recent messages to jog user's memory (recent exchanges)
+        const recentExchanges = messages
+          .filter(msg => (msg.type === 'user' || msg.type === 'assistant') && !msg.isMeta)
+          .slice(-3);
+
+        const formattedExchanges = recentExchanges
+          .map(msg => {
+            const speaker = msg.type === 'user' ? 'User' : (log.agentName || 'Claude');
+            const rawText = msg.message?.content ? getContentText(msg.message.content) : null;
+            if (!rawText) return null;
+            const singleLineText = rawText.replace(/\s+/g, ' ').trim();
+            const truncated = singleLineText.length > 80 ? singleLineText.slice(0, 80) + '...' : singleLineText;
+            return `  ${speaker}: "${truncated}"`;
+          })
+          .filter((line): line is string => line !== null);
+
+        const bannerLines = [
+          `Resumed session: ${log.agentName || 'Claude'} (${sessionId.slice(0, 8)})`,
+          log.projectPath ? `  Project: ${basename(log.projectPath)}` : '',
+          hasActiveGoal ? `  Active Goal: ${goalState.goal}` : '',
+          formattedExchanges.length > 0 ? '\n  Recent activity:' : '',
+          ...formattedExchanges,
+        ].filter(line => line !== '');
+
+        const resumeBanner = bannerLines.join('\n');
+        messages.push(createSystemMessage(resumeBanner, 'suggestion'));
 
         // Reset messages to the provided initial messages
         // Use a callback to ensure we're not dependent on stale state

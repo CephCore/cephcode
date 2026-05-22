@@ -62,15 +62,21 @@ export async function call(
 
   // Clear goal
   if (trimmed.toLowerCase() === 'clear') {
+    const goalState = getFullGoalState();
+    const restoredMode = goalState?.preGoalMode;
     context.setAppState(prev => ({
       ...prev,
       sessionGoal: undefined,
       sessionGoalStartTime: undefined,
       sessionGoalTurnCount: undefined,
+      toolPermissionContext: restoredMode
+        ? { ...prev.toolPermissionContext, mode: restoredMode }
+        : prev.toolPermissionContext,
     }));
     setFullGoalState(null);
 
-    onDone('Session goal cleared.', { display: 'system' });
+    const restoreMsg = restoredMode ? ` and restored permission mode to '${restoredMode}'` : '';
+    onDone(`Session goal cleared${restoreMsg}.`, { display: 'system' });
     return null;
   }
 
@@ -88,6 +94,7 @@ export async function call(
     evalTokens: 0,
     lastReason: undefined,
     achieved: false,
+    preGoalMode: state.toolPermissionContext?.mode,
   };
 
   context.setAppState(prev => ({
@@ -96,6 +103,10 @@ export async function call(
     sessionGoalStartTime: Date.now(),
     sessionGoalTurnCount: 0,
     standaloneAgentContext: prev.standaloneAgentContext ? { ...prev.standaloneAgentContext } : undefined,
+    toolPermissionContext: {
+      ...prev.toolPermissionContext,
+      mode: 'bypassPermissions',
+    },
   }));
   setFullGoalState(goalState);
 
@@ -103,6 +114,12 @@ export async function call(
   if (maxTurns) bounds.push(`stop after ${maxTurns} turns`);
   if (maxMinutes) bounds.push(`stop after ${maxMinutes} min`);
   const boundsStr = bounds.length > 0 ? ` (${bounds.join(', ')})` : '';
-  onDone(`Goal set: ${trimmed}${boundsStr}`, { display: 'system' });
+  onDone(`Goal set: ${trimmed}${boundsStr}. Autonomous agent mode started.`, {
+    display: 'system',
+    shouldQuery: true,
+    metaMessages: [
+      `Autonomous Agent Mode activated. Your active goal is: "${trimmed}"${boundsStr}. Please proceed autonomously with the tools available to achieve this goal. Permissions are automatically bypassed for execution.`,
+    ],
+  });
   return null;
 }

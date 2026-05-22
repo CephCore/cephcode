@@ -116,6 +116,7 @@ import { emitHookStarted, emitHookResponse, startHookProgressInterval } from './
 import { createAttachmentMessage } from './attachments.js';
 import { all } from './generators.js';
 import { findToolByName, type Tools, type ToolUseContext } from '../Tool.js';
+import picomatch from 'picomatch';
 import { execPromptHook } from './hooks/execPromptHook.js';
 import type { Message, AssistantMessage } from '../types/message.js';
 import { execAgentHook } from './hooks/execAgentHook.js';
@@ -1376,6 +1377,15 @@ async function prepareIfConditionMatcher(
   const patternMatcher =
     input?.success && tool?.preparePermissionMatcher ? await tool.preparePermissionMatcher(input.data) : undefined;
 
+  // Build a fallback glob matcher from the tool input for tools without
+  // preparePermissionMatcher (BashTool, PowerShellTool, etc.). picomatch is
+  // evaluated per-rule against the same stringified tool_input.
+  const inputStr: string | undefined = patternMatcher
+    ? undefined
+    : hookInput.tool_input
+      ? Object.values(hookInput.tool_input).filter(v => typeof v === 'string').join(' ')
+      : undefined;
+
   return ifCondition => {
     const parsed = permissionRuleValueFromString(ifCondition);
     if (normalizeLegacyToolName(parsed.toolName) !== toolName) {
@@ -1384,7 +1394,18 @@ async function prepareIfConditionMatcher(
     if (!parsed.ruleContent) {
       return true;
     }
-    return patternMatcher ? patternMatcher(parsed.ruleContent) : false;
+    if (patternMatcher) {
+      return patternMatcher(parsed.ruleContent);
+    }
+    // Fallback: glob-match against the tool input string
+    if (inputStr) {
+      try {
+        return picomatch(parsed.ruleContent, { noglobstar: false })(inputStr);
+      } catch {
+        return false;
+      }
+    }
+    return false;
   };
 }
 

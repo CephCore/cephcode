@@ -2138,15 +2138,26 @@ export const fetchResourcesForClient = memoizeWithLRU(
         return [];
       }
 
-      const result = await client.client.request({ method: 'resources/list' }, ListResourcesResultSchema);
+      // Handle paginated resources/list — the MCP spec supports nextCursor
+      const allResources: ServerResource[] = [];
+      let cursor: string | undefined;
+      do {
+        const params: { method: 'resources/list'; params?: { cursor: string } } = { method: 'resources/list' };
+        if (cursor) {
+          params.params = { cursor };
+        }
+        const result = await client.client.request(params, ListResourcesResultSchema);
+        if (!result.resources) break;
+        allResources.push(
+          ...result.resources.map(resource => ({
+            ...resource,
+            server: client.name,
+          })),
+        );
+        cursor = result.nextCursor;
+      } while (cursor);
 
-      if (!result.resources) return [];
-
-      // Add server name to each resource
-      return result.resources.map(resource => ({
-        ...resource,
-        server: client.name,
-      }));
+      return allResources;
     } catch (error) {
       logMCPError(client.name, `Failed to fetch resources: ${errorMessage(error)}`);
       return [];
@@ -2165,16 +2176,25 @@ export const fetchCommandsForClient = memoizeWithLRU(
         return [];
       }
 
-      // Request prompts list from client
-      const result = (await client.client.request(
-        { method: 'prompts/list' },
-        ListPromptsResultSchema,
-      )) as ListPromptsResult;
-
-      if (!result.prompts) return [];
+      // Handle paginated prompts/list — the MCP spec supports nextCursor
+      const allPrompts: ListPromptsResult['prompts'] = [];
+      let cursor: string | undefined;
+      do {
+        const params: { method: 'prompts/list'; params?: { cursor: string } } = { method: 'prompts/list' };
+        if (cursor) {
+          params.params = { cursor };
+        }
+        const result = (await client.client.request(
+          params,
+          ListPromptsResultSchema,
+        )) as ListPromptsResult;
+        if (!result.prompts) break;
+        allPrompts.push(...result.prompts);
+        cursor = result.nextCursor;
+      } while (cursor);
 
       // Sanitize prompt data from MCP server
-      const promptsToProcess = recursivelySanitizeUnicode(result.prompts);
+      const promptsToProcess = recursivelySanitizeUnicode(allPrompts);
 
       // Convert MCP prompts to our Command format
       return promptsToProcess.map(prompt => {

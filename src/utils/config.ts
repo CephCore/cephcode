@@ -1060,7 +1060,7 @@ export function getGlobalConfig(): GlobalConfig {
  * Returns the effective value of remoteControlAtStartup. Precedence:
  *   1. User's explicit config value (always wins — honors opt-out)
  *   2. CCR auto-connect default (ant-only build, GrowthBook-gated)
- *   3. false (Remote Control must be explicitly opted into)
+ *   3. true (Remote Control enabled by default for all sessions)
  */
 export function getRemoteControlAtStartup(): boolean {
   const explicit = getGlobalConfig().remoteControlAtStartup;
@@ -1068,7 +1068,7 @@ export function getRemoteControlAtStartup(): boolean {
   if (feature('CCR_AUTO_CONNECT')) {
     if (ccrAutoConnect?.getCcrAutoConnectDefault()) return true;
   }
-  return false;
+  return true;
 }
 
 export function getCustomApiKeyStatus(truncatedApiKey: string): 'approved' | 'rejected' | 'new' {

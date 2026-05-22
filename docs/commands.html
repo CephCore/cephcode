@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Commands — Ceph Code</title>
-  <meta name="description" content="Complete reference for all slash commands in Ceph Code — built-in commands, skills, and plugin commands.">
+  <title>Commands — Claude Code</title>
+  <meta name="description" content="Complete reference for all slash commands in Claude Code — built-in commands, skills, and plugin commands.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-<header class="header"><div class="header-inner"><a href="index.html" class="logo"><span class="logo-mark">~</span><span>Ceph Code</span></a><nav class="header-nav"><a href="index.html">Home</a><a href="index.html#features">Features</a><a href="index.html#commands">Commands</a><a href="quick-start.html" class="active">Docs</a><a href="https://github.com/CephCore/cephcode" target="_blank">GitHub</a></nav><button class="menu-btn" id="menuToggle" aria-label="Toggle navigation"><span></span><span></span><span></span></button></div></header>
+<header class="header"><div class="header-inner"><a href="index.html" class="logo"><span class="logo-mark">~</span><span>Claude Code</span></a><nav class="header-nav"><a href="index.html">Home</a><a href="index.html#features">Features</a><a href="index.html#commands">Commands</a><a href="quick-start.html" class="active">Docs</a><a href="https://github.com/CephCore/cephcode" target="_blank">GitHub</a></nav><button class="menu-btn" id="menuToggle" aria-label="Toggle navigation"><span></span><span></span><span></span></button></div></header>
 <div class="app"><aside class="sidebar" id="sidebar"></aside><div class="sidebar-overlay" id="sidebarOverlay"></div><main class="content">
   <h1>Commands</h1>
-  <p class="section-subtitle">Ceph Code ships with 80+ built-in slash commands plus dynamically loaded skills and plugin commands. Commands can be <strong>local</strong> (terminal execution), <strong>prompt</strong> (text expanded to the model), or <strong>local-jsx</strong> (Ink UI panels).</p>
+  <p class="section-subtitle">Claude Code ships with 80+ built-in slash commands plus dynamically loaded skills and plugin commands. Commands can be <strong>local</strong> (terminal execution), <strong>prompt</strong> (text expanded to the model), or <strong>local-jsx</strong> (Ink UI panels).</p>
 
   <div class="callout callout-tip">
     <strong>Discovery</strong>
@@ -78,11 +78,11 @@
   <h2>Agents</h2>
   <table>
     <tr><th>Command</th><th>Description</th></tr>
-    <tr><td><code>/agent</code></td><td>Manage Ceph Code AI Agents execution, state checkpoints, and approvals</td></tr>
+    <tr><td><code>/agent</code></td><td>Manage Claude Code AI Agents execution, state checkpoints, and approvals</td></tr>
     <tr><td><code>/agents</code></td><td>Manage agent configurations</td></tr>
     <tr><td><code>/tasks</code></td><td>List and manage background tasks</td></tr>
-    <tr><td><code>/daemon</code></td><td>Manage the 24/7 autonomous agent daemon (start/stop/status)</td></tr>
-    <tr><td><code>/task</code></td><td>Manage the autonomous task queue (add/list/done/cancel/retry)</td></tr>
+    <tr><td><code>/daemon</code></td><td>Open an interactive 24/7 autonomous daemon control panel; subcommands still support start/stop/status/restart</td></tr>
+    <tr><td><code>/task</code></td><td>Create scheduled tasks with an interactive form; subcommands still manage the autonomous task queue</td></tr>
   </table>
 
   <h2>System &amp; Diagnostics</h2>
@@ -186,7 +186,7 @@
   <p>Use <code>/reload-plugins</code> to reload plugin-provided commands without restarting. Remote-safe and bridge-safe commands have explicit allowlists in <code>src/commands.ts</code>.</p>
 
   <footer class="footer">
-    <span>Ceph Code v2.1.152 — Open Source (MIT)</span>
+    <span>Claude Code v2.1.154 — Open Source (MIT)</span>
     <div class="footer-links">
       <a href="https://github.com/CephCore/cephcode">GitHub</a>
       <a href="https://github.com/CephCore/cephcode/issues">Issues</a>

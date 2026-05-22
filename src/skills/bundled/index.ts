@@ -8,7 +8,7 @@ import { registerKeybindingsSkill } from './keybindings.js';
 import { registerLoremIpsumSkill } from './loremIpsum.js';
 import { registerRememberSkill } from './remember.js';
 import { registerScraplingSkill } from './scrapling.js';
-import { registerSimplifySkill } from './simplify.js';
+import { registerCodeReviewSkill } from './code-review.js';
 import { registerSkillifySkill } from './skillify.js';
 import { registerStuckSkill } from './stuck.js';
 import { registerUpdateConfigSkill } from './updateConfig.js';
@@ -31,7 +31,7 @@ export function initBundledSkills(): void {
   registerLoremIpsumSkill();
   registerSkillifySkill();
   registerRememberSkill();
-  registerSimplifySkill();
+  registerCodeReviewSkill();
   registerBatchSkill();
   registerStuckSkill();
   registerScraplingSkill();

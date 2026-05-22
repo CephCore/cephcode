@@ -17,9 +17,9 @@ import type { Command } from '../../commands.js';
 const task: Command = {
   type: 'local-jsx',
   name: 'task',
-  description: 'Manage the autonomous task queue (add/list/done/cancel/retry)',
+  description: 'Create scheduled tasks or manage the autonomous task queue',
   isEnabled: () => true,
-  argumentHint: '<add|list|done|cancel|retry|remove|show> [args]',
+  argumentHint: '[add|list|done|cancel|retry|remove|show] [args]',
   load: () => import('./task.js'),
 };
 

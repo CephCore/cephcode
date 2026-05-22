@@ -790,7 +790,16 @@ function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props
       const elapsed = sessionGoalStartTime ? Math.floor((Date.now() - sessionGoalStartTime) / 1000) : 0;
       const elapsedStr = elapsed > 0 ? `${Math.floor(elapsed / 60)}m${elapsed % 60}s` : '0s';
       const turns = sessionGoalTurnCount ?? 0;
-      sessionGoalDisplay = ' ' + claudePill(`${sessionGoal} ${elapsedStr} t${turns}`);
+      if (permissionMode === 'bypassPermissions') {
+        const text = `● Autonomous Goal: ${sessionGoal} · ${elapsedStr} · turns: ${turns}`;
+        sessionGoalDisplay =
+          ' ' +
+          chalk.hex(CLAUDE_THEME.subtle)('[') +
+          chalk.hex(CLAUDE_THEME.accent)(text) +
+          chalk.hex(CLAUDE_THEME.subtle)(']');
+      } else {
+        sessionGoalDisplay = ' ' + claudePill(`${sessionGoal} ${elapsedStr} t${turns}`);
+      }
     }
     // Build stats parts (only show non-zero)
     const statsParts: string[] = [];

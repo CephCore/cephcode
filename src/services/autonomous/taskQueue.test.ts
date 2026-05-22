@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
-import { existsSync, unlinkSync } from 'fs';
+import { existsSync } from 'fs';
+import { unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -14,19 +15,23 @@ import {
   addTask,
   buildWorkerPrompt,
   expireLeases,
+  getLogPathForTask,
   getNextTask,
   getQueueStats,
   getTask,
+  getTaskLogDir,
   leaseTask,
   listTasks,
   loadQueue,
   markTaskCancelled,
   markTaskCompleted,
   markTaskFailed,
+  readTaskLog,
   releaseLease,
   removeTask,
   requeueDeadLetter,
   retryTask,
+  writeTaskLog,
 } from './taskQueue.js';
 
 function cleanTestDir(): void {
@@ -312,4 +317,34 @@ test('getQueueStats returns all status counts', () => {
 test('getNextTask returns undefined on empty queue', () => {
   _resetQueueForTest();
   expect(getNextTask()).toBeUndefined();
+});
+
+// ─── Task Log Helpers ──────────────────────────────────────────
+
+test('writeTaskLog and readTaskLog persist and retrieve log content', async () => {
+  const id = await addTask({ title: 'Log test' });
+  await writeTaskLog(id, 'line 1');
+  await writeTaskLog(id, 'line 2');
+  const log = await readTaskLog(id);
+  expect(log).toContain('line 1');
+  expect(log).toContain('line 2');
+});
+
+test('readTaskLog returns empty string when no log file exists', async () => {
+  const badId = `no-log-${Date.now()}`;
+  const log = await readTaskLog(badId);
+  expect(log).toBe('');
+});
+
+test('getLogPathForTask returns a path inside the daemon logs directory', () => {
+  const id = 'some-task-id';
+  const path = getLogPathForTask(id);
+  expect(path).toContain('daemon');
+  expect(path).toContain(id);
+});
+
+test('getTaskLogDir returns the daemon logs directory', () => {
+  const logDir = getTaskLogDir();
+  expect(logDir).toContain('daemon');
+  expect(logDir).toContain('logs');
 });

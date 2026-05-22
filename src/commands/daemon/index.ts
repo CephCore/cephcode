@@ -13,9 +13,9 @@ import type { Command } from '../../commands.js';
 const daemon: Command = {
   type: 'local-jsx',
   name: 'daemon',
-  description: 'Manage the 24/7 autonomous agent daemon (start/stop/status)',
+  description: 'Open the interactive 24/7 autonomous daemon control panel',
   isEnabled: () => true,
-  argumentHint: '<start|stop|status|restart>',
+  argumentHint: '[start|stop|status|restart]',
   load: () => import('./daemon.js'),
 };
 

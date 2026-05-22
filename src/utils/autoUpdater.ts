@@ -22,6 +22,7 @@ import { gte, lt } from './semver.js';
 import { getInitialSettings } from './settings/settings.js';
 import { filterClaudeAliases, getShellConfigPaths, readFileLines, writeFileLines } from './shellConfig.js';
 import { jsonParse } from './slowOperations.js';
+import { sleep } from './sleep.js';
 
 const GCS_BUCKET_URL =
   'https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases';
@@ -42,6 +43,68 @@ export type MaxVersionConfig = {
   external_message?: string;
   ant_message?: string;
 };
+
+/**
+ * Categories of update failures for structured error reporting.
+ */
+export type UpdateErrorCategory =
+  | 'network'
+  | 'permissions'
+  | 'registry'
+  | 'lock_contention'
+  | 'platform'
+  | 'unknown';
+
+/**
+ * Classifies an error into a category and extracts the OS error code if available.
+ */
+export function classifyUpdateError(error: unknown): {
+  category: UpdateErrorCategory;
+  osCode: string | null;
+  message: string;
+} {
+  const msg = String(error);
+  const err = error as Record<string, unknown> | null | undefined;
+
+  // OS error code (EACCES, ENOENT, ECONNREFUSED, etc.)
+  const osCode =
+    (typeof err?.code === 'string' ? err.code : null) ??
+    (typeof (error as Error)?.message === 'string' ? extractErrno((error as Error).message) : null);
+
+  if (osCode === 'EACCES' || osCode === 'EPERM') {
+    return { category: 'permissions', osCode, message: msg };
+  }
+  if (osCode === 'ECONNREFUSED' || osCode === 'ECONNRESET' || osCode === 'ENOTFOUND' || osCode === 'ETIMEDOUT') {
+    return { category: 'network', osCode, message: msg };
+  }
+  if (osCode === 'EAI_AGAIN') {
+    return { category: 'network', osCode, message: msg };
+  }
+  if (osCode === 'EEXIST') {
+    return { category: 'lock_contention', osCode, message: msg };
+  }
+  if (
+    msg.includes('network') ||
+    msg.includes('fetch') ||
+    msg.includes('ENOTFOUND') ||
+    msg.includes('ECONNREFUSED') ||
+    msg.includes('socket')
+  ) {
+    return { category: 'network', osCode, message: msg };
+  }
+  if (msg.includes('permission') || msg.includes('EACCES') || msg.includes('EPERM')) {
+    return { category: 'permissions', osCode, message: msg };
+  }
+  if (msg.includes('registry') || msg.includes('npm') || msg.includes('dist-tags')) {
+    return { category: 'registry', osCode, message: msg };
+  }
+  return { category: 'unknown', osCode, message: msg };
+}
+
+function extractErrno(msg: string): string | null {
+  const m = msg.match(/(E[A-Z]+)/);
+  return m?.[1] ?? null;
+}
 
 /**
  * Checks if the current version meets the minimum required version from Statsig config
@@ -294,27 +357,43 @@ export async function checkGlobalInstallPermissions(): Promise<{
 
 export async function getLatestVersion(channel: ReleaseChannel): Promise<string | null> {
   const npmTag = channel === 'stable' ? 'stable' : 'latest';
+  const maxRetries = 2;
+  const baseDelay = 1000;
 
-  // Run from home directory to avoid reading project-level .npmrc
-  // which could be maliciously crafted to redirect to an attacker's registry
-  const result = await execFileNoThrowWithCwd(
-    'npm',
-    ['view', `${MACRO.PACKAGE_URL}@${npmTag}`, 'version', '--prefer-online'],
-    { abortSignal: AbortSignal.timeout(5000), cwd: homedir() },
-  );
-  if (result.code !== 0) {
-    logForDebugging(`npm view failed with code ${result.code}`);
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    // Run from home directory to avoid reading project-level .npmrc
+    // which could be maliciously crafted to redirect to an attacker's registry
+    const result = await execFileNoThrowWithCwd(
+      'npm',
+      ['view', `${MACRO.PACKAGE_URL}@${npmTag}`, 'version', '--prefer-online'],
+      { abortSignal: AbortSignal.timeout(5000), cwd: homedir() },
+    );
+    if (result.code === 0) {
+      return result.stdout.trim();
+    }
+
+    const category = classifyUpdateError(result.stderr || result.stdout);
+    logForDebugging(
+      `npm view failed (attempt ${attempt + 1}/${maxRetries + 1}): ${category.category}${category.osCode ? ` (${category.osCode})` : ''}`,
+    );
     if (result.stderr) {
       logForDebugging(`npm stderr: ${result.stderr.trim()}`);
-    } else {
-      logForDebugging('npm stderr: (empty)');
     }
     if (result.stdout) {
       logForDebugging(`npm stdout: ${result.stdout.trim()}`);
     }
-    return null;
+
+    // Don't retry permission errors — they're not transient
+    if (category.category === 'permissions') {
+      return null;
+    }
+
+    if (attempt < maxRetries) {
+      await sleep(baseDelay * (attempt + 1));
+    }
   }
-  return result.stdout.trim();
+
+  return null;
 }
 
 export type NpmDistTags = {
@@ -356,16 +435,24 @@ export async function getNpmDistTags(): Promise<NpmDistTags> {
  * This is used by installations that don't have npm (e.g. package manager installs).
  */
 export async function getLatestVersionFromGcs(channel: ReleaseChannel): Promise<string | null> {
-  try {
-    const response = await axios.get(`${GCS_BUCKET_URL}/${channel}`, {
-      timeout: 5000,
-      responseType: 'text',
-    });
-    return response.data.trim();
-  } catch (error) {
-    logForDebugging(`Failed to fetch ${channel} from GCS: ${error}`);
-    return null;
+  const maxRetries = 2;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await axios.get(`${GCS_BUCKET_URL}/${channel}`, {
+        timeout: 5000,
+        responseType: 'text',
+      });
+      return response.data.trim();
+    } catch (error) {
+      const { category, osCode } = classifyUpdateError(error);
+      logForDebugging(`Failed to fetch ${channel} from GCS (attempt ${attempt + 1}/${maxRetries + 1}): ${category}${osCode ? ` (${osCode})` : ''} - ${error}`);
+      if (category === 'permissions' || attempt >= maxRetries) {
+        return null;
+      }
+      await sleep(1000 * (attempt + 1));
+    }
   }
+  return null;
 }
 
 /**

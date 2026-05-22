@@ -15,7 +15,7 @@ const TENTACLE_TRAIL = '…'.repeat(WELCOME_V2_WIDTH - CLAWD_PREFIX.length - TEN
 
 export function WelcomeV2(): React.ReactNode {
   const [theme] = useTheme();
-  const welcomeMessage = 'Welcome to Ceph Code';
+  const welcomeMessage = 'Welcome to Claude Code';
 
   if (env.terminal === 'Apple_Terminal') {
     return <AppleTerminalWelcomeV2 theme={theme} welcomeMessage={welcomeMessage} />;

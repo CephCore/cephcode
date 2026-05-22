@@ -30,9 +30,9 @@ export function parseSlashCommand(input: string): ParsedSlashCommand | null {
     return null;
   }
 
-  // Remove the leading '/' and split by spaces
+  // Remove the leading '/' and split by whitespace
   const withoutSlash = trimmedInput.slice(1);
-  const words = withoutSlash.split(' ');
+  const words = withoutSlash.split(/\s+/);
 
   if (!words[0]) {
     return null;

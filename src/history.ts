@@ -337,6 +337,16 @@ async function flushPromptHistory(retries: number): Promise<void> {
 async function addToPromptHistory(command: HistoryEntry | string): Promise<void> {
   const entry = typeof command === 'string' ? { display: command, pastedContents: {} } : command;
 
+  // Deduplicate: skip if this entry matches the most recent pending entry.
+  // This prevents consecutive duplicate entries when the user recalls a prompt
+  // with arrow-up and submits it again without modification.
+  if (pendingEntries.length > 0) {
+    const last = pendingEntries[pendingEntries.length - 1]!;
+    if (last.display === entry.display) {
+      return;
+    }
+  }
+
   const storedPastedContents: Record<number, StoredPastedContent> = {};
   if (entry.pastedContents) {
     for (const [id, content] of Object.entries(entry.pastedContents)) {

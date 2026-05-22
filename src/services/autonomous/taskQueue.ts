@@ -13,7 +13,7 @@
  */
 
 import { existsSync, readFileSync, watch, writeFileSync } from 'fs';
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { mkdir, readFile, writeFile, appendFile } from 'fs/promises';
 import { join } from 'path';
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js';
 import { jsonParse } from '../../utils/slowOperations.js';
@@ -53,6 +53,10 @@ export interface TaskQueueEntry {
   leaseExpiresAt?: number;
   /** Human-readable reason for dead-letter state */
   deadLetterReason?: string;
+  /** Exit code from the worker process that executed this task */
+  workerExitCode?: number;
+  /** Structured error log lines from the worker (e.g. hook errors) */
+  errorLog?: string[];
 }
 
 export interface TaskQueueFile {
@@ -75,6 +79,7 @@ export type TaskFilter = {
 
 const DAEMON_DIR = join(getClaudeConfigHomeDir(), 'daemon');
 const QUEUE_PATH = join(DAEMON_DIR, 'tasks.json');
+const LOGS_DIR = join(DAEMON_DIR, 'logs');
 const DEFAULT_LEASE_MS = 5 * 60 * 1000; // 5 minutes
 const DEFAULT_BACKOFF_BASE_MS = 30_000; // 30s initial backoff
 const WATCH_DEBOUNCE_MS = 300;          // 300ms debounce for file watcher
@@ -216,6 +221,7 @@ export async function addTask(input: {
     retryCount: 0,
     maxRetries: input.maxRetries ?? 3,
     backoffFactor: input.backoffFactor ?? 2,
+    errorLog: [],
     ...(input.projectRoot ? { projectRoot: input.projectRoot } : {}),
     ...(input.scheduledAt ? { scheduledAt: input.scheduledAt } : {}),
   };
@@ -457,6 +463,8 @@ export async function retryTask(id: string): Promise<'pending' | 'dead_letter' |
   task.retryAfter = Date.now() + backoffBase;
   task.error = undefined;
   task.agentId = undefined;
+  task.workerExitCode = undefined;
+  task.errorLog = undefined;
   task.leaseOwner = undefined;
   task.leaseExpiresAt = undefined;
   await saveQueue();
@@ -481,6 +489,8 @@ export async function requeueDeadLetter(id: string): Promise<boolean> {
   task.error = undefined;
   task.lastError = undefined;
   task.completedAt = undefined;
+  task.workerExitCode = undefined;
+  task.errorLog = undefined;
   task.leaseOwner = undefined;
   task.leaseExpiresAt = undefined;
   await saveQueue();
@@ -534,6 +544,41 @@ function sanitizeForXml(input: string): string {
   // Limit length
   if (s.length > 4000) s = s.slice(0, 4000) + '...';
   return s;
+}
+
+// ─── Task Log Files ─────────────────────────────────────────────
+
+/** Absolute path to the directory where per-task log files are stored. */
+export function getTaskLogDir(): string {
+  return LOGS_DIR;
+}
+
+/** Absolute path to the log file for a given task id. */
+export function getLogPathForTask(taskId: string): string {
+  return join(LOGS_DIR, `${taskId}.log`);
+}
+
+/**
+ * Append a line to a task's log file.
+ * Creates the log directory if it doesn't exist.
+ */
+export async function writeTaskLog(taskId: string, line: string): Promise<void> {
+  await mkdir(LOGS_DIR, { recursive: true });
+  const path = getLogPathForTask(taskId);
+  await appendFile(path, `${line}\n`, 'utf-8');
+}
+
+/**
+ * Read the full log file for a task. Returns empty string if no log exists.
+ */
+export async function readTaskLog(taskId: string): Promise<string> {
+  const path = getLogPathForTask(taskId);
+  try {
+    const content = await readFile(path, 'utf-8');
+    return content;
+  } catch {
+    return '';
+  }
 }
 
 // ─── Stats ────────────────────────────────────────────────────

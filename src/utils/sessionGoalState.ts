@@ -3,6 +3,7 @@ import { join } from 'path';
 import { getSessionId } from '../bootstrap/state.js';
 import { getCwd } from './cwd.js';
 import { pathExists } from './file.js';
+import type { PermissionMode } from '../types/permissions.js';
 
 /**
  * Persistent session goal state.
@@ -36,19 +37,19 @@ export type GoalState = {
   achieved?: boolean;
   /** When the goal was achieved or cleared */
   endedAt?: number;
+  /** The stashed permission mode before the goal started */
+  preGoalMode?: PermissionMode;
 };
 
 let currentGoal: string | null = null;
 let currentGoalState: GoalState | null = null;
-let restored = false;
-let persistencePath: string | null = null;
+let restoredSessionId: string | null = null;
 
 function getGoalFilePath(): string {
-  if (persistencePath) return persistencePath;
   const sessionId = getSessionId();
   const cwd = getCwd();
   const slug = Buffer.from(cwd).toString('base64url').slice(0, 32);
-  persistencePath = join(
+  return join(
     process.env.HOME || process.env.USERPROFILE || '/tmp',
     '.claude',
     'projects',
@@ -57,16 +58,20 @@ function getGoalFilePath(): string {
     sessionId,
     'goal.json',
   );
-  return persistencePath;
 }
 
 async function tryRestore(): Promise<void> {
-  if (restored) return;
-  restored = true;
+  const sessionId = getSessionId();
+  if (restoredSessionId === sessionId) return;
+  restoredSessionId = sessionId;
   try {
     const filePath = getGoalFilePath();
     const exists = await pathExists(filePath);
-    if (!exists) return;
+    if (!exists) {
+      currentGoal = null;
+      currentGoalState = null;
+      return;
+    }
     const raw = await readFile(filePath, 'utf-8');
     const parsed = JSON.parse(raw) as GoalState | { goal?: string };
     // Handle both old format ({ goal: string }) and new format (GoalState)
@@ -79,9 +84,14 @@ async function tryRestore(): Promise<void> {
         currentGoal = null;
         currentGoalState = null;
       }
+    } else {
+      currentGoal = null;
+      currentGoalState = null;
     }
   } catch {
     // Non-fatal — goal stays null
+    currentGoal = null;
+    currentGoalState = null;
   }
 }
 
@@ -93,6 +103,11 @@ export function getFullGoalState(): GoalState | null {
   return currentGoalState;
 }
 
+export async function restoreSessionGoal(): Promise<GoalState | null> {
+  await tryRestore();
+  return currentGoalState;
+}
+
 /**
  * Synchronous version for use in non-async contexts (e.g. system prompt builder).
  * Lazily triggers async restore on first call; subsequent calls use cached value.
@@ -100,15 +115,17 @@ export function getFullGoalState(): GoalState | null {
  * for the first turn, then the restored value for subsequent turns.
  */
 export function getSessionGoalSync(): string | null {
-  if (!restored) {
+  const sessionId = getSessionId();
+  if (restoredSessionId !== sessionId) {
     tryRestore();
   }
   return currentGoal;
 }
 
 export function setSessionGoal(goal: string | null): void {
+  const sessionId = getSessionId();
   currentGoal = goal;
-  restored = true; // don't re-restore after explicit set
+  restoredSessionId = sessionId; // don't re-restore after explicit set
   if (goal === null) {
     currentGoalState = null;
   }
@@ -117,9 +134,10 @@ export function setSessionGoal(goal: string | null): void {
 
 /** Set the full goal state with all metadata */
 export function setFullGoalState(state: GoalState | null): void {
+  const sessionId = getSessionId();
   currentGoal = state?.goal ?? null;
   currentGoalState = state;
-  restored = true;
+  restoredSessionId = sessionId;
   persistGoal(state).catch(() => {});
 }
 

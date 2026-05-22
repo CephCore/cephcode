@@ -221,7 +221,7 @@ describe('PLAN I — Agent Runtime / Orchestrator Unit Tests', () => {
 
     // Verify report got written
     const report = await orchestrator.runStore.loadReport(runId);
-    expect(report).toContain('Ceph Code Agent Run Report');
+    expect(report).toContain('Claude Code Agent Run Report');
     expect(report).toContain('mock-code.ts');
   });
 });

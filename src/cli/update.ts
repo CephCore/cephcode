@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { logEvent } from 'src/services/analytics/index.js';
-import { getLatestVersion, type InstallStatus, installGlobalPackage } from 'src/utils/autoUpdater.js';
+import { getLatestVersion, type InstallStatus, installGlobalPackage, classifyUpdateError, type UpdateErrorCategory } from 'src/utils/autoUpdater.js';
 import { regenerateCompletionCache } from 'src/utils/completionCache.js';
 import { getGlobalConfig, type InstallMethod, saveGlobalConfig } from 'src/utils/config.js';
 import { logForDebugging } from 'src/utils/debug.js';
@@ -194,7 +194,7 @@ export async function update() {
       }
 
       if (!result.latestVersion) {
-        process.stderr.write('Failed to check for updates\n');
+        process.stderr.write(`Failed to check for updates (current: ${MACRO.VERSION})\n`);
         await gracefulShutdown(1);
       }
 
@@ -208,7 +208,9 @@ export async function update() {
       }
       await gracefulShutdown(0);
     } catch (error) {
-      process.stderr.write('Error: Failed to install native update\n');
+      const { category, osCode } = classifyUpdateError(error);
+      process.stderr.write(`Error: Failed to install native update (${category}${osCode ? ` / ${osCode}` : ''})\n`);
+      process.stderr.write(`Current version: ${MACRO.VERSION}\n`);
       process.stderr.write(String(error) + '\n');
       process.stderr.write('Try running "claude doctor" for diagnostics\n');
       await gracefulShutdown(1);
@@ -233,14 +235,15 @@ export async function update() {
   if (!latestVersion) {
     logForDebugging('update: Failed to get latest version from npm registry');
     process.stderr.write(chalk.red('Failed to check for updates') + '\n');
+    process.stderr.write(`Current version: ${MACRO.VERSION}\n`);
     process.stderr.write('Unable to fetch latest version from npm registry\n');
     process.stderr.write('\n');
     process.stderr.write('Possible causes:\n');
-    process.stderr.write('  • Network connectivity issues\n');
-    process.stderr.write('  • npm registry is unreachable\n');
-    process.stderr.write('  • Corporate proxy/firewall blocking npm\n');
+    process.stderr.write('  • [network] Network connectivity issues\n');
+    process.stderr.write('  • [registry] npm registry is unreachable\n');
+    process.stderr.write('  • [network] Corporate proxy/firewall blocking npm\n');
     if (MACRO.PACKAGE_URL && !MACRO.PACKAGE_URL.startsWith('@anthropic')) {
-      process.stderr.write('  • Internal/development build not published to npm\n');
+      process.stderr.write('  • [registry] Internal/development build not published to npm\n');
     }
     process.stderr.write('\n');
     process.stderr.write('Try:\n');
@@ -314,6 +317,7 @@ export async function update() {
       break;
     case 'no_permissions':
       process.stderr.write('Error: Insufficient permissions to install update\n');
+      process.stderr.write(`Current version: ${MACRO.VERSION}, target: ${latestVersion}\n`);
       if (useLocalUpdate) {
         process.stderr.write('Try manually updating with:\n');
         process.stderr.write(`  cd ~/.claude/local && npm update ${MACRO.PACKAGE_URL}\n`);
@@ -325,6 +329,7 @@ export async function update() {
       break;
     case 'install_failed':
       process.stderr.write('Error: Failed to install update\n');
+      process.stderr.write(`Current version: ${MACRO.VERSION}, target: ${latestVersion}\n`);
       if (useLocalUpdate) {
         process.stderr.write('Try manually updating with:\n');
         process.stderr.write(`  cd ~/.claude/local && npm update ${MACRO.PACKAGE_URL}\n`);

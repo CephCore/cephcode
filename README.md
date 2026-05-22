@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/ceph-logo-long.png" alt="Ceph Code" width="480" />
+  <img src="assets/ceph-logo-long.png" alt="Claude Code" width="480" />
 </p>
 
 <p align="center">
@@ -9,15 +9,15 @@
   <a href="readme/README.th.md">ไทย</a>
 </p>
 
-# Ceph Code
+# Claude Code
 
-Ceph Code is an independent, research-oriented **reverse-engineered rebuild** of Anthropic's [Claude Code](https://claude.ai/code) CLI. The goal is a **runnable, buildable, and debuggable** terminal workflow from source—not a black-box binary—while extending the runtime with multi-provider routing, adapters, and engineering tooling.
+Claude Code is an independent, research-oriented **reverse-engineered rebuild** of Anthropic's [Claude Code](https://claude.ai/code) CLI. The goal is a **runnable, buildable, and debuggable** terminal workflow from source—not a black-box binary—while extending the runtime with multi-provider routing, adapters, and engineering tooling.
 
 > **Disclaimer:** This repository is not affiliated with, endorsed by, or sponsored by Anthropic PBC. The upstream Claude Code product is proprietary; this project reconstructs and extends behavior for research and self-hosted use. Review [LICENSE.md](LICENSE.md) before redistributing or deploying.
 
 ## Positioning
 
-| Aspect | What Ceph Code provides |
+| Aspect | What Claude Code provides |
 | --- | --- |
 | **Source fidelity** | Reconstructed CLI aligned with Claude Code's terminal UX, tools, and extension points |
 | **Build & debug** | Bun/TypeScript tree you can `bun run dev`, type-check, test, and patch locally |
@@ -28,7 +28,7 @@ Ceph Code is an independent, research-oriented **reverse-engineered rebuild** of
 
 ## What It Does
 
-Ceph Code gives you an AI coding assistant that runs in your terminal, can inspect and edit a local codebase, execute tools, switch between model providers, and coordinate longer workflows through commands, agents, plugins, and project skills.
+Claude Code gives you an AI coding assistant that runs in your terminal, can inspect and edit a local codebase, execute tools, switch between model providers, and coordinate longer workflows through commands, agents, plugins, and project skills.
 
 Highlights:
 
@@ -40,11 +40,12 @@ Highlights:
 - **Agent and supervisor workflows** for delegating research, coding, and coordination tasks.
 - **Durable Agent Runtime & Orchestrator** with offline-first execution, checkpoints, and interactive approvals.
 - **24/7 Autonomous Mode** with persistent task queue, daemon process, health checks, auto-retry, dead-letter handling, and lease-based concurrency control.
+- **Scheduled Tasks** from the interactive `/task` form for one-shot reminders and recurring checks, with optional durable storage in `.claude/scheduled_tasks.json`.
 - **Session and bridge features** for saving context, restoring work, and supporting remote collaboration.
 
 ### Compatibility Namespace
 
-Ceph Code's command is `ceph`, but parts of the runtime intentionally still read Claude-compatible project and user paths such as `.claude/settings.json`, `.claude/skills/`, and selected `CLAUDE_CODE_*` environment variables. This keeps existing Claude Code-style projects, plugins, skills, hooks, and settings reusable while the public CLI and docs use the Ceph Code name.
+Claude Code's command is `ceph`, but parts of the runtime intentionally still read Claude-compatible project and user paths such as `.claude/settings.json`, `.claude/skills/`, and selected `CLAUDE_CODE_*` environment variables. This keeps existing Claude Code-style projects, plugins, skills, hooks, and settings reusable while the public CLI and docs use the Claude Code name.
 
 ## Quick Start
 
@@ -94,7 +95,7 @@ export OPENROUTER_API_KEY=sk-or-...
 export OLLAMA_HOST=http://localhost:11434
 ```
 
-Inside Ceph Code, switch models or providers with:
+Inside Claude Code, switch models or providers with:
 
 ```text
 /model
@@ -117,11 +118,52 @@ See [docs/providers.html](docs/providers.html) for the provider overview.
 /plugin     Manage plugins
 /bridge     Configure bridge mode
 /agent      Manage local agent workflows (run, status, trace, approvals, report)
-/daemon     Manage 24/7 autonomous agent daemon (start/stop/status)
-/task       Manage autonomous task queue (add/list/done/retry)
+/daemon     Open the interactive 24/7 autonomous daemon control panel
+/task       Create scheduled tasks or manage the autonomous task queue
 ```
 
 Type `/` inside the CLI to discover available commands.
+
+## Scheduled Tasks
+
+Scheduled tasks can be created from an interactive `/task` form, so you do not need to remember cron syntax. Run `/task` with no arguments, fill in the name, schedule, prompt, and storage mode, then confirm.
+
+| You do | Claude Code does |
+| --- | --- |
+| `/task` | Opens the interactive scheduled task form |
+| Select `Daily` around `09:00` | Creates a recurring daily task |
+| Select `Weekdays` around `09:00` | Creates a weekday cron such as `0 9 * * 1-5` |
+| Select `In N minutes` with `10` | Creates a one-shot reminder for the next matching local time |
+| Select `Custom cron` | Accepts a standard 5-field cron expression |
+| `/task scheduled` | Opens the same form explicitly |
+| `/task list` | Lists autonomous queue tasks |
+
+Details:
+
+- Uses standard 5-field cron in the machine's local timezone: `minute hour day-of-month month day-of-week`.
+- `Durable` storage persists scheduled tasks to `.claude/scheduled_tasks.json` across sessions.
+- `Session-only` storage keeps tasks in memory for the current session only.
+- Recurring tasks auto-expire after 30 days unless they are system-created permanent tasks.
+- One-shot tasks auto-delete after they fire.
+- Natural language scheduling still works through the underlying `CronCreate`, `CronList`, and `CronDelete` tools when the model chooses to use them.
+
+Examples:
+
+```text
+/task
+Name: Server status
+Schedule: Daily
+Time: 20:00
+Prompt: Check the server status
+Storage: Durable
+
+/task
+Name: Commit reminder
+Schedule: In N minutes
+Delay: 10
+Prompt: Don't forget to commit the code
+Storage: Session-only
+```
 
 ## Development
 
@@ -177,7 +219,7 @@ src/
 
 ## Architecture
 
-Ceph Code is built around a provider-agnostic tool execution loop:
+Claude Code is built around a provider-agnostic tool execution loop:
 
 ```text
 Terminal UI
@@ -234,7 +276,7 @@ bun install
 bun run dev
 ```
 
-Ceph Code includes a bundled Windows `ripgrep` binary at `src/utils/vendor/ripgrep/x64-win32/rg.exe` for file search tools.
+Claude Code includes a bundled Windows `ripgrep` binary at `src/utils/vendor/ripgrep/x64-win32/rg.exe` for file search tools.
 
 ### Production Build
 

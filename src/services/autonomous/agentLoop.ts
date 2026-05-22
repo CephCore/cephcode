@@ -14,7 +14,7 @@
  */
 
 import { existsSync, readFileSync } from 'fs';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js';
 import { jsonParse } from '../../utils/slowOperations.js';
@@ -23,15 +23,19 @@ import {
   buildWorkerPrompt,
   expireLeases,
   getNextTask,
+  getTaskLogDir,
   leaseTask,
   loadQueue,
   markTaskCompleted,
   markTaskFailed,
+  readTaskLog,
   releaseLease,
   retryTask,
   saveQueue,
+  updateTask,
   watchQueue,
   closeWatcher as closeQueueWatcher,
+  writeTaskLog,
 } from './taskQueue.js';
 import { ensureSupervisor, sendRequest } from '../Supervisor/ipcClient.js';
 
@@ -116,6 +120,25 @@ export async function saveStatus(): Promise<void> {
 function updateStatus(partial: Partial<AutonomousStatus>): void {
   Object.assign(status, partial);
   saveStatus().catch(() => {});
+}
+
+// ─── Task Log Persistence ─────────────────────────────────────
+
+/**
+ * Read the supervisor's captured worker output log for a session.
+ * The supervisor pipes stdout+stderr to ~/.claude/daemon/jobs/{sessionId}/output.log.
+ * Returns the last 500 lines to avoid unbounded growth.
+ */
+async function getWorkerOutput(sessionId: string): Promise<string> {
+  const logPath = join(DAEMON_DIR, 'jobs', sessionId, 'output.log');
+  try {
+    const raw = await readFile(logPath, 'utf-8');
+    // Return last 500 lines to keep per-task disk usage bounded
+    const lines = raw.split('\n');
+    return lines.length > 500 ? lines.slice(-500).join('\n') : raw;
+  } catch {
+    return '';
+  }
 }
 
 // ─── Worker Spawning ──────────────────────────────────────────
@@ -262,6 +285,35 @@ async function processTask(task: TaskQueueEntry): Promise<void> {
 
     // Sleep before next poll
     await sleep(WORKER_POLL_MS);
+  }
+
+  // ── Persist worker output to per-task log file ─────────────────
+  // The supervisor captures worker stdout+stderr to a per-session log.
+  // We copy the last 500 lines into the task-specific log at
+  // ~/.claude/daemon/logs/{taskId}.log for easy retrieval via /task log.
+  // Never throw here — log failures must not crash the daemon.
+  try {
+    const workerOutput = await getWorkerOutput(worker.sessionId);
+    if (workerOutput) {
+      await writeTaskLog(task.id, workerOutput);
+    }
+
+    // Persist worker exit status and any structured error lines collected from output
+    const exitCode = completed ? 0 : 1;
+    await updateTask(task.id, {
+      workerExitCode: exitCode,
+      // Derive errorLog: last 20 non-noise lines when failed, empty array otherwise
+      ...(!completed && workerOutput
+        ? {
+            errorLog: workerOutput
+              .split('\n')
+              .filter(l => !l.startsWith('[Autonomous] ') && l.trim().length > 0)
+              .slice(-20),
+          }
+        : { errorLog: [] }),
+    });
+  } catch (err) {
+    console.error(`[Autonomous] Failed to persist worker log for task ${task.id}:`, err);
   }
 
   // Handle failure with dead-letter aware retry

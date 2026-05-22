@@ -9,23 +9,23 @@ The upstream Claude Code product is proprietary software:
 - Copyright (c) Anthropic PBC. All rights reserved.
 - Subject to Anthropic's applicable terms, including Commercial Terms of Service where they apply to your use of Anthropic services.
 
-Ceph Code contributors do **not** claim ownership of Anthropic's original work. This project has **no authorization** from Anthropic to redistribute their proprietary source or to imply endorsement.
+Claude Code contributors do **not** claim ownership of Anthropic's original work. This project has **no authorization** from Anthropic to redistribute their proprietary source or to imply endorsement.
 
 ## Trademarks
 
-"Claude", "Claude Code", "Anthropic", and related marks are trademarks of their respective owners. Ceph Code is an independent community project name and must not be presented as an official Anthropic offering.
+"Claude", "Claude Code", "Anthropic", and related marks are trademarks of their respective owners. Claude Code is an independent community project name and must not be presented as an official Anthropic offering.
 
 ## What Is Licensed Under MIT
 
-**Only modifications and original additions** authored by Ceph Code contributors are offered under the MIT License, where legally permissible:
+**Only modifications and original additions** authored by Claude Code contributors are offered under the MIT License, where legally permissible:
 
 ```
 MIT License
 
-Copyright (c) 2026 Ceph Code contributors (modifications and original additions only)
+Copyright (c) 2026 Claude Code contributors (modifications and original additions only)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
-of the modifications and original additions made by Ceph Code contributors,
+of the modifications and original additions made by Claude Code contributors,
 to deal in those modifications without restriction, including without
 limitation the rights to use, copy, modify, merge, publish, distribute,
 sublicense, and/or sell copies of such modifications, subject to the
@@ -53,4 +53,4 @@ This file does **not** grant you rights to Anthropic's proprietary code, models,
 
 ## Your Responsibility
 
-Before you clone, modify, redistribute, or deploy Ceph Code, evaluate your own legal position. If you are unsure, consult qualified counsel. Contributors should only submit material they have the right to license.
+Before you clone, modify, redistribute, or deploy Claude Code, evaluate your own legal position. If you are unsure, consult qualified counsel. Contributors should only submit material they have the right to license.

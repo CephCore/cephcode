@@ -20,6 +20,7 @@ import {
 } from '../../utils/fastMode.js';
 import { MODEL_ALIASES } from '../../utils/model/aliases.js';
 import { checkOpus1mAccess, checkSonnet1mAccess } from '../../utils/model/check1mAccess.js';
+import { fetchProviderModels, supportsModelFetching } from '../../utils/model/fetchProviderModels.js';
 import {
   getDefaultMainLoopModelSetting,
   isOpus1mMergeEnabled,
@@ -316,14 +317,117 @@ function ShowModelAndClose({ onDone }: { onDone: (result?: string) => void }): R
   return null;
 }
 
+function ShowModelListAndClose({ onDone }: { onDone: (result: string) => void }): React.ReactNode {
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const loadModels = async (): Promise<void> => {
+      try {
+        const { ProviderManager } = await import('../../services/ai/ProviderManager.js');
+        const { getProviderRegistryEntry } = await import('../../services/ai/providerRegistry.js');
+        const { providersConfig } = await import('../../services/ai/ModelDiscoveryService.js');
+
+        const pm = ProviderManager.getInstance();
+        const providerId = pm.getActiveProviderName();
+        const entry = getProviderRegistryEntry(providerId as any);
+        const providerLabel = entry?.label ?? providerId;
+
+        // Check if provider supports fetching models from API
+        const { supportsModelFetching, fetchProviderModels } = await import(
+          '../../utils/model/fetchProviderModels.js',
+        );
+
+        // Show a transient "loading…" status
+        onDone(chalk.dim(`Fetching live model list from ${providerLabel} API…`));
+
+        let lines: string[];
+        if (!supportsModelFetching(providerId as any)) {
+          // Fall back to static providers.json
+          const staticModels = (providersConfig as any)?.[providerId]?.models ?? [];
+          lines = buildStaticList(providerLabel, staticModels);
+        } else {
+          try {
+            const fetched = await fetchProviderModels(providerId as any);
+            if (cancelled) return;
+
+            if (!fetched || fetched.length === 0) {
+              // API returned nothing — show warning + static fallback
+              const staticModels = (providersConfig as any)?.[providerId]?.models ?? [];
+              lines = [
+                chalk.yellow(
+                  `${providerLabel} /v1/models returned no results — check your API key and network.`,
+                ),
+                '',
+                `${chalk.dim('Static fallback (providers.json)')}:`,
+                ...buildStaticEntries(staticModels),
+              ];
+            } else {
+              lines = [`${fetched.length} model${fetched.length !== 1 ? 's' : ''} available (${providerLabel}):`, '', ...buildFetchedEntries(fetched)];
+            }
+          } catch (apiErr) {
+            const staticModels = (providersConfig as any)?.[providerId]?.models ?? [];
+            const errMsg = apiErr instanceof Error ? apiErr.message : 'Unknown error';
+            lines = [
+              chalk.red(`API fetch failed: ${errMsg}`),
+              '',
+              `${chalk.dim('Static fallback (providers.json)')}:`,
+              ...buildStaticEntries(staticModels),
+            ];
+          }
+        }
+
+        if (!cancelled) {
+          onDone(lines.join('\n'));
+        }
+      } catch (err) {
+        if (cancelled) return;
+        onDone(chalk.red(`Failed to list models: ${err instanceof Error ? err.message : 'Unknown error'}`));
+      }
+    };
+
+    void loadModels();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onDone]);
+
+  return null;
+}
+
+function buildStaticEntries(staticModels: any[]): string[] {
+  const lines: string[] = [`${staticModels.length} model${staticModels.length !== 1 ? 's' : ''} available:`, ''];
+  for (const m of staticModels) {
+    const ctx = m.capabilities?.maxContext ? `${(m.capabilities.maxContext / 1000).toFixed(0)}K ctx` : '';
+    const cw = m.capabilities?.maxOutput ? `${(m.capabilities.maxOutput / 1000).toFixed(0)}K out` : '';
+    lines.push(`  ${(m.label || m.id).padEnd(50)}  ${m.id.padEnd(40)}  ${ctx}  ${cw}`);
+  }
+  return lines;
+}
+
+function buildStaticList(providerLabel: string, staticModels: any[]): string[] {
+  return [`${staticModels.length} model${staticModels.length !== 1 ? 's' : ''} available (${providerLabel} — static):`, '', ...buildStaticEntries(staticModels)];
+}
+
+function buildFetchedEntries(fetched: Array<{ id: string; label: string; contextWindow?: number }>): string[] {
+  return fetched.map(m => {
+    const ctx = m.contextWindow ? `${(m.contextWindow / 1000).toFixed(0)}K ctx` : '';
+    return `  ${m.label.padEnd(50)}  ${m.id.padEnd(40)}  ${ctx}`;
+  });
+}
+
 export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
   args = args?.trim() || '';
+
+  // /model list — fetch live models from the active provider API
+  if (args === 'list') {
+    return <ShowModelListAndClose onDone={onDone} />;
+  }
+
   if (COMMON_INFO_ARGS.includes(args)) {
-    logEvent('tengu_model_command_inline_help', {
-      args: args as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    });
     return <ShowModelAndClose onDone={onDone} />;
   }
+
   if (COMMON_HELP_ARGS.includes(args)) {
     onDone('Run /model to open the model selection menu, or /model [modelName] to set the model.', {
       display: 'system',

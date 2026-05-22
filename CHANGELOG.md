@@ -8,6 +8,19 @@ This project follows a practical changelog format based on:
 - `Fixed` for bug fixes
 - `Security` for permission, sandbox, auth, and trust-related hardening
 - `Internal` for tests, types, refactors, and developer-facing implementation work
+
+## [2.1.154] - 2026-05-22
+
+### Added
+
+- **Interactive scheduled task creation in `/task`** — Running `/task` with no subcommand now opens a form for name, schedule type, time/cron value, prompt, and storage mode. The form creates one-shot or recurring scheduled tasks through the existing cron runtime.
+- **`/task scheduled` alias** — Opens the same scheduled task form explicitly while preserving existing queue-management subcommands such as `/task list`, `/task add`, `/task retry`, and `/task requeue`.
+- **Interactive daemon control panel** — Running `/daemon` with no subcommand now opens an action menu for start, stop, restart, refresh, status output, scheduled task creation, and queue listing.
+
+### Changed
+
+- **Scheduled task docs** — README and docs site now document `/task` as the primary user-facing scheduled task workflow, with `CronCreate`, `CronList`, and `CronDelete` described as the underlying model-facing tools.
+
 ## [2.1.153] - 2026-05-21
 
 ### Security
@@ -166,7 +179,7 @@ This project follows a practical changelog format based on:
 
 ### Breaking / Migration Notes
 
-- Rebranded the project-facing name from **Claude Code** / **dek1milliontoken** to **Ceph Code** across README, docs, terminal UI, onboarding, trust dialogs, stats, and logo components.
+- Rebranded the project-facing name from **Claude Code** / **dek1milliontoken** to **Claude Code** across README, docs, terminal UI, onboarding, trust dialogs, stats, and logo components.
 - Renamed the npm package metadata from `@jonusnattapong/claudecode` to `cephcode`.
 - Added the direct global binary mapping:
 
@@ -244,14 +257,14 @@ This project follows a practical changelog format based on:
 
 ### Changed
 
-- Updated README title and introduction to use **Ceph Code**.
-- Updated docs homepage title, hero text, install snippets, launch command, and footer branding to use **Ceph Code**.
-- Updated `LICENSE.md` modification attribution from `dek1milliontoken contributors` to `Ceph Code contributors`.
-- Updated onboarding command description from “configure Claude Code” to “configure Ceph Code”.
-- Updated onboarding wizard title to **Ceph Code Setup Wizard**.
-- Updated trust dialog wording to say **Ceph Code** will be able to read, edit, and execute files.
-- Updated stats loading and empty-state copy to use **Ceph Code**.
-- Updated `LogoV2` and `CondensedLogo` titles from **Claude Code** to **Ceph Code**.
+- Updated README title and introduction to use **Claude Code**.
+- Updated docs homepage title, hero text, install snippets, launch command, and footer branding to use **Claude Code**.
+- Updated `LICENSE.md` modification attribution from `dek1milliontoken contributors` to `Claude Code contributors`.
+- Updated onboarding command description from “configure Claude Code” to “configure Claude Code”.
+- Updated onboarding wizard title to **Claude Code Setup Wizard**.
+- Updated trust dialog wording to say **Claude Code** will be able to read, edit, and execute files.
+- Updated stats loading and empty-state copy to use **Claude Code**.
+- Updated `LogoV2` and `CondensedLogo` titles from **Claude Code** to **Claude Code**.
 - Updated `/resume` command argument hint from:
 
   ```txt
@@ -315,7 +328,7 @@ This project follows a practical changelog format based on:
 
 ### Security
 
-- Updated trust and safety copy to reflect the Ceph Code name.
+- Updated trust and safety copy to reflect the Claude Code name.
 - Improved permission-mode cycling to reduce accidental bypass-mode transitions.
 - Improved background-mode rejection messages so unsafe or unsupported execution gates are clearer.
 

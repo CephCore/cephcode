@@ -447,6 +447,18 @@ export async function* handleStopHooks(
             updateGoalState({ achieved: true, endedAt: Date.now() });
             logForDebugging(`[goal] achieved: ${result.reason}`);
             yield createSystemMessage(`◎ Goal achieved: ${result.reason}`, 'info');
+
+            const restoredMode = goalState.preGoalMode;
+            if (restoredMode) {
+              toolUseContext.setAppState(prev => ({
+                ...prev,
+                toolPermissionContext: {
+                  ...prev.toolPermissionContext,
+                  mode: restoredMode,
+                },
+              }));
+              yield createSystemMessage(`◎ Restored permission mode to '${restoredMode}'`, 'info');
+            }
           } else {
             // Goal not met — inject nudge to continue working
             logForDebugging(`[goal] not met: ${result.reason}`);

@@ -2,6 +2,7 @@
  * /task command implementation.
  */
 
+import { createElement, type ReactNode } from 'react';
 import {
   addTask,
   getTask,
@@ -13,10 +14,12 @@ import {
   removeTask,
   requeueDeadLetter,
   retryTask,
+  readTaskLog,
   type TaskPriority,
 } from '../../services/autonomous/taskQueue.js';
 import type { ToolUseContext } from '../../Tool.js';
 import type { LocalJSXCommandContext, LocalJSXCommandOnDone } from '../../types/command.js';
+import { ScheduledTaskForm } from './ScheduledTaskForm.js';
 
 function parseArgs(args: string): string[] {
   const result: string[] = [];
@@ -53,12 +56,20 @@ export async function call(
   onDone: LocalJSXCommandOnDone,
   _context: ToolUseContext & LocalJSXCommandContext,
   args: string,
-): Promise<null> {
+): Promise<ReactNode | null> {
   await loadQueue();
   const tokens = parseArgs(args || '');
   const subcommand = tokens[0]?.toLowerCase();
 
+  if (!subcommand) {
+    return createElement(ScheduledTaskForm, { onDone });
+  }
+
   switch (subcommand) {
+    case 'scheduled':
+    case 'schedule':
+      return createElement(ScheduledTaskForm, { onDone });
+
     case 'add': {
       // Everything after subcommand, before flags
       const title = tokens
@@ -230,6 +241,21 @@ export async function call(
       break;
     }
 
+    case 'log': {
+      const id = tokens[1];
+      if (!id) {
+        onDone('Usage: /task log <id>', { display: 'system' });
+        return null;
+      }
+      const taskLog = await readTaskLog(id);
+      if (!taskLog) {
+        onDone(`No log output found for task ${id}.`, { display: 'system' });
+      } else {
+        onDone(taskLog, { display: 'system' });
+      }
+      break;
+    }
+
     default: {
       onDone(
         [
@@ -243,6 +269,7 @@ export async function call(
           '  /task retry <id>',
           '  /task requeue <id>     Re-queue a dead-letter task',
           '  /task remove <id>',
+          '  /task log <id>         Show task execution log',
           '',
           'Priorities: low, normal, high, critical',
           'Statuses: pending, in_progress, completed, failed, cancelled, dead_letter',

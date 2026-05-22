@@ -1839,13 +1839,22 @@ export async function validateForceLoginOrg(): Promise<OrgValidationResult> {
     return { valid: true };
   }
 
-  if (!isAnthropicAuthEnabled()) {
-    return { valid: true };
-  }
-
   const requiredOrgUuid = getSettingsForSource('policySettings')?.forceLoginOrgUUID;
   if (!requiredOrgUuid) {
     return { valid: true };
+  }
+
+  // forceLoginOrgUUID is set: Anthropic OAuth is required. Third-party providers
+  // (Bedrock/Vertex/Foundry), API-key sessions, and external auth tokens cannot
+  // verify org membership and must be blocked.
+  if (!isAnthropicAuthEnabled()) {
+    return {
+      valid: false,
+      message:
+        `This organization requires login with an Anthropic account (org: ${requiredOrgUuid}).\n` +
+        `Third-party providers and API-key-only sessions are not allowed.\n` +
+        `Please run 'claude auth login' to authenticate with your organization account.`,
+    };
   }
 
   // Ensure the access token is fresh before hitting the profile endpoint.
@@ -1903,6 +1912,39 @@ export async function validateForceLoginOrg(): Promise<OrgValidationResult> {
       `but this machine requires organization ${requiredOrgUuid}.\n\n` +
       `Please log in with the correct organization: claude auth login`,
   };
+}
+
+/**
+ * Validate that the active authentication method matches the required method
+ * set by `forceLoginMethod` in managed settings.
+ *
+ * When `forceLoginMethod` is set to 'claudeai' or 'console', third-party
+ * provider sessions and API-key-only sessions are denied since they cannot
+ * satisfy the required OAuth method.
+ */
+export async function validateForceLoginMethod(): Promise<OrgValidationResult> {
+  if (process.env.ANTHROPIC_UNIX_SOCKET) {
+    return { valid: true };
+  }
+
+  const requiredMethod = getSettingsForSource('policySettings')?.forceLoginMethod;
+  if (!requiredMethod) {
+    return { valid: true };
+  }
+
+  // If Anthropic auth is not enabled, the session uses a third-party provider
+  // or API key, which cannot satisfy the required login method.
+  if (!isAnthropicAuthEnabled()) {
+    return {
+      valid: false,
+      message:
+        `This organization requires login via ${requiredMethod} (managed setting: forceLoginMethod).\n` +
+        `Third-party providers and API-key-only sessions are not allowed.\n` +
+        `Please run 'claude auth login' to authenticate with your organization account.`,
+    };
+  }
+
+  return { valid: true };
 }
 
 class GcpCredentialsTimeoutError extends Error {}

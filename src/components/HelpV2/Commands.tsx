@@ -18,7 +18,10 @@ type Props = {
 export function Commands({ commands, maxHeight, columns, title, onCancel, emptyMessage }: Props): React.ReactNode {
   const { headerFocused, focusHeader } = useTabHeaderFocus();
   const maxWidth = Math.max(1, columns - 10);
-  const visibleCount = Math.max(1, Math.floor((maxHeight - 10) / 2));
+  // visibleOptionCount: reserve 4 rows for header/description/footer, then show
+  // as many items as will fit. Floor ensures we don't overflow. At minimum show
+  // 3 items (not 1) so small terminals get a useful view without excessive paging.
+  const visibleCount = Math.max(3, Math.floor((maxHeight - 4) / 2));
 
   const options = useMemo(() => {
     // Custom commands can appear more than once (e.g. same name at user and

@@ -191,7 +191,7 @@ function AgentCommandMenu({
   return React.createElement(
     Dialog,
     {
-      title: 'Ceph Code Agent',
+      title: 'Claude Code Agent',
       subtitle: 'Use arrows to choose; Enter on input rows lets you type the value here.',
       onCancel: () => onDone('Agent menu dismissed', { display: 'system' }),
       isCancelActive: !isRunning,
@@ -221,7 +221,7 @@ async function executeAgentCommand(onDone: LocalJSXCommandOnDone, workspaceRoot:
 
   if (!subcommand) {
     onDone(
-      `Ceph Code Agent CLI\n\n` +
+      `Claude Code Agent CLI\n\n` +
         `Usage:\n` +
         `  /agent run "<task>"       - Start a new AI Agent run\n` +
         `  /agent status [run-id]    - View current active runs or run details\n` +
@@ -472,7 +472,7 @@ async function executeAgentCommand(onDone: LocalJSXCommandOnDone, workspaceRoot:
       }
 
       case 'doctor': {
-        let doctorStr = `**Ceph Code Agent Runtime Diagnostics**\n\n`;
+        let doctorStr = `**Claude Code Agent Runtime Diagnostics**\n\n`;
 
         const dirs = [
           path.join(workspaceRoot, '.ceph'),

@@ -31,7 +31,7 @@ type Props = {
 type OAuthStatus =
   | { state: 'idle' } // Initial state, waiting to select login method
   | { state: 'platform_setup' } // Show platform setup info (Bedrock/Vertex/Foundry)
-  | { state: 'local_profile' } // Ceph Code local profile — skip OAuth, use config
+  | { state: 'local_profile' } // Claude Code local profile — skip OAuth, use config
   | { state: 'ready_to_start' } // Flow started, waiting for browser to open
   | { state: 'waiting_for_login'; url: string } // Browser opened, waiting for user to login
   | { state: 'creating_api_key' } // Got access token, creating API key
@@ -456,7 +456,7 @@ function OAuthStatusMessage({
                 {
                   label: (
                     <Text>
-                      Ceph Code local profile · <Text dimColor>OpenAI, DeepSeek, OpenRouter, or other providers</Text>
+                      Claude Code local profile · <Text dimColor>OpenAI, DeepSeek, OpenRouter, or other providers</Text>
                       {'\n'}
                     </Text>
                   ),
@@ -535,7 +535,7 @@ function OAuthStatusMessage({
     case 'local_profile':
       return (
         <Box flexDirection="column" gap={1} marginTop={1}>
-          <Text bold>Ceph Code — Local Profile</Text>
+          <Text bold>Claude Code — Local Profile</Text>
           <Text>Using your configured provider profile. No Anthropic authentication required.</Text>
           <Box flexDirection="column" gap={1} marginTop={1}>
             <Text>Set your provider via environment variables or the onboarding wizard:</Text>

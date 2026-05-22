@@ -148,6 +148,10 @@ const TEAMMATE_ENV_VARS = [
   // in background sessions respects the user's configured editor.
   'EDITOR',
   'VISUAL',
+  // Subagent model override — without this, teammate processes ignore
+  // CLAUDE_CODE_SUBAGENT_MODEL and fall back to the parent's model
+  // (or the default), even though non-teammate subagents respect it.
+  'CLAUDE_CODE_SUBAGENT_MODEL',
 ] as const;
 
 /**
