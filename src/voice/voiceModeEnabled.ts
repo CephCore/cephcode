@@ -11,10 +11,8 @@ import { getClaudeAIOAuthTokens, isAnthropicAuthEnabled } from '../utils/auth.js
  * should be *visible* (e.g., command registration, config UI).
  */
 export function isVoiceGrowthBookEnabled(): boolean {
-  // Positive ternary pattern — see docs/feature-gating.md.
-  // Negative pattern (if (!feature(...)) return) does not eliminate
-  // inline string literals from external builds.
-  return feature('VOICE_MODE') ? !getFeatureValue_CACHED_MAY_BE_STALE('tengu_amber_quartz_disabled', false) : false;
+  // Always enable voice mode in our reconstructed open-source build
+  return true;
 }
 
 /**
@@ -45,5 +43,10 @@ export function hasVoiceAuth(): boolean {
  * paths use useVoiceEnabled() instead (memoizes the auth half).
  */
 export function isVoiceModeEnabled(): boolean {
-  return hasVoiceAuth() && isVoiceGrowthBookEnabled();
+  const hasAltKeys = Boolean(
+    process.env.OPENAI_API_KEY ||
+      process.env.GROQ_API_KEY ||
+      (process.env.WHISPER_API_KEY && process.env.WHISPER_API_URL),
+  );
+  return (hasVoiceAuth() || hasAltKeys) && isVoiceGrowthBookEnabled();
 }

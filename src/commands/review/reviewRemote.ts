@@ -215,7 +215,7 @@ export async function launchRemoteReview(
   } else {
     // Branch mode: bundle the working tree, orchestrator diffs against
     // the fork point. No PR, no existing comments, no dedup.
-    const baseBranch = (await getDefaultBranch()) || 'main';
+    const baseBranch = prNumber || (await getDefaultBranch()) || 'main';
     // Env-manager's `git remote remove origin` after bundle-clone
     // deletes refs/remotes/origin/* — the base branch name won't resolve
     // in the container. Pass the merge-base SHA instead: it's reachable
@@ -271,8 +271,12 @@ export async function launchRemoteReview(
         },
       ];
     }
-    command = '/ultrareview';
-    target = baseBranch;
+    command = prNumber ? `/ultrareview ${prNumber}` : '/ultrareview';
+    const { stdout: branchOut } = await execFileNoThrow(gitExe(), ['branch', '--show-current'], {
+      preserveOutputOnError: false,
+    });
+    const branchName = branchOut.trim() || 'HEAD';
+    target = `${branchName} → ${baseBranch}`;
   }
 
   if (!session) {
@@ -294,7 +298,7 @@ export async function launchRemoteReview(
   return [
     {
       type: 'text',
-      text: `Ultrareview launched for ${target} (~10–20 min, runs in the cloud). Track: ${sessionUrl}${resolvedBillingNote} Findings arrive via task-notification. Briefly acknowledge the launch to the user without repeating the target or URL — both are already visible in the tool output above.`,
+      text: `Ultrareview launched for ${target}\n└ ~10–20 min, runs in the cloud.${resolvedBillingNote}\nTrack: ${sessionUrl}\nBriefly acknowledge the launch to the user without repeating the target or URL — both are already visible in the tool output above.`,
     },
   ];
 }

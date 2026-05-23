@@ -92,14 +92,14 @@ type VoiceStreamMessage =
 // ─── Availability ──────────────────────────────────────────────────────
 
 export function isVoiceStreamAvailable(): boolean {
-  // voice_stream uses the same OAuth as Claude Code — available when the
-  // user is authenticated with Anthropic (Claude.ai subscriber or has
-  // valid OAuth tokens).
-  if (!isAnthropicAuthEnabled()) {
-    return false;
+  if (isAnthropicAuthEnabled() && getClaudeAIOAuthTokens()?.accessToken) {
+    return true;
   }
-  const tokens = getClaudeAIOAuthTokens();
-  return tokens !== null && tokens.accessToken !== null;
+  return Boolean(
+    process.env.OPENAI_API_KEY ||
+      process.env.GROQ_API_KEY ||
+      (process.env.WHISPER_API_KEY && process.env.WHISPER_API_URL),
+  );
 }
 
 // ─── Connection ────────────────────────────────────────────────────────
@@ -108,6 +108,11 @@ export async function connectVoiceStream(
   callbacks: VoiceStreamCallbacks,
   options?: { language?: string; keyterms?: string[] },
 ): Promise<VoiceStreamConnection | null> {
+  const isAnthropicStream = isAnthropicAuthEnabled() && Boolean(getClaudeAIOAuthTokens()?.accessToken);
+  if (!isAnthropicStream) {
+    return connectCustomWhisperSTT(callbacks, options);
+  }
+
   // Ensure OAuth token is fresh before connecting
   await checkAndRefreshOAuthTokenIfNeeded();
 
@@ -494,6 +499,148 @@ export async function connectVoiceStream(
       callbacks.onError(`Voice stream connection error: ${err.message}`);
     }
   });
+
+  return connection;
+}
+
+function encodeWAV(pcmBuffer: Buffer, sampleRate = 16000, numChannels = 1, bitsPerSample = 16): Buffer {
+  const buffer = Buffer.alloc(44 + pcmBuffer.length);
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + pcmBuffer.length, 4);
+  buffer.write('WAVE', 8);
+  buffer.write('fmt ', 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(numChannels, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * numChannels * (bitsPerSample / 8), 28);
+  buffer.writeUInt16LE(numChannels * (bitsPerSample / 8), 32);
+  buffer.writeUInt16LE(bitsPerSample, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(pcmBuffer.length, 40);
+  pcmBuffer.copy(buffer, 44);
+  return buffer;
+}
+
+async function transcribeWAV(wavBuffer: Buffer, language?: string): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY || process.env.WHISPER_API_KEY;
+  if (!apiKey) {
+    throw new Error('No API Key found for transcription. Please set OPENAI_API_KEY or GROQ_API_KEY.');
+  }
+
+  let url = 'https://api.openai.com/v1/audio/transcriptions';
+  let authHeader = `Bearer ${apiKey}`;
+
+  if (process.env.GROQ_API_KEY && !process.env.OPENAI_API_KEY) {
+    url = 'https://api.groq.com/v1/audio/transcriptions';
+  } else if (process.env.WHISPER_API_URL) {
+    url = process.env.WHISPER_API_URL;
+    if (process.env.WHISPER_API_KEY) {
+      authHeader = `Bearer ${process.env.WHISPER_API_KEY}`;
+    }
+  }
+
+  const boundary = `----AntigravityBoundary${Math.random().toString(36).substring(2)}`;
+  const parts: Buffer[] = [];
+
+  parts.push(Buffer.from(`--${boundary}\r\n`));
+  parts.push(Buffer.from(`Content-Disposition: form-data; name="file"; filename="audio.wav"\r\n`));
+  parts.push(Buffer.from(`Content-Type: audio/wav\r\n\r\n`));
+  parts.push(wavBuffer);
+  parts.push(Buffer.from(`\r\n`));
+
+  const modelName = process.env.GROQ_API_KEY && !process.env.OPENAI_API_KEY ? 'whisper-large-v3' : 'whisper-1';
+  parts.push(Buffer.from(`--${boundary}\r\n`));
+  parts.push(Buffer.from(`Content-Disposition: form-data; name="model"\r\n\r\n`));
+  parts.push(Buffer.from(`${modelName}\r\n`));
+
+  if (language) {
+    parts.push(Buffer.from(`--${boundary}\r\n`));
+    parts.push(Buffer.from(`Content-Disposition: form-data; name="language"\r\n\r\n`));
+    parts.push(Buffer.from(`${language}\r\n`));
+  }
+
+  parts.push(Buffer.from(`--${boundary}--\r\n`));
+  const bodyBuffer = Buffer.concat(parts);
+
+  const headers: Record<string, string> = {
+    'Content-Type': `multipart/form-data; boundary=${boundary}`,
+  };
+
+  if (authHeader) {
+    headers['Authorization'] = authHeader;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: bodyBuffer,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Transcription request failed with status ${response.status}: ${errorText}`);
+  }
+
+  const data = (await response.json()) as { text?: string };
+  return data.text ?? '';
+}
+
+async function connectCustomWhisperSTT(
+  callbacks: VoiceStreamCallbacks,
+  options?: { language?: string; keyterms?: string[] },
+): Promise<VoiceStreamConnection | null> {
+  logForDebugging('[voice_stream] Utilizing Custom STT / Whisper Emulator');
+
+  let chunks: Buffer[] = [];
+  let isConnectedFlag = true;
+  let finalized = false;
+
+  const connection: VoiceStreamConnection = {
+    send(audioChunk: Buffer): void {
+      if (finalized) return;
+      chunks.push(Buffer.from(audioChunk));
+    },
+    async finalize(): Promise<FinalizeSource> {
+      if (finalized) return 'ws_already_closed';
+      finalized = true;
+      isConnectedFlag = false;
+
+      logForDebugging(`[voice_stream] Custom STT finalize with ${String(chunks.length)} chunks`);
+
+      if (chunks.length === 0) {
+        callbacks.onTranscript('', true);
+        return 'no_data_timeout';
+      }
+
+      const pcmBuffer = Buffer.concat(chunks);
+      const wavBuffer = encodeWAV(pcmBuffer, 16000, 1, 16);
+
+      try {
+        const text = await transcribeWAV(wavBuffer, options?.language);
+        logForDebugging(`[voice_stream] Transcribed text: "${text}"`);
+        callbacks.onTranscript(text, true);
+        return 'post_closestream_endpoint';
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        logForDebugging(`[voice_stream] Transcription failed: ${errMsg}`);
+        callbacks.onError(errMsg);
+        return 'safety_timeout';
+      }
+    },
+    close(): void {
+      finalized = true;
+      isConnectedFlag = false;
+      chunks = [];
+    },
+    isConnected(): boolean {
+      return isConnectedFlag;
+    },
+  };
+
+  setTimeout(() => {
+    callbacks.onReady(connection);
+  }, 50);
 
   return connection;
 }
