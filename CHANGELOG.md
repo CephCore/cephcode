@@ -9,6 +9,16 @@ This project follows a practical changelog format based on:
 - `Security` for permission, sandbox, auth, and trust-related hardening
 - `Internal` for tests, types, refactors, and developer-facing implementation work
 
+## [2.1.157] - 2026-05-22
+
+### Changed
+
+- **`/dashboard` redesigned** — Replaced the 3-pane bordered layout with a clean Dialog + Tabs design using the design system (`ProgressBar`, `StatusIcon`, `Divider`). Organizes data into 4 tabs: Overview (goal/daemon summary), Agents (run list), Daemons (daemon status + MCP servers), Tasks (task queue).
+
+### Fixed
+
+- **Duplicate CTX display in `/dashboard`** — Removed model/cost/cache info from the dashboard Overview that was redundant with the main app StatusLine, eliminating double CTX display.
+
 ## [2.1.156] - 2026-05-22
 
 ### Added
@@ -186,18 +196,6 @@ This project follows a practical changelog format based on:
 - Created `docs/features/searxng-search.html` documentation page.
 
 ## [2.1.146] - 2026-05-19
-
-### Added
-
-- **Profile system** — built-in multi-profile isolation using `~/.claude/profiles/<name>/`.
-  - Each profile has its own `provider.json`, `settings.json`, sessions, memory, and credentials.
-  - Global config (`~/.claude.json`) stays shared across profiles (OAuth tokens, user ID, theme).
-  - New `/profile` command with interactive Ink picker: navigate with ↑↓, Enter to switch, `d` to delete, `q` to quit.
-  - New `--profile <name>` CLI flag for one-shot profile selection.
-  - Profile resolution priority: `CLAUDECODE_PROFILE` env var > `--profile` flag > `active-profile` file > default (no profile).
-  - Added `src/utils/profileManager.ts` — ProfileManager singleton with CRUD operations.
-  - Added `src/utils/profileManager.test.ts` — 23 tests covering all operations.
-  - `getClaudeConfigHomeDir()` is now profile-aware; falls back to `~/.claude/` when no profile is active.
 
 ### Changed
 

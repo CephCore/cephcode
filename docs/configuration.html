@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Configuration — Claude Code</title>
-  <meta name="description" content="Comprehensive configuration guide for Claude Code — CLI flags, environment variables, settings file, and profiles.">
+  <meta name="description" content="Comprehensive configuration guide for Claude Code — CLI flags, environment variables, settings file, and in-session commands.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -48,7 +48,6 @@
     <tr><td><code>--session-id &lt;uuid&gt;</code></td><td>Use a specific session ID</td></tr>
     <tr><td><code>--name, -n &lt;name&gt;</code></td><td>Display name for this session</td></tr>
     <tr><td><code>--agents &lt;json&gt;</code></td><td>JSON defining custom agents</td></tr>
-    <tr><td><code>--profile &lt;name&gt;</code></td><td>Use a specific configuration profile</td></tr>
     <tr><td><code>--output-format &lt;format&gt;</code></td><td>text, json, or stream-json (with --print)</td></tr>
     <tr><td><code>--input-format &lt;format&gt;</code></td><td>text or stream-json (with --print)</td></tr>
     <tr><td><code>--json-schema &lt;schema&gt;</code></td><td>JSON Schema for structured output validation</td></tr>
@@ -81,7 +80,6 @@
     <tr><td><code>KAIROS=1</code></td><td>Enable proactive/brief/assistant features</td></tr>
     <tr><td><code>ENABLE_LSP_TOOL=1</code></td><td>Enable LSP tool integration</td></tr>
     <tr><td><code>ENABLE_COMPUTER_USE=1</code></td><td>Enable Computer Use tool (Windows)</td></tr>
-    <tr><td><code>CLAUDECODE_PROFILE</code></td><td>Active config profile name</td></tr>
     <tr><td><code>CLAUDECODE_NO_RESPAWN</code></td><td>Disable process respawn</td></tr>
     <tr><td><code>SENTRY_DSN</code></td><td>Enable Sentry error reporting (opt-in)</td></tr>
     <tr><td><code>TAVILY_API_KEY</code></td><td>Tavily web search (highest priority)</td></tr>
@@ -99,7 +97,6 @@
     <li>Plugin and MCP server configs</li>
     <li>Theme and UI preferences</li>
     <li>Session persistence settings</li>
-    <li>Profile configurations</li>
   </ul>
 
   <h2>Config Paths</h2>
@@ -115,7 +112,6 @@
 
   <h2>In-Session Configuration</h2>
   <pre><code>/config      # Open config panel (aliases: settings)
-/profile     # Manage isolated configurations
 /theme       # Change the theme
 /color       # Set prompt bar color
 /keybindings # Edit keybindings

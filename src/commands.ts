@@ -153,7 +153,6 @@ import model from './commands/model/index.js';
 import outputStyle from './commands/output-style/index.js';
 import skill from './commands/skill/index.js';
 import powerup from './commands/powerup/index.js';
-import profile from './commands/profile/index.js';
 import remoteEnv from './commands/remote-env/index.js';
 import upgrade from './commands/upgrade/index.js';
 import { usageCredits, usageCreditsNonInteractive } from './commands/usage-credits/index.js';
@@ -279,7 +278,6 @@ const COMMANDS = memoize((): Command[] => [
   plugin,
   pluginDetails,
   pr_comments,
-  profile,
   releaseNotes,
   reloadPlugins,
   rename,

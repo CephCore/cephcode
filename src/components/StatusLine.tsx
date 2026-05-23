@@ -165,21 +165,21 @@ export function getLastAssistantMessageId(messages: Message[]): string | null {
 }
 
 // ─── Context bar helpers ────────────────────────────────────────────────────
-const FRACTIONS = [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 const CLAUDE_THEME = {
   text: '#D6D3CC',
-  muted: '#8A8780',
-  subtle: '#5F5B54',
-  surface: '#2F2A25',
-  accent: '#D97757',
-  accentSoft: '#B56A4D',
-  success: '#B8B08A',
-  warning: '#D9A441',
-  danger: '#E06C75',
+  muted: '#A58BBA',
+  subtle: '#6A5680',
+  surface: '#2F2635',
+  accent: '#B266FF',
+  accentSoft: '#8700FF',
+  success: '#E2B6FF',
+  warning: '#FF88DD',
+  danger: '#FF5555',
   mcp: '#C6A0F6',
 } as const;
 
 const BAR_FREE_HEX = CLAUDE_THEME.surface;
+const CONTEXT_HEART_COUNT = 6;
 const CLAUDE_DOT = chalk.hex(CLAUDE_THEME.subtle)(' · ');
 
 function claudeMuted(text: string): string {
@@ -228,30 +228,24 @@ function buildCacheSegments(
   return segs;
 }
 
-/** Render a multi-segment horizontal bar using Unicode block characters. */
-function renderSegments(segs: { tokens: number; hex: string }[], total: number, width: number): string {
-  if (total <= 0 || segs.length === 0) return chalk.hex(BAR_FREE_HEX)('░'.repeat(width));
-
-  const chars: string[] = [];
-  let cursor = 0;
-  for (const s of segs) {
-    const end = cursor + (s.tokens / total) * width;
-    const startInt = Math.floor(cursor);
-    const endInt = Math.floor(end);
-    const frac = end - endInt;
-
-    for (let i = 0; i < endInt - startInt; i++) {
-      chars.push(chalk.hex(s.hex)('█'));
-    }
-    if (frac > 0.001 && endInt < width) {
-      chars.push(chalk.hex(s.hex)(FRACTIONS[Math.min(Math.round(frac * 8), 8)]));
-    }
-    cursor = end;
+/** Render remaining context as six hearts. */
+function renderContextHearts(segs: { tokens: number; hex: string }[], total: number): string {
+  if (total <= 0 || segs.length === 0) {
+    return chalk.hex(CLAUDE_THEME.success)('♥'.repeat(CONTEXT_HEART_COUNT));
   }
 
-  while (chars.length < width) chars.push(chalk.hex(BAR_FREE_HEX)('░'));
-  if (chars.length > width) chars.length = width;
-  return chars.join('');
+  const usedTokens = Math.min(
+    total,
+    segs.reduce((sum, s) => sum + s.tokens, 0),
+  );
+  const remainingFraction = Math.max(0, 1 - usedTokens / total);
+  const filledHearts = Math.ceil(remainingFraction * CONTEXT_HEART_COUNT);
+  const heartColor =
+    filledHearts <= 1 ? CLAUDE_THEME.danger : filledHearts <= 2 ? CLAUDE_THEME.warning : CLAUDE_THEME.success;
+  return (
+    chalk.hex(heartColor)('♥'.repeat(filledHearts)) +
+    chalk.hex(BAR_FREE_HEX)('♡'.repeat(CONTEXT_HEART_COUNT - filledHearts))
+  );
 }
 
 interface ToolActivity {
@@ -742,34 +736,23 @@ function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props
       // when getCurrentUsage returns null (e.g. during thinking, tool runs, or streaming start).
       if (!currentUsage && lastKnownCtxBarRef.current) {
         const frac = lastKnownCtxBarRef.current.pct / 100;
-        const fullBlocks = Math.floor(frac * 10);
-        const chars: string[] = [];
-        for (let i = 0; i < fullBlocks; i++) chars.push(chalk.hex(CLAUDE_THEME.muted)('█'));
-        while (chars.length < 10) chars.push(chalk.hex(BAR_FREE_HEX)('░'));
-        return chars.join('');
+        const filledHearts = Math.ceil(Math.max(0, 1 - frac) * CONTEXT_HEART_COUNT);
+        return (
+          chalk.hex(CLAUDE_THEME.muted)('♥'.repeat(filledHearts)) +
+          chalk.hex(BAR_FREE_HEX)('♡'.repeat(CONTEXT_HEART_COUNT - filledHearts))
+        );
       }
       const cacheSegs = buildCacheSegments(usageForContext, contextWindowSize);
       if (cacheSegs.length > 0) {
-        return renderSegments(cacheSegs, contextWindowSize, 10);
+        return renderContextHearts(cacheSegs, contextWindowSize);
       }
-      return chalk.hex(BAR_FREE_HEX)('░'.repeat(10));
+      return chalk.hex(CLAUDE_THEME.success)('♥'.repeat(CONTEXT_HEART_COUNT));
     })();
 
-    // Extract tool/agent/todo activity
-    const { tools, agents, todos } = extractActivity(messagesRef.current);
-    const runningTools = tools.filter(t => t.status === 'running');
-    const completedTools = tools.filter(t => t.status === 'completed' || t.status === 'error');
+    // Extract agent activity
+    const { agents } = extractActivity(messagesRef.current);
     const runningAgents = agents.filter(a => a.status === 'running');
     const completedAgents = agents.filter(a => a.status === 'completed');
-
-    // Build tool count summary for completed tools
-    const toolCounts = new Map<string, number>();
-    for (const t of completedTools) {
-      toolCounts.set(t.name, (toolCounts.get(t.name) ?? 0) + 1);
-    }
-    const sortedCompletedTools = Array.from(toolCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
 
     const ruleCount = countPermissionRules(settings);
     const hookCount = countHooks(settings);
@@ -808,14 +791,15 @@ function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props
     if (mcpCount > 0) statsParts.push(`${mcpCount} MCPs`);
     const statsStr = statsParts.length > 0 ? CLAUDE_DOT + statsParts.map(claudeMuted).join(CLAUDE_DOT) : '';
 
-    const line1 =
+    const leftLine =
       claudeAccent('▌ ') +
       cwdDisplay +
       CLAUDE_DOT +
       chalk.hex(CLAUDE_THEME.text)(modelName) +
       activeProviderDisplay +
-      sessionGoalDisplay +
-      claudeSubtle('  ') +
+      sessionGoalDisplay;
+
+    const rightLine =
       bar +
       claudeSubtle(' ') +
       percentText +
@@ -824,21 +808,6 @@ function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props
       CLAUDE_DOT +
       claudeMuted(`◷ ${formatCompactDuration(duration)}`) +
       statsStr;
-
-    // ── Build activity line ──
-    const hasRunningTools = runningTools.length > 0;
-    const hasCompletedTools = sortedCompletedTools.length > 0;
-    let completedToolsLine = '';
-    if (hasCompletedTools) {
-      const parts: string[] = [];
-      for (const [name, count] of sortedCompletedTools.slice(0, 3)) {
-        parts.push(claudeSuccess('✓ ') + claudeMuted(name) + claudeSubtle(`×${count}`));
-      }
-      if (sortedCompletedTools.length > 3) {
-        parts.push(claudeSubtle(`+${sortedCompletedTools.length - 3} more`));
-      }
-      completedToolsLine = parts.join(CLAUDE_DOT);
-    }
 
     const agentLines: Array<{ key: string; node: React.ReactNode }> = [
       ...runningAgents.slice(-1).map(a => ({
@@ -874,91 +843,26 @@ function StatusLineInner({ messagesRef, lastAssistantMessageId, vimMode }: Props
       })),
     ];
 
-    const todoLine = todos
-      ? todos.total > 0 && todos.completed === todos.total
-        ? claudeSuccess('✓') +
-          claudeSubtle(' All todos complete ') +
-          claudeSubtle(`(${todos.completed}/${todos.total})`)
-        : todos.inProgress
-          ? claudeSubtle(' ') +
-            claudeMuted(truncate(todos.inProgress, 50)) +
-            claudeSubtle(` (${todos.completed}/${todos.total})`)
-          : claudeSuccess('✓') + claudeSubtle(' Todos ') + claudeSubtle(`(${todos.completed}/${todos.total})`)
-      : '';
-
     return (
       <Box flexDirection="column" gap={0} marginTop={0}>
-        <Box overflowX="hidden">
-          <Text>
-            <Ansi>{line1}</Ansi>
-          </Text>
-        </Box>
-
-        {/* Running tools with animated spinner */}
-        {hasRunningTools && (
-          <Box overflowX="hidden" flexDirection="row">
-            {runningTools.slice(-2).map((t, i) => (
-              <React.Fragment key={t.id}>
-                {i > 0 && <Text color={CLAUDE_THEME.subtle}> · </Text>}
-                {t.isMcp ? (
-                  <Text color={CLAUDE_THEME.mcp}>
-                    ◈ <Text color={CLAUDE_THEME.mcp}>{t.name.replace(/^mcp__/, 'mcp:')}</Text>
-                    {t.target ? (
-                      <Text color={CLAUDE_THEME.subtle}> {truncate(t.target.replace(/\\/g, '/'), 20)}</Text>
-                    ) : null}
-                  </Text>
-                ) : (
-                  <>
-                    <Spinner color="#D97757" isStatusLine={true} />
-                    <Text>
-                      <Ansi>
-                        {claudeSubtle(' ') +
-                          claudeAccent(t.name) +
-                          (t.target ? claudeSubtle(` ${truncate(t.target.replace(/\\/g, '/'), 20)}`) : '')}
-                      </Ansi>
-                    </Text>
-                  </>
-                )}
-              </React.Fragment>
-            ))}
-            {/* separator before completed tools */}
-            {hasCompletedTools && <Text color={CLAUDE_THEME.subtle}> · </Text>}
-            {completedToolsLine && (
-              <Text>
-                <Ansi>{completedToolsLine}</Ansi>
-              </Text>
-            )}
-          </Box>
-        )}
-        {/* Completed tools only (no running tools) */}
-        {!hasRunningTools && completedToolsLine && (
+        <Box flexDirection="row" justifyContent="space-between" width="100%">
           <Box overflowX="hidden">
             <Text>
-              <Ansi>{completedToolsLine}</Ansi>
+              <Ansi>{leftLine}</Ansi>
             </Text>
           </Box>
-        )}
+          <Box flexShrink={0} paddingLeft={1}>
+            <Text>
+              <Ansi>{rightLine}</Ansi>
+            </Text>
+          </Box>
+        </Box>
 
         {agentLines.map(({ key, node }) => (
           <Box key={key} overflowX="hidden">
             {node}
           </Box>
         ))}
-
-        {todos && todos.total > 0 && todos.inProgress && (
-          <Box overflowX="hidden" flexDirection="row">
-            <Text>
-              <Ansi>{claudeAccent('◐') + todoLine}</Ansi>
-            </Text>
-          </Box>
-        )}
-        {todos && todos.total > 0 && !todos.inProgress && todoLine && (
-          <Box overflowX="hidden">
-            <Text>
-              <Ansi>{todoLine}</Ansi>
-            </Text>
-          </Box>
-        )}
       </Box>
     );
   })();

@@ -24,7 +24,8 @@ import { fetchProviderModels, supportsModelFetching } from '../../utils/model/fe
 import {
   getDefaultMainLoopModelSetting,
   isOpus1mMergeEnabled,
-  renderDefaultModelSetting,
+  parseUserSpecifiedModel,
+  renderModelName,
 } from '../../utils/model/model.js';
 import { isModelAllowed } from '../../utils/model/modelAllowlist.js';
 import { addRecentModel } from '../../utils/model/recentModels.js';
@@ -450,6 +451,7 @@ export const call: LocalJSXCommandCall = async (onDone, _context, args) => {
 };
 
 function renderModelLabel(model: string | null): string {
-  const rendered = renderDefaultModelSetting(model ?? getDefaultMainLoopModelSetting());
+  const effective = model ?? getDefaultMainLoopModelSetting();
+  const rendered = renderModelName(parseUserSpecifiedModel(effective), undefined, 'short');
   return model === null ? `${rendered} (default)` : rendered;
 }

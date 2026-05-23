@@ -1,6 +1,6 @@
 /**
  * Color command - minimal metadata only.
- * Implementation is lazy-loaded from color.ts to reduce startup time.
+ * Implementation is lazy-loaded to reduce startup time.
  */
 import type { Command } from '../../commands.js';
 

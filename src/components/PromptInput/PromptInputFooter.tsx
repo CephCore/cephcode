@@ -150,7 +150,7 @@ function PromptInputFooter({
         paddingRight={2}
         gap={isNarrow ? 0 : 1}
       >
-        <Box flexDirection="column" flexShrink={isNarrow ? 0 : 1}>
+        <Box flexDirection="column" flexGrow={isNarrow ? 0 : 1} flexShrink={isNarrow ? 0 : 1}>
           {mode === 'prompt' && !exitMessage.show && !isPasting && statusLineShouldDisplay(settings) && (
             <StatusLine messagesRef={messagesRef} lastAssistantMessageId={lastAssistantMessageId} vimMode={vimMode} />
           )}

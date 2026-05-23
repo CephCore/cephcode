@@ -2,7 +2,7 @@ import { basename } from 'path';
 import type * as React from 'react';
 import { useIdeConnectionStatus } from '../hooks/useIdeConnectionStatus.js';
 import type { IDESelection } from '../hooks/useIdeSelection.js';
-import { Text } from '../ink.js';
+import { Box, Text } from '../ink.js';
 import type { MCPServerConnection } from '../services/mcp/types.js';
 
 type IdeStatusIndicatorProps = {
@@ -23,17 +23,21 @@ export function IdeStatusIndicator({ ideSelection, mcpClients }: IdeStatusIndica
 
   if (ideSelection.text && ideSelection.lineCount > 0) {
     return (
-      <Text color="ide" key="selection-indicator" wrap="truncate">
-        ⧉ {ideSelection.lineCount} {ideSelection.lineCount === 1 ? 'line' : 'lines'} selected
-      </Text>
+      <Box width="100%" flexDirection="row" justifyContent="flex-end" key="selection-indicator">
+        <Text color="ide" wrap="truncate">
+          ⧉ {ideSelection.lineCount} {ideSelection.lineCount === 1 ? 'line' : 'lines'} selected
+        </Text>
+      </Box>
     );
   }
 
   if (ideSelection.filePath) {
     return (
-      <Text color="ide" key="selection-indicator" wrap="truncate">
-        ⧉ In {basename(ideSelection.filePath)}
-      </Text>
+      <Box width="100%" flexDirection="row" justifyContent="flex-end" key="selection-indicator">
+        <Text color="ide" wrap="truncate">
+          ⧉ In {basename(ideSelection.filePath)}
+        </Text>
+      </Box>
     );
   }
 }

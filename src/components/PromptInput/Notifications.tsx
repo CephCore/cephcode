@@ -145,7 +145,7 @@ export function Notifications({
 
   return (
     <SentryErrorBoundary>
-      <Box flexDirection="column" alignItems="flex-start" flexShrink={0} overflowX="hidden">
+      <Box flexDirection="column" alignItems="stretch" width="100%" flexShrink={0} overflowX="hidden">
         <NotificationContent
           ideSelection={ideSelection}
           mcpClients={mcpClients}

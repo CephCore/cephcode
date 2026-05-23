@@ -1654,12 +1654,6 @@ async function run(): Promise<CommanderCommand> {
       profileCheckpoint('action_handler_start');
       applyProviderOption((options as { provider?: string }).provider, (options as { model?: string }).model);
 
-      // Apply profile selection before any config loads
-      const profileOption = (options as { profile?: string }).profile;
-      if (profileOption) {
-        process.env.CLAUDECODE_PROFILE = profileOption;
-      }
-
       // --bare = one-switch minimal mode. Sets SIMPLE so all the existing
       // gates fire (CLAUDE.md, skills, hooks inside executeHooks, agent
       // dir-walk). Must be set before setup() / any of the gated work runs.
@@ -4987,10 +4981,6 @@ async function run(): Promise<CommanderCommand> {
   program.option(
     '--provider <provider>',
     'Select AI provider: openai, gemini, openrouter, groq, xai, mistral, kilocode, ollama, anthropic (default: openai)',
-  );
-  program.option(
-    '--profile <name>',
-    'Use a named profile (isolated config directory with its own provider, settings, sessions)',
   );
   // --model already added earlier (line 1016), skip duplicate
   // program.option('--model <model>', 'Override the default model for the selected provider');
