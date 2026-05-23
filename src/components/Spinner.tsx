@@ -9,7 +9,7 @@ import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growt
 import { isEnvTruthy } from '../utils/envUtils.js';
 import { count } from '../utils/array.js';
 import sample from 'lodash-es/sample.js';
-import { formatDuration, formatNumber, formatSecondsShort } from '../utils/format.js';
+import { formatDuration, formatNumber } from '../utils/format.js';
 import type { Theme } from 'src/utils/theme.js';
 import { activityManager } from '../utils/activityManager.js';
 import { getSpinnerVerbs } from '../constants/spinnerVerbs.js';
@@ -185,11 +185,11 @@ function SpinnerWithVerbInner({
     foregroundedTeammate && !foregroundedTeammate.isIdle
       ? (foregroundedTeammate.spinnerVerb ?? randomVerb)
       : leaderVerb;
-  const message = effectiveVerb + '…';
+  const message = `${effectiveVerb}…`;
 
   // Track CLI activity when spinner is active
   useEffect(() => {
-    const operationId = 'spinner-' + mode;
+    const operationId = `spinner-${mode}`;
     activityManager.startCLIActivity(operationId);
     return () => {
       activityManager.endCLIActivity(operationId);
@@ -230,8 +230,8 @@ function SpinnerWithVerbInner({
   // progress updates to s.tasks trigger re-renders that keep this fresh.
   const leaderTokenCount = Math.round(responseLengthRef.current / 4);
 
-  const defaultColor: keyof Theme = 'claude';
-  const defaultShimmerColor = 'claudeShimmer';
+  const defaultColor: keyof Theme = 'autoAccept';
+  const defaultShimmerColor: keyof Theme = 'autoAccept';
   const messageColor = overrideColor ?? defaultColor;
   const shimmerColor = overrideShimmerColor ?? defaultShimmerColor;
 
@@ -240,9 +240,9 @@ function SpinnerWithVerbInner({
   // line instead of taking a separate row. apiMetricsRef is a ref so this
   // doesn't trigger re-renders; we pick up updates on the parent's ~25x/turn
   // re-render cadence, same as the old ApiMetricsLine did.
-  let ttftText: string | null = null;
+  let _ttftText: string | null = null;
   if ('external' === 'ant' && apiMetricsRef?.current && apiMetricsRef.current.length > 0) {
-    ttftText = computeTtftText(apiMetricsRef.current);
+    _ttftText = computeTtftText(apiMetricsRef.current);
   }
 
   // When leader is idle but teammates are running (and we're viewing the leader),
@@ -411,7 +411,7 @@ function BriefSpinner({ mode, overrideMessage }: BriefSpinnerProps): React.React
 
   // Track CLI activity so OS/IDE "busy" indicators fire in brief mode too
   useEffect(() => {
-    const operationId = 'spinner-' + mode;
+    const operationId = `spinner-${mode}`;
     activityManager.startCLIActivity(operationId);
     return () => {
       activityManager.endCLIActivity(operationId);

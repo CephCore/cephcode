@@ -7,11 +7,10 @@
 import type { Command } from '../../types/command.js';
 
 const recap = {
-  type: 'local',
+  type: 'local-jsx',
   name: 'recap',
   description: 'Generate a short summary of what happened in this session',
   aliases: [],
-  supportsNonInteractive: false,
   load: () => import('./recap.js'),
 } satisfies Command;
 

@@ -209,6 +209,33 @@ Tool System
   src/tools/
   src/services/tools/
 
+State Management
+  src/state/store.ts          # Lightweight observable store (createStore<T>)
+  src/state/AppState.tsx       # Root app state (React context)
+  src/state/AppStateStore.ts
+  src/state/selectors.ts
+
+Agent Runtime
+  src/agentRuntime/orchestrator.ts   # Agent orchestration
+  src/agentRuntime/runStore.ts       # Persistent run store
+  src/agentRuntime/toolGateway.ts    # Tool routing for agents
+  src/agentRuntime/workflowRegistry.ts
+  src/agentRuntime/agentRegistry.ts
+
+Autonomous / Daemon
+  src/services/autonomous/taskQueue.ts   # File-backed persistent task queue
+  src/services/autonomous/agentLoop.ts   # 24/7 agent loop (queue → spawn → monitor)
+  src/services/autonomous/daemonMode.ts  # Daemon entry for supervisor-managed bg process
+  src/services/autonomous/supervisorIntegration.ts
+
+Coordinator (Multi-Agent)
+  src/coordinator/coordinatorMode.ts  # Coordinator agent orchestration
+  src/coordinator/workerAgent.ts      # Worker agent for delegated tasks
+
+Research / Memory
+  src/research/               # Deep research, dossier generation, truth checking
+  src/memdir/                 # Semantic memory search and storage
+
 Infrastructure
   src/services/mcp/
   src/services/plugins/
@@ -218,7 +245,7 @@ Infrastructure
   src/services/SessionMemory/
   src/services/settingsSync/
   src/bridge/
-  src/coordinator/
+  src/voice/                  # Voice mode support (compile-time gated)
 ```
 
 ## Key Files
@@ -226,6 +253,9 @@ Infrastructure
 | File | Role |
 | --- | --- |
 | `src/main.tsx` | Main CLI bootstrap, Ink app setup, streaming loop |
+| `src/entrypoints/cli.tsx` | Alternative CLI entry point (Commander-based) |
+| `src/entrypoints/init.ts` | Init/repl entry point |
+| `src/entrypoints/mcp.ts` | MCP server entry point |
 | `src/query.ts` | Core query processing, message building, context handling, tool call loop |
 | `src/QueryEngine.ts` | Query orchestration, caching, deduplication, rate limiting |
 | `src/commands.ts` | Slash command registry |
@@ -269,6 +299,43 @@ When modifying this flow, check all of these areas:
 - provider capability flags
 - model discovery and cache behavior
 
+## State Management
+
+The app uses a lightweight observable store pattern (`createStore<T>` in `src/state/store.ts`):
+
+```typescript
+type Store<T> = {
+  getState: () => T;
+  setState: (updater: (prev: T) => T) => void;
+  subscribe: (listener: Listener) => () => void;
+};
+```
+
+Stores are plain functions, not classes. React components subscribe via the `AppState` React context. When adding new global state, prefer adding to an existing store or creating a new one with `createStore` rather than introducing a state management library.
+
+## Agent Runtime & Autonomous System
+
+The agent runtime (`src/agentRuntime/`) manages multi-agent orchestration:
+- `orchestrator.ts` — coordinates agent sessions
+- `runStore.ts` — persists agent run data
+- `toolGateway.ts` — routes tools to/from agents
+- `workflowRegistry.ts` — declares named workflows
+
+The autonomous system (`src/services/autonomous/`) enables 24/7 background execution:
+- `taskQueue.ts` — file-backed queue with priorities, leases, dead-letter
+- `agentLoop.ts` — continuous loop: dequeue → spawn worker → monitor → retry
+- `daemonMode.ts` — supervisor-managed background process
+- `supervisorIntegration.ts` — health checks and auto-respawn
+
+The coordinator layer (`src/coordinator/`) supports multi-agent collaboration:
+- `coordinatorMode.ts` — delegate tasks to sub-agents
+- `workerAgent.ts` — standalone worker for delegated subtasks
+
+## Research & Memory System
+
+- `src/research/` — built-in deep research: citation extraction, claim verification, dossier generation, truth checking, source ranking
+- `src/memdir/` — semantic memory: text embedding search, memory age tracking, cross-session memory recall
+
 ## Tool Execution Flow
 
 1. Model emits one or more `tool_use` blocks.
@@ -280,12 +347,26 @@ When modifying this flow, check all of these areas:
 
 When adding or editing a tool:
 
-- define strict schemas
+- define strict schemas (Zod)
 - validate input early
 - keep output stable and machine-readable where possible
 - avoid hidden side effects
 - respect permission and hook behavior
 - add or update tests near the tool when possible
+
+### Tool File Convention
+
+Each tool in `src/tools/<ToolName>/` follows a consistent structure:
+
+| File | Purpose |
+| --- | --- |
+| `<ToolName>.ts` or `index.ts` | Tool class extending `Tool` with `inputSchema` + `execute` |
+| `prompt.ts` | System prompt content describing the tool to the model |
+| `UI.tsx` | Ink React component for terminal output during execution |
+| `constants.ts` | Shared constants (timeouts, limits, defaults) |
+| `types.ts` | TypeScript types specific to the tool |
+
+Tools are registered in `src/tools.ts`. Tool prompts are collected by the query system and injected into the system prompt.
 
 ## Slash Command Guidelines
 
@@ -334,9 +415,38 @@ When changing plugin or skill behavior:
 Important constraints:
 
 - Windows uses bundled ripgrep at `src/utils/vendor/ripgrep/x64-win32/rg.exe`; `Glob` and `Grep` may depend on it.
+- Windows also has a dedicated `PowerShellTool` alongside the `BashTool` — test Windows changes with both shells.
+- `src/main.tsx` applies TTY workarounds for Windows PowerShell/Ink compatibility (stdin `isTTY`, `setRawMode`, `ref`/`unref` shims).
 - `@ant/claude-for-chrome-mcp` is dynamically imported at runtime for Claude-in-Chrome functionality.
 - Native TypeScript ports live in `src/native-ts/`.
 - Some native or external packages are intentionally externalized during build.
+
+### Biome Formatting Conventions
+
+Biome config at `biome.json` controls formatting. Key settings:
+
+- 120 char line width, 2-space indent, LF line endings
+- Single quotes, trailing commas, semicolons always
+- `organizeImports` runs on assist (auto-import sorting)
+- VCS git integration enabled (respects `.gitignore`)
+- `noUnusedVariables` and `noUnusedImports` are warnings (not errors)
+- `noExplicitAny`, `noNonNullAssertion` are **off** — use is permitted
+
+### Feature Flags (Compile-Time)
+
+Build uses Bun `--define` for feature gating:
+
+| Flag | Purpose |
+| --- | --- |
+| `TRANSCRIPT_CLASSIFIER` | Auto mode / permission cycling |
+| `CHICAGO_MCP` | MCP server enhancements |
+| `VOICE_MODE` | Voice input support |
+
+These are set in `dev` and `build` scripts. When adding new feature flags, add them to `bun run dev` and `bun run build` scripts in `package.json`.
+
+### Settings Hooks (Auto-Format)
+
+`.claude/settings.json` configures a `PostToolUse` hook that auto-runs Biome on any file edited by `FileEditTool` or `FileWriteTool`. This means generated or edited code will be automatically formatted — no need to run `bun run format` manually after edits unless you want to format untouched files.
 
 ## Environment Variables
 
@@ -405,12 +515,27 @@ Use this checklist before making risky changes.
 - Is terminal output stable and readable?
 - Are keybindings or aliases affected?
 
+### Autonomous / Daemon Changes
+
+- Does the task queue format change? (backward-compat with existing queue files)
+- Does the agent loop need to handle the new state?
+- Are leases, dead-letter, or retry semantics affected?
+- Does the supervisor integration (health check, respawn) still work?
+
+### State / Store Changes
+
+- Is the store shape backward-compatible?
+- Are React subscribers re-rendering correctly?
+- Is serialization/deserialization safe (no functions, no circular refs)?
+
 ### Build/Runtime Changes
 
 - Does the change affect Windows, macOS, Linux, or WSL2 differently?
+- Does it affect the PowerShellTool as well as BashTool?
 - Does it introduce a native dependency that must be externalized or bundled?
 - Does it break Bun ESM / `NodeNext` resolution?
 - Does it rely on Node-only behavior unsupported by Bun?
+- Are feature flags (`--define` in build scripts) needed for new compile-time gated features?
 
 ## Do Not Do
 

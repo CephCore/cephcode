@@ -338,7 +338,7 @@ function countPermissionRules(settings: ReadonlySettings): number {
   return (permissions.allow?.length ?? 0) + (permissions.deny?.length ?? 0) + (permissions.ask?.length ?? 0);
 }
 
-function countClaudeFiles(cwd: string): number {
+function _countClaudeFiles(cwd: string): number {
   const seen = new Set<string>();
   const addIfExists = (path: string) => {
     if (existsSync(path)) seen.add(path);
@@ -489,7 +489,7 @@ function extractActivity(messages: Message[]): {
 
 function truncate(str: string, maxLen: number = 40): string {
   if (str.length <= maxLen) return str;
-  return str.slice(0, maxLen - 3) + '...';
+  return `${str.slice(0, maxLen - 3)}...`;
 }
 
 // ─── StatusLine component ──────────────────────────────────────────────────
@@ -583,7 +583,7 @@ function StatusLineInner({
     } catch {
       /* ignore */
     }
-  }, [messagesRef, setAppState]);
+  }, [messagesRef, setAppState, mainLoopProviderForSession, mainLoopProvider]);
 
   const scheduleUpdate = useCallback(() => {
     if (debounceTimerRef.current !== undefined) clearTimeout(debounceTimerRef.current);
@@ -637,7 +637,7 @@ function StatusLineInner({
         });
       }
     }
-  }, []);
+  }, [settings?.statusLine, addNotification, settings.disableAllHooks]);
 
   useEffect(() => {
     void doUpdate();
@@ -645,7 +645,7 @@ function StatusLineInner({
       abortControllerRef.current?.abort();
       if (debounceTimerRef.current !== undefined) clearTimeout(debounceTimerRef.current);
     };
-  }, []);
+  }, [doUpdate]);
 
   const paddingX = settings?.statusLine?.padding ?? 0;
   const decodedStatusLineText = statusLineText ? decodeHtmlEntities(statusLineText) : statusLineText;
