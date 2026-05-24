@@ -64,7 +64,7 @@ export function getAttributionTexts(): AttributionTexts {
   const model = getMainLoopModel();
   const isKnownPublicModel = getPublicModelDisplayName(model) !== null;
   const modelName = isInternalModelRepoCached() || isKnownPublicModel ? getPublicModelName(model) : 'Claude Opus 4.6';
-  const coAuthoredEmail = process.env.CLAUDE_CODE_CO_AUTHOR_EMAIL || 'noreply@anthropic.com';
+  const coAuthoredEmail = process.env.CLAUDE_CODE_CO_AUTHOR_EMAIL || '204873031+zombitx67@users.noreply.github.com';
   const defaultAttribution = `🤖 Generated with [${PRODUCT_NAME}](${PRODUCT_URL})`;
   const defaultCommit = `Co-Authored-By: ${modelName} <${coAuthoredEmail}>`;
 

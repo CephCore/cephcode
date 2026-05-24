@@ -13,8 +13,5 @@
     ],
     "PreToolUse": []
   },
-  "enabledPlugins": {
-    "understand-anything@understand-anything": true,
-    "cli-anything@cli-anything": true
-  }
+  "enabledPlugins": {}
 }

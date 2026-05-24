@@ -44,7 +44,7 @@ function extractProviderFromModel(model: string): string {
   if (lower.startsWith('mistral')) return 'mistral';
   if (lower.startsWith('mixtral')) return 'mistral';
   if (lower.startsWith('kimi')) return 'openrouter'; // Often via OpenRouter
-  if (lower.startsWith('deepseek')) return 'openrouter'; // Often via OpenRouter
+  if (lower.startsWith('deepseek')) return 'deepseek';
 
   // Default to 'unknown' if can't determine
   return 'unknown';
