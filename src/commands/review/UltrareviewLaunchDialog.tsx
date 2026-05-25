@@ -3,15 +3,9 @@ import { useCallback, useRef, useState } from 'react';
 import { Select } from '../../components/CustomSelect/select.js';
 import { Dialog } from '../../components/design-system/Dialog.js';
 import { Box, Text } from '../../ink.js';
+import { StatsLine, type UltrareviewScope } from '../../context/ultrareviewStats.js';
 
-export type UltrareviewScope = {
-  target: string;
-  base?: string;
-  filesChanged?: number;
-  insertions?: number;
-  deletions?: number;
-  billingNote?: string;
-};
+export type { UltrareviewScope };
 
 type Props = {
   scope: UltrareviewScope;
@@ -32,19 +26,6 @@ function ScopeLine({ scope }: { scope: UltrareviewScope }): React.ReactNode {
   return (
     <Text>
       Reviewing <Text color="cyan">{scope.target}</Text>.
-    </Text>
-  );
-}
-
-function StatsLine({ scope }: { scope: UltrareviewScope }): React.ReactNode {
-  if (scope.filesChanged === undefined) {
-    return <Text dimColor>Scope will be resolved before launch.</Text>;
-  }
-
-  return (
-    <Text dimColor>
-      Scope: {scope.filesChanged} files changed, {scope.insertions ?? 0} insertions(+), {scope.deletions ?? 0}{' '}
-      deletions(-)
     </Text>
   );
 }

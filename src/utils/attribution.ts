@@ -60,12 +60,12 @@ export function getAttributionTexts(): AttributionTexts {
 
   // @[MODEL LAUNCH]: Update the hardcoded fallback model name below (guards against codename leaks).
   // For internal repos, use the real model name. For external repos,
-  // fall back to "Claude Opus 4.6" for unrecognized models to avoid leaking codenames.
+  // fall back to "Claude" for unrecognized models to avoid leaking codenames.
   const model = getMainLoopModel();
   const isKnownPublicModel = getPublicModelDisplayName(model) !== null;
-  const modelName = isInternalModelRepoCached() || isKnownPublicModel ? getPublicModelName(model) : 'Claude Opus 4.6';
-  const coAuthoredEmail = process.env.CLAUDE_CODE_CO_AUTHOR_EMAIL || '204873031+zombitx67@users.noreply.github.com';
-  const defaultAttribution = `🤖 Generated with [${PRODUCT_NAME}](${PRODUCT_URL})`;
+  const modelName = isInternalModelRepoCached() || isKnownPublicModel ? getPublicModelName(model) : 'Claude';
+  const coAuthoredEmail = process.env.CLAUDE_CODE_CO_AUTHOR_EMAIL || 'noreply@anthropic.com';
+  const defaultAttribution = `Generated with [${PRODUCT_NAME}](${PRODUCT_URL})`;
   const defaultCommit = `Co-Authored-By: ${modelName} <${coAuthoredEmail}>`;
 
   const settings = getInitialSettings();
@@ -293,7 +293,7 @@ export async function getEnhancedPRAttribution(getAppState: () => AppState): Pro
     return '';
   }
 
-  const defaultAttribution = `🤖 Generated with [${PRODUCT_NAME}](${PRODUCT_URL})`;
+  const defaultAttribution = `Generated with [${PRODUCT_NAME}](${PRODUCT_URL})`;
 
   // Get AppState first
   const appState = getAppState();
@@ -332,7 +332,7 @@ export async function getEnhancedPRAttribution(getAppState: () => AppState): Pro
   // Build the enhanced attribution: "🤖 Generated with Claude Code (93% 3-shotted by claude-opus-4-5, 2 memories recalled)"
   const memSuffix =
     memoryAccessCount > 0 ? `, ${memoryAccessCount} ${memoryAccessCount === 1 ? 'memory' : 'memories'} recalled` : '';
-  const summary = `🤖 Generated with [${PRODUCT_NAME}](${PRODUCT_URL}) (${claudePercent}% ${promptCount}-shotted by ${shortModelName}${memSuffix})`;
+  const summary = `Generated with [${PRODUCT_NAME}](${PRODUCT_URL}) (${claudePercent}% ${promptCount}-shotted by ${shortModelName}${memSuffix})`;
 
   // Append trailer lines for squash-merge survival. Only for allowlisted repos
   // (INTERNAL_MODEL_REPOS) and only in builds with COMMIT_ATTRIBUTION enabled —

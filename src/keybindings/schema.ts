@@ -85,6 +85,7 @@ export const KEYBINDING_ACTIONS = [
   'chat:newline',
   'chat:undo',
   'chat:externalEditor',
+  'chat:improvePrompt',
   'chat:stash',
   'chat:imagePaste',
   'chat:messageActions',

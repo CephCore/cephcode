@@ -1,10 +1,10 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Repository Purpose
 
-This repository is a research-oriented fork of Anthropic's Claude Code CLI. The binary is renamed to `claudevil` to avoid conflicts with the official `claude` package. It keeps the original terminal-first coding-agent workflow while adding:
+This repository is a research-oriented fork of Anthropic's Codex CLI. The binary is renamed to `claudevil` to avoid conflicts with the official `Codex` package. It keeps the original terminal-first coding-agent workflow while adding:
 
 - unified multi-provider model routing
 - provider-specific adapters
@@ -48,7 +48,7 @@ bun run preload services/ai     # services/ai/
 bun run preload src/bridge      # also works with src/ prefix
 ```
 
-The script generates context at `.claude/context/<module>.md`:
+The script generates context at `.Codex/context/<module>.md`:
 - All files in the module with sizes
 - Exports and key types
 - Internal dependencies
@@ -139,7 +139,7 @@ bun run session restore
 ### CodeIndex (fuzzy code search)
 
 ```bash
-# Index the codebase (once, persists to .claude/code-index/)
+# Index the codebase (once, persists to .Codex/code-index/)
 bun run codeindex index
 
 # Search across all indexed code
@@ -420,7 +420,7 @@ Important constraints:
 - Windows uses bundled ripgrep at `src/utils/vendor/ripgrep/x64-win32/rg.exe`; `Glob` and `Grep` may depend on it.
 - Windows also has a dedicated `PowerShellTool` alongside the `BashTool` — test Windows changes with both shells.
 - `src/main.tsx` applies TTY workarounds for Windows PowerShell/Ink compatibility (stdin `isTTY`, `setRawMode`, `ref`/`unref` shims).
-- `@ant/claude-for-chrome-mcp` is dynamically imported at runtime for Claude-in-Chrome functionality.
+- `@ant/Codex-for-chrome-mcp` is dynamically imported at runtime for Codex-in-Chrome functionality.
 - Native TypeScript ports live in `src/native-ts/`.
 - Some native or external packages are intentionally externalized during build.
 
@@ -449,7 +449,7 @@ These are set in `dev` and `build` scripts. When adding new feature flags, add t
 
 ### Settings Hooks (Auto-Format)
 
-`.claude/settings.json` configures a `PostToolUse` hook that auto-runs Biome on any file edited by `FileEditTool` or `FileWriteTool`. This means generated or edited code will be automatically formatted — no need to run `bun run format` manually after edits unless you want to format untouched files.
+`.Codex/settings.json` configures a `PostToolUse` hook that auto-runs Biome on any file edited by `FileEditTool` or `FileWriteTool`. This means generated or edited code will be automatically formatted — no need to run `bun run format` manually after edits unless you want to format untouched files.
 
 ## Environment Variables
 

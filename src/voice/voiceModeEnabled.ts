@@ -1,5 +1,3 @@
-import { feature } from 'bun:bundle';
-import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js';
 import { getClaudeAIOAuthTokens, isAnthropicAuthEnabled } from '../utils/auth.js';
 
 /**
@@ -37,16 +35,23 @@ export function hasVoiceAuth(): boolean {
 }
 
 /**
+ * Returns true when any STT backend is available: OAuth (Anthropic
+ * voice_stream) or a local Whisper-compatible API key (OpenAI/Groq/Whisper).
+ */
+export function hasAlternativeSttKey(): boolean {
+  return Boolean(
+    process.env.OPENAI_API_KEY ||
+      process.env.GROQ_API_KEY ||
+      (process.env.WHISPER_API_KEY && process.env.WHISPER_API_URL),
+  );
+}
+
+/**
  * Full runtime check: auth + GrowthBook kill-switch. Callers: `/voice`
  * (voice.ts, voice/index.ts), ConfigTool, VoiceModeNotice — command-time
  * paths where a fresh keychain read is acceptable. For React render
  * paths use useVoiceEnabled() instead (memoizes the auth half).
  */
 export function isVoiceModeEnabled(): boolean {
-  const hasAltKeys = Boolean(
-    process.env.OPENAI_API_KEY ||
-      process.env.GROQ_API_KEY ||
-      (process.env.WHISPER_API_KEY && process.env.WHISPER_API_URL),
-  );
-  return (hasVoiceAuth() || hasAltKeys) && isVoiceGrowthBookEnabled();
+  return (hasVoiceAuth() || hasAlternativeSttKey()) && isVoiceGrowthBookEnabled();
 }

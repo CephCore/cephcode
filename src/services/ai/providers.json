@@ -510,12 +510,11 @@
         "label": "DeepSeek V4 Pro (OpenRouter)",
         "tags": [
           "tools",
-          "vision",
           "reasoning"
         ],
         "capabilities": {
           "toolCalling": "native",
-          "vision": true,
+          "vision": false,
           "streaming": "full",
           "maxContext": 1048576,
           "maxOutput": 128000,
@@ -586,12 +585,12 @@
     "modelsUrl": "https://api.deepseek.com/v1/models",
     "defaultModel": "deepseek-v4-pro",
     "defaultModelVerified": true,
-    "note": "DeepSeek V4 family. Released April 24, 2026.",
+    "note": "DeepSeek V4 family. Released April 24, 2026. Text-only â€” does not support image_url content blocks.",
     "capabilities": {
       "chat": true,
       "streaming": "full",
       "toolCalling": true,
-      "vision": true,
+      "vision": false,
       "jsonSchema": true,
       "reasoningEffort": true,
       "contextLength": "1M"
@@ -602,13 +601,12 @@
         "label": "DeepSeek V4 Pro (2026-04-24)",
         "tags": [
           "tools",
-          "vision",
           "latest",
           "moe"
         ],
         "capabilities": {
           "toolCalling": "native",
-          "vision": true,
+          "vision": false,
           "streaming": "full",
           "maxContext": 1000000,
           "maxOutput": "varies",
@@ -626,7 +624,7 @@
         ],
         "capabilities": {
           "toolCalling": "native",
-          "vision": true,
+          "vision": false,
           "streaming": "full",
           "maxContext": 1000000,
           "maxOutput": "varies",
@@ -877,12 +875,11 @@
         "label": "DeepSeek V4 Pro (Go)",
         "tags": [
           "tools",
-          "vision",
           "reasoning"
         ],
         "capabilities": {
           "toolCalling": "native",
-          "vision": true,
+          "vision": false,
           "streaming": "full",
           "maxContext": 1000000,
           "maxOutput": 128000,
@@ -1629,7 +1626,7 @@
     "modelsUrl": "https://integrate.api.nvidia.com/v1/models",
     "defaultModel": "deepseek-ai/deepseek-v4-pro",
     "defaultModelVerified": true,
-    "note": "NVIDIA NIM — optimized inference. Source: build.nvidia.com, May 2026.",
+    "note": "NVIDIA NIM ï¿½ optimized inference. Source: build.nvidia.com, May 2026.",
     "capabilities": {
       "chat": true,
       "streaming": "full",

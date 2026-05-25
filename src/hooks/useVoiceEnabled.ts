@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useAppState } from '../state/AppState.js';
-import { hasVoiceAuth, isVoiceGrowthBookEnabled } from '../voice/voiceModeEnabled.js';
+import { hasVoiceAuth, hasAlternativeSttKey, isVoiceGrowthBookEnabled } from '../voice/voiceModeEnabled.js';
 
 /**
  * Combines user intent (settings.voiceEnabled) with auth + GB kill-switch.
@@ -18,5 +18,7 @@ export function useVoiceEnabled(): boolean {
   const authVersion = useAppState(s => s.authVersion);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const authed = useMemo(hasVoiceAuth, [authVersion]);
-  return userIntent && authed && isVoiceGrowthBookEnabled();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const altStt = useMemo(hasAlternativeSttKey, []);
+  return userIntent && (authed || altStt) && isVoiceGrowthBookEnabled();
 }

@@ -464,8 +464,33 @@ export function ContextStats({ data, onClose }: Props): React.ReactNode {
             <Metric label="Usage" value={`${percentage.toFixed(0)}%`} color={usageStatus.color} />
           </Box>
 
-          <Box marginTop={1}>
-            <Text>{bar}</Text>
+          <Box flexDirection="column" marginTop={1}>
+            <Box flexDirection="row" justifyContent="flex-end">
+              <Text dimColor>{(100 - percentage).toFixed(0)}% until auto-compact</Text>
+            </Box>
+            <Box marginTop={1}>
+              <Text>{bar}</Text>
+            </Box>
+            <Box marginTop={1}>
+              <Text>
+                {overviewRows
+                  .filter(row => row.tokens > 0)
+                  .map((row, i, arr) => {
+                    const displayColor = COLOR_MAP[row.color] || row.color;
+                    const label = row.label;
+                    const value = formatTokens(row.tokens);
+                    const sep = i < arr.length - 1 ? <Text dimColor> · </Text> : null;
+                    return (
+                      <Text key={row.key}>
+                        <Text color={displayColor}>{label}</Text>
+                        <Text>: </Text>
+                        <Text color={displayColor}>{value}</Text>
+                        {sep}
+                      </Text>
+                    );
+                  })}
+              </Text>
+            </Box>
           </Box>
         </Box>
 
