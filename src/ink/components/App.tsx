@@ -128,6 +128,9 @@ export default class App extends PureComponent<Props, State> {
   rawModeEnabledCount = 0;
   internal_eventEmitter = new EventEmitter();
   keyParseState = INITIAL_STATE;
+  // Streaming UTF-8 decoder for raw byte input (Bun on Windows may ignore
+  // setEncoding and deliver Buffers instead of decoded strings).
+  utf8Decoder = new TextDecoder('utf-8', { stream: true });
   // Timer for flushing incomplete escape sequences
   incompleteEscapeTimer: NodeJS.Timeout | null = null;
   // Timeout durations for incomplete sequences (ms)
@@ -241,7 +244,6 @@ export default class App extends PureComponent<Props, State> {
         );
       }
     }
-    stdin.setEncoding('utf8');
     if (isEnabled) {
       // Ensure raw mode is enabled only once
       if (this.rawModeEnabledCount === 0) {
@@ -374,9 +376,13 @@ export default class App extends PureComponent<Props, State> {
     this.lastStdinTime = now;
     try {
       let chunk;
-      while ((chunk = this.props.stdin.read() as string | null) !== null) {
+      while ((chunk = this.props.stdin.read()) !== null) {
+        // Bun on Windows may deliver raw Buffers even when setEncoding('utf8')
+        // is called (or when it's removed, always Buffers). Use TextDecoder
+        // with streaming flag for proper UTF-8 decoding across chunk boundaries.
+        const text = typeof chunk === 'string' ? chunk : this.utf8Decoder.decode(chunk as Buffer, { stream: true });
         // Process the input chunk
-        this.processInput(chunk);
+        this.processInput(text);
       }
     } catch (error) {
       // In Bun, an uncaught throw inside a stream 'readable' handler can

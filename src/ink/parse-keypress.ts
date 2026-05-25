@@ -195,12 +195,33 @@ export const INITIAL_STATE: KeyParseState = {
 
 function inputToString(input: Buffer | string): string {
   if (Buffer.isBuffer(input)) {
-    if (input[0]! > 127 && input[1] === undefined) {
-      (input[0] as unknown as number) -= 128;
+    // The legacy "high bit = Alt" encoding (subtract 128, prepend ESC)
+    // conflicts with multi-byte UTF-8. Since App.tsx now uses TextDecoder
+    // to decode raw bytes as proper strings, this path is mostly a safety
+    // net for any remaining Buffer → string conversion.
+    //
+    // Valid UTF-8 lead bytes (0xC2-0xF4) arriving alone are NOT Alt-modified
+    // ASCII — they're partial multi-byte sequences. Return them as single
+    // characters so the pipeline accumulates them rather than corrupting them
+    // into Alt+<garbage>. The same applies to continuation bytes (0x80-0xBF).
+    if (input.length === 1 && input[0]! > 127) {
+      const byte = input[0]!;
+      // Valid UTF-8 multi-byte lead: 0xC2-0xF4
+      if (byte >= 0xC2 && byte <= 0xF4) {
+        return String.fromCharCode(byte);
+      }
+      // Continuation bytes: 0x80-0xBF — could be Alt+control or UTF-8 tail.
+      // Treat as-is to avoid Alt-key corruption.
+      if (byte >= 0x80 && byte <= 0xBF) {
+        return String.fromCharCode(byte);
+      }
+      // 0xC0-0xC1 (overlong UTF-8 leads) and 0xF5-0xFF (beyond Unicode)
+      // are definitively Alt-encoded: subtract 128 and prepend ESC.
+      input[0] = byte - 128;
       return '\x1b' + String(input);
-    } else {
-      return String(input);
     }
+    // Multi-byte buffer or ASCII: decode as UTF-8
+    return String(input);
   } else if (input !== undefined && typeof input !== 'string') {
     return String(input);
   } else if (!input) {
