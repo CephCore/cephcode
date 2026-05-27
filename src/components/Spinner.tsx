@@ -208,6 +208,9 @@ function SpinnerWithVerbInner({
   const runningTeammates = getAllInProcessTeammateTasks(tasks).filter(t => t.status === 'running');
   const hasRunningTeammates = runningTeammates.length > 0;
   const allIdle = hasRunningTeammates && runningTeammates.every(t => t.isIdle);
+  // Count background agents and workflows for post-response display
+  const backgroundTaskCount = Object.values(tasks).filter(t => isBackgroundTask(t) && !isInProcessTeammateTask(t)).length;
+  const totalBackgroundCount = backgroundTaskCount + runningTeammates.length;
 
   // Gather aggregate token stats from all running swarm teammates
   // In spinner-tree mode, skip aggregation (teammates have their own lines in the tree)
@@ -260,8 +263,7 @@ function SpinnerWithVerbInner({
       <Box flexDirection="column" width="100%" alignItems="flex-start">
         <Box flexDirection="row" flexWrap="wrap" marginTop={1} width="100%">
           <Text dimColor>
-            {TEARDROP_ASTERISK} Idle
-            {!allIdle && ' · teammates running'}
+            {TEARDROP_ASTERISK} Waiting for {totalBackgroundCount} background {totalBackgroundCount === 1 ? 'agent' : 'agents'}/{totalBackgroundCount === 1 ? 'workflow' : 'workflows'} to finish
           </Text>
         </Box>
         {showSpinnerTree && (
