@@ -3317,10 +3317,12 @@ export function REPL({
       // and now. Turn 1 via processInitialMessage is the main beneficiary.
       const { tools: freshTools, mcpClients: freshMcpClients } = toolUseContext.options;
 
-      // Scope the skill's effort override to this turn's context only —
-      // wrapping getAppState keeps the override out of the global store so
-      // background agents and UI subscribers (Spinner, LogoV2) never see it.
+      // Scope the skill's effort override to this turn's context only.
+      // Also propagate to global AppState so UI subscribers (StatusLine,
+      // Spinner, LogoV2) show the skill/agent's effort rather than the
+      // user's baseline /effort setting. Restored after the turn ends.
       if (effort !== undefined) {
+        setAppState(prev => ({ ...prev, effortValue: effort }));
         const previousGetAppState = toolUseContext.getAppState;
         toolUseContext.getAppState = () => ({
           ...previousGetAppState(),
@@ -3535,6 +3537,11 @@ export function REPL({
           }
         }
 
+        // Save previous effort before skill/agent turn overrides it for
+        // UI display. Restored in finally below so the status bar, spinner,
+        // and logo revert to the user's baseline after the turn ends.
+        const prevEffortForUi = effort !== undefined ? store.getState().effortValue : undefined;
+
         await onQueryImpl(
           latestMessages,
           newMessages,
@@ -3555,6 +3562,12 @@ export function REPL({
           // if onQueryImpl throws. onTurnComplete is called separately in
           // onQueryImpl only on successful completion.
           resetLoadingState();
+
+          // Restore effort value after a skill/agent turn overrode it
+          // for UI display (see effort propagation above in onQueryImpl).
+          if (effort !== undefined) {
+            setAppState(prev => ({ ...prev, effortValue: prevEffortForUi }));
+          }
 
           await mrOnTurnComplete(messagesRef.current, abortController.signal.aborted);
 
