@@ -4988,6 +4988,18 @@ export function REPL({
     setFrozenTranscriptState(null);
   }, []);
 
+  // Live-tailing: update frozen state when new messages arrive in transcript mode
+  // so Ctrl+O shows new messages instead of freezing at the open moment.
+  useEffect(() => {
+    if (screen === 'transcript' && frozenTranscriptState) {
+      setFrozenTranscriptState(prev =>
+        prev && (messages.length > prev.messagesLength || streamingToolUses.length > prev.streamingToolUsesLength)
+          ? { messagesLength: messages.length, streamingToolUsesLength: streamingToolUses.length }
+          : prev,
+      );
+    }
+  }, [screen, messages.length, streamingToolUses.length, frozenTranscriptState]);
+
   // Props for GlobalKeybindingHandlers component (rendered inside KeybindingSetup)
   const virtualScrollActive = isFullscreenEnvEnabled() && !disableVirtualScroll;
 
